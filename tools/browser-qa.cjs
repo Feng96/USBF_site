@@ -27,6 +27,7 @@ async function run(){
  page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
  page.on('response',r=>{if(r.url().startsWith(base)&&r.status()>=400)failures.push({url:r.url(),status:r.status()});});
  await page.goto(base,{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.portal?.data.features.length===240);
+ await page.locator('.demo-group').evaluateAll(els=>els.forEach(el=>el.open=true));await page.locator('#layer-footprints').check();
  await page.waitForFunction(()=>portal.map.areTilesLoaded()&&portal.map.queryRenderedFeatures({layers:['demo-fill']}).length>0,null,{timeout:45000});
  assert(await page.evaluate(()=>portal.engine==='MapLibre GL JS'&&maplibregl.getVersion()==='5.6.2'),'MapLibre GL JS is the actual renderer');
  assert(await page.evaluate(()=>portal.map.isSourceLoaded('base-light')),'Reference basemap tiles loaded');
