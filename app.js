@@ -47,7 +47,7 @@
     } else if(kind==='basemap') {
       title='Choose your canvas';
       content='<p>Reference maps give context to the layers you explore.</p>'+Object.keys(basemaps).map(function(k){return '<button class="dialog-option '+(k===activeBasemap?'selected':'')+'" data-basemap="'+k+'">'+icon('map')+'<span><strong>'+basemaps[k].name+'</strong><small>'+basemaps[k].description+'</small></span>'+(k===activeBasemap?'<span class="pill">Active</span>':icon('arrow-right'))+'</button>';}).join('');
-    } else if(kind==='lod2') {
+    } else if(kind==='lod2') {if(window.PortalModels){PortalModels.open();return;}
       title='Roof models, in context';
       content='<p>The map’s <strong>3D demo</strong> extrudes synthetic footprint heights as LoD1 blocks. Actual <strong>LoD2 roof models and point clouds are not connected</strong> to this map yet.</p><p>Your existing research viewer provides interactive roof examples and method comparisons.</p><a class="primary-button" href="https://feng96.github.io/research-daily/lod2/" target="_blank" rel="noopener">Open LoD2 research '+icon('external')+'</a><p style="margin-top:16px">The coverage layer is a synthetic sample boundary, not verified LoD2 availability.</p>';
     } else if(kind==='connections') {
@@ -61,7 +61,7 @@
       content='<p>GIS-style controls, with a simple browser workspace.</p><dl class="help-grid"><dt>Add Data</dt><dd>Choose a public catalog layer, connect a PMTiles/GeoJSON/XYZ URL, or open a local GeoJSON file.</dd><dt>Explore</dt><dd>Drag to pan. Scroll or use + / − to zoom.</dd><dt>Identify</dt><dd>Click a colored demo footprint to inspect its attributes.</dd><dt>Measure</dt><dd>Click two or more positions to measure distance. Escape exits the tool.</dd><dt>Contents</dt><dd>Toggle layers, change opacity, or switch to height coloring.</dd><dt>Attributes</dt><dd>Open the table, select a row and inspect its footprint.</dd><dt>Search</dt><dd>Find Georgetown, the United States, or DEMO-001…DEMO-240.</dd><dt>Export</dt><dd>Download selected or all synthetic features as GeoJSON.</dd><dt>Share</dt><dd>Copy a URL preserving map view, layers and selected building.</dd></dl><p style="margin-top:18px">快捷键：<kbd>/</kbd> 图层搜索；<kbd>Esc</kbd> 退出工具。地图默认指北。</p>';
     } else {
       title='US Buildings · Open workspace';
-      content='<p>An open GIS workspace for <strong>USBF footprints, building heights and LoD2 roof models</strong>.</p><p>Add public building tiles and imagery, or open your own GeoJSON. Synthetic demo layers are optional and clearly labelled. USBF production releases and LoD2 roof models have not yet been connected to this map.</p><p>Created for Yinan Feng.</p><a class="primary-button" href="https://feng96.github.io/research-daily/" target="_blank" rel="noopener">Research updates '+icon('external')+'</a>';
+      content='<p>An open GIS workspace for <strong>building footprints, heights and roof models</strong>.</p><p>VIDA supplies the current working footprint layer. Browse its source attributes, filter records and export the visible map. US experimental roof models and a small set of actual 3DBAG training references are available in Models. USBF production releases will be connected as they are prepared.</p><p>Created for Yinan Feng.</p><a class="primary-button" href="https://feng96.github.io/research-daily/" target="_blank" rel="noopener">Research updates '+icon('external')+'</a>';
     }
     $('#dialog-title').textContent=title;$('#dialog-eyebrow').textContent=eyebrow;$('#dialog-content').innerHTML=content;
     if(!$('#workspace-dialog').open)$('#workspace-dialog').showModal();
@@ -136,7 +136,9 @@
   }
   function clearSelection() {var previous=selected;selected=null;$('#properties').hidden=true;refreshSelection(previous);renderTable();if(map)setTimeout(function(){map.resize();},10);status('Selection cleared');saveView();}
   function renderTable() {
+    if(window.PortalLayers?.layers.size&&window.PortalInventory){PortalInventory.refresh();return;}
     if(!collection)return;
+    $('#attribute-head').innerHTML='<tr><th>Building ID</th><th>Revision</th><th>Demo height (m)</th><th>Demo area (m²)</th><th>Data status</th></tr>';$('#table-layer-name').textContent='Synthetic demo';$('#table-kind').textContent='DEMO';
     var filtered=$('#selected-only').checked?collection.features.filter(function(f){return f.id===selected;}):collection.features;
     $('#table-count').textContent=filtered.length+' records';
     $('#attribute-rows').innerHTML=filtered.length?filtered.map(function(f){var p=f.properties;return '<tr tabindex="0" data-feature="'+f.id+'" class="'+(f.id===selected?'selected':'')+'" aria-selected="'+(f.id===selected)+'"><td>'+f.id+'</td><td>Illustrative '+(p.demo_modified?'modified':'unchanged')+'</td><td>'+p.demo_height_m+'</td><td>'+p.demo_area_m2+'</td><td>Synthetic demo</td></tr>';}).join(''):'<tr><td colspan="5">No selected feature. Click a demo footprint or turn off “Selected only”.</td></tr>';
@@ -160,7 +162,7 @@
   }
   function saveView() {
     if(!mapReady || !collection)return;
-    var c=map.getCenter(),q=new URLSearchParams();if(window.PortalLayers)PortalLayers.writeShare(q);q.set('v',c.lat.toFixed(5)+','+c.lng.toFixed(5)+','+map.getZoom());q.set('base',activeBasemap);
+    var c=map.getCenter(),q=new URLSearchParams();if(window.PortalLayers)PortalLayers.writeShare(q);if(window.PortalModels)PortalModels.writeShare(q);q.set('v',c.lat.toFixed(5)+','+c.lng.toFixed(5)+','+map.getZoom());q.set('base',activeBasemap);
     var layers=['footprints','original','height','lod2'].filter(function(k){return $('#layer-'+k).checked;});q.set('layers',layers.join(','));q.set('opacity',$('#opacity').value);if(selected)q.set('feature',selected);
     q.set('mode',view3d?'3d':'2d');if(view3d){q.set('bearing',map.getBearing().toFixed(1));q.set('pitch',map.getPitch().toFixed(1));}
     try{history.replaceState(null,'','#'+q.toString());}catch(e){/* Standalone file preview may restrict history. */}
@@ -176,12 +178,12 @@
     if(featuresById.has(q.get('feature')))selectFeature(q.get('feature'),false);
   }
   function search() {
-    var query=$('#place-search').value.trim().toLowerCase(),results=[];
+    var query=$('#place-search').value.trim().toLowerCase(),results=[];if(window.PortalInventory){var found=PortalInventory.search(query);if(found.length)return found;}
     if(!query){$('#search-results').hidden=true;return results;}
     if(/george|wash|dc|demo area/.test(query))results.push({label:'Georgetown, Washington, DC',note:'Synthetic demo area',action:'demo'});
     if(/united|usa|conus|america/.test(query))results.push({label:'Continental United States',note:'Reference basemap only',action:'conus'});
     if(collection)collection.features.filter(function(f){return f.id.toLowerCase().includes(query);}).slice(0,7).forEach(function(f){results.push({label:f.id,note:'Synthetic demonstration feature',action:f.id});});
-    $('#search-results').innerHTML=results.length?results.map(function(r){return '<button type="button" data-search-result="'+r.action+'">'+r.label+'<small>'+r.note+'</small></button>';}).join(''):'<p>Search Georgetown, United States, or DEMO-001…240. Live place search is planned.</p>';
+    $('#search-results').innerHTML=results.length?results.map(function(r){return '<button type="button" data-search-result="'+r.action+'">'+r.label+'<small>'+r.note+'</small></button>';}).join(''):'<p>Try an indexed city, longitude/latitude, or a sample model ID.</p>';
     $('#search-results').hidden=false;return results;
   }
   function bookmark(place) {
@@ -193,19 +195,19 @@
   async function action(name) {
     if(name==='close-dialog'){$('#workspace-dialog').close();return;}
     if(name==='layers'){var open=$('#sidebar').classList.toggle('is-open');$('[data-action=layers]').setAttribute('aria-expanded',String(open));return;}
-    if(name==='table'){toggleTable();return;}
+    if(name==='table'){if(window.PortalLayers?.layers.size&&window.PortalInventory)PortalInventory.toggleTable();else toggleTable();return;}
     if(name==='close-welcome'){$('#welcome-card').hidden=true;return;}
     if(name==='export'){exportData();return;}
     if(name==='legend'){var body=$('.legend-body');body.hidden=!body.hidden;$('.legend-title').setAttribute('aria-expanded',String(!body.hidden));return;}
     if(name==='collapse-groups'){var groups=$$('.layer-group'),open=groups.some(function(g){return !g.open;});groups.forEach(function(g){g.open=open;});return;}
     if(!map){toast('The map is not available yet.');return;}
     if(name==='home'&&!(window.PortalLayers&&PortalLayers.fullExtent()))bookmark('demo');
-    if(name==='sample'){$('#layer-footprints').checked=true;syncLayers();$('.demo-group').open=true;selectFeature('DEMO-129',true);}
+    if(name==='sample'){window.PortalModels?.hide();PortalLayers.layers.forEach(l=>{l.visible=false;});PortalLayers.set3D();$('#layer-footprints').checked=true;syncLayers();$('.demo-group').open=true;selectFeature('DEMO-129',true);}
     if(name==='zoom-in')map.zoomIn();
     if(name==='zoom-out')map.zoomOut();
     if(name==='north'){map.resetNorth({duration:reducedMotion?0:250});toast('Map aligned to north.');}
     if(name==='view-2d')setViewMode(false,true);
-    if(name==='view-3d'){setViewMode(true,true);toast('3D demo · synthetic height extrusion (LoD1), not LoD2 roof geometry.');}
+    if(name==='view-3d'){setViewMode(true,true);toast('3D view · only supplied heights or available roof models are shown.');}
     if(name==='clear-selection')clearSelection();
     if(name==='clear-measure')clearMeasure();
     if(name==='retry-basemap'){tileFailures=0;$('#tile-warning').hidden=true;map.getSource('base-'+activeBasemap).setTiles([basemaps[activeBasemap].url]);}
@@ -222,17 +224,17 @@
     if(el.dataset.modal)modal(el.dataset.modal);
     if(el.dataset.tool)setTool(el.dataset.tool);
     if(el.dataset.layerInfo)layerInfo(el.dataset.layerInfo);
-    if(el.dataset.tab){var tab=el.dataset.tab;$$('[data-tab]').forEach(function(b){var isSelected=b.dataset.tab===tab;b.classList.toggle('selected',isSelected);b.setAttribute('aria-selected',String(isSelected));b.tabIndex=isSelected?0:-1;});$('#layers-panel').hidden=tab!=='layers';$('#catalog-panel').hidden=tab!=='catalog';}
+    if(el.dataset.tab){var tab=el.dataset.tab;$$('[data-tab]').forEach(function(b){var isSelected=b.dataset.tab===tab;b.classList.toggle('selected',isSelected);b.setAttribute('aria-selected',String(isSelected));b.tabIndex=isSelected?0:-1;});$('#layers-panel').hidden=tab!=='layers';$('#catalog-panel').hidden=tab!=='catalog';$('#models-panel').hidden=tab!=='models';}
     if(el.dataset.basemap){setBasemap(el.dataset.basemap);$('#workspace-dialog').close();}
     if(el.dataset.bookmark){bookmark(el.dataset.bookmark);$('#workspace-dialog').close();}
     if(el.dataset.feature)selectFeature(el.dataset.feature,true);
-    if(el.dataset.searchResult){if(el.dataset.searchResult.startsWith('DEMO-'))selectFeature(el.dataset.searchResult,true);else bookmark(el.dataset.searchResult);$('#search-results').hidden=true;$('#place-search').value='';}
+    if(el.dataset.searchResult){if(window.PortalInventory?.navigate(el.dataset.searchResult)){$('#search-results').hidden=true;return;}if(el.dataset.searchResult.startsWith('DEMO-'))selectFeature(el.dataset.searchResult,true);else bookmark(el.dataset.searchResult);$('#search-results').hidden=true;$('#place-search').value='';}
   });
   document.addEventListener('keydown',function(e){
     if(e.key==='Escape') {if($('#workspace-dialog').open)$('#workspace-dialog').close();else{setTool('explore');$('#search-results').hidden=true;$('#sidebar').classList.remove('is-open');$('[data-action=layers]').setAttribute('aria-expanded','false');}}
     if(e.key==='/'&&!/input|textarea/i.test(document.activeElement.tagName)&&!$('#workspace-dialog').open){e.preventDefault();$('[data-tab=layers]').click();$('#sidebar').classList.add('is-open');$('[data-action=layers]').setAttribute('aria-expanded','true');$('#layer-filter').focus();}
     if((e.key==='Enter'||e.key===' ')&&e.target.matches('[data-feature]')){e.preventDefault();selectFeature(e.target.dataset.feature,true);}
-    if((e.key==='ArrowLeft'||e.key==='ArrowRight')&&e.target.matches('[data-tab]')){e.preventDefault();var next=e.target.dataset.tab==='layers'?'catalog':'layers';$('[data-tab='+next+']').click();$('[data-tab='+next+']').focus();}
+    if((e.key==='ArrowLeft'||e.key==='ArrowRight')&&e.target.matches('[data-tab]')){e.preventDefault();var tabs=['layers','catalog','models'],next=tabs[(tabs.indexOf(e.target.dataset.tab)+(e.key==='ArrowRight'?1:2))%3];$('[data-tab='+next+']').click();$('[data-tab='+next+']').focus();}
   });
   $('#workspace-dialog').addEventListener('click',function(e){if(e.target===$('#workspace-dialog')){var r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.target.close();}});
   $('#layer-filter').addEventListener('input',function(){var q=this.value.toLowerCase(),visible=0;$$('.layer-row').forEach(function(row){row.hidden=!row.textContent.toLowerCase().includes(q);if(!row.hidden){visible++;if(row.closest('details'))row.closest('details').open=true;}});$('.layer-empty').hidden=visible>0;});
@@ -257,9 +259,9 @@
     $('#mode-2d').setAttribute('aria-pressed',String(!three));$('#mode-3d').setAttribute('aria-pressed',String(three));
     if(three){map.dragRotate.enable();map.touchZoomRotate.enableRotation();}
     else{map.dragRotate.disable();map.touchZoomRotate.disableRotation();}
-    if(mapReady)syncLayers();
+    if(mapReady)syncLayers();if(window.PortalLayers)PortalLayers.set3D();
     if(animate)map.easeTo({pitch:three?55:0,bearing:three?-20:0,duration:reducedMotion?0:500});
-    $('#tool-hint').textContent=three?'Synthetic height extrusion (LoD1) · Right-drag to rotate · Click to inspect':'Drag to explore · Scroll to zoom · Click a building to inspect';
+    $('#tool-hint').textContent=three?'3D camera · Right-drag to rotate · Supplied heights and roof models only':'Drag to explore · Scroll to zoom · Click a building to inspect';
     saveView();
   }
   function addDataLayers() {
@@ -283,7 +285,7 @@
     var sources={},baseLayers=[{id:'background',type:'background',paint:{'background-color':'#e9ede4'}}];
     Object.keys(basemaps).forEach(function(k){var b=basemaps[k];sources['base-'+k]={type:'raster',tiles:[b.url],tileSize:256,maxzoom:b.maxZoom,attribution:b.attribution};baseLayers.push({id:'base-'+k,type:'raster',source:'base-'+k,layout:{visibility:k==='light'?'visible':'none'},paint:{'raster-fade-duration':0}});});
     maplibregl.setWorkerCount(2);
-    map=new maplibregl.Map({container:'map',style:{version:8,sources:sources,layers:baseLayers},center:[-77.0644,38.9092],zoom:15,minZoom:2,maxZoom:20,maxPitch:60,attributionControl:false,renderWorldCopies:false,canvasContextAttributes:{antialias:true}});
+    map=new maplibregl.Map({container:'map',style:{version:8,sources:sources,layers:baseLayers},center:[-98.5,39.5],zoom:4,minZoom:2,maxZoom:20,maxPitch:60,attributionControl:false,renderWorldCopies:false,canvasContextAttributes:{antialias:true}});
     map.addControl(new maplibregl.AttributionControl({compact:true}),'bottom-right');
     map.addControl(new maplibregl.ScaleControl({maxWidth:80,unit:'metric'}),'bottom-left');
     map.dragRotate.disable();map.touchZoomRotate.disableRotation();
@@ -306,12 +308,14 @@
       else{map.getCanvas().style.cursor=tool==='identify'?'crosshair':'';hoverPopup.remove();}
     });
     map.on('mouseout',function(){hoverPopup.remove();});
-    map.on('click',function(e){if(tool==='measure'){hoverPopup.remove();addMeasure(e.lngLat);return;}var hits=map.queryRenderedFeatures(e.point,{layers:[view3d?'demo-extrusion':'demo-fill']});if(window.PortalLayers&&PortalLayers.identify(e))return;if(hits.length)selectFeature(hits[0].properties.building_id,false);});
+    map.on('click',function(e){if(tool==='measure'){hoverPopup.remove();addMeasure(e.lngLat);return;}var hits=map.queryRenderedFeatures(e.point,{layers:[view3d?'demo-extrusion':'demo-fill']});if(window.PortalModels?.identify(e))return;if(window.PortalLayers&&PortalLayers.identify(e))return;if(hits.length)selectFeature(hits[0].properties.building_id,false);});
     $('#feature-count').textContent=collection.features.length;renderTable();saveView();
     $('#zoom-label').textContent='Zoom '+map.getZoom().toFixed(1);
     window.portal={engine:'MapLibre GL JS',get map(){return map;},get data(){return collection;},get selected(){return selected;},get view3d(){return view3d;},selectFeature:selectFeature};
-    window.portal.clearSelection=clearSelection;window.portal.saveView=saveView;
+    window.portal.clearSelection=clearSelection;window.portal.saveView=saveView;window.portal.setViewMode=setViewMode;window.portal.setBasemap=setBasemap;window.portal.initialHash=initialHash;
     if(window.PortalLayers)await PortalLayers.init(window.portal,initialHash);
+    window.PortalInventory?.init(window.portal);window.portal.ready=true;document.dispatchEvent(new CustomEvent('portal-ready'));
+    if(!initialHash&&!new URLSearchParams(location.search).has('empty')){PortalLayers.add(PortalLayers.catalog[0],{restore:true});}
     new ResizeObserver(function(){map.resize();}).observe($('#map-column'));
   }
   init().catch(function(e){$('#map-failure').hidden=false;status('Workspace could not initialize');console.error(e);});

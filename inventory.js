@@ -1,0 +1,58 @@
+(function(){
+'use strict';const $=s=>document.querySelector(s);const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const places=[['United States',-98.5,39.5,4],['Washington, DC',-77.071,38.912,16],['New York',-73.985,40.748,15],['Los Angeles',-118.244,34.052,15],['Chicago',-87.63,41.88,15],['Knoxville',-83.9207,35.9606,15],['Denver',-104.99,39.74,15],['Boston',-71.06,42.36,15],['Seattle',-122.335,47.608,15],['San Francisco',-122.419,37.775,15],['Austin',-97.743,30.267,15],['Miami',-80.192,25.762,15]];
+let api,map,rows=[],filtered=[],page=0,timer,lastLayer=null;const size=50;
+const number=v=>v===null||v===undefined||v===''?null:Number.isFinite(Number(v))?Number(v):null;
+const format=v=>v===null?'—':Number(v).toLocaleString('en-US',{maximumFractionDigits:1});
+function key(f){const p=f.properties||{};return p.usbf_id?String(p.usbf_id):p.geohash?[p.country_iso,p.geohash,p.bf_source,p.area_in_meters].join('|'):f.id!==undefined?String(f.id):JSON.stringify([p,f.geometry]);}
+function source(f){return f.properties?.bf_source??f.properties?.source??'Not provided';}
+function height(f,l){return l?.heightField?number(f.properties?.[l.heightField]):null;}
+function area(f){return number(f.properties?.area_in_meters??f.properties?.area_m2);}
+function records(l){if(!map||!l||!l.visible||l.cfg.type==='raster')return [];const layer=l.id+(api.view3d&&l.heightField?'-fill-extrusion':'-fill');const ids=[layer,l.id+'-circle',l.id+'-line'].filter(x=>map.getLayer(x));const found=map.queryRenderedFeatures({layers:ids}),seen=new Set(),out=[];for(const f of found){const k=key(f);if(seen.has(k))continue;seen.add(k);out.push(f);if(out.length>=20000)break;}return out;}
+function refresh(){
+ if(!map)return;const l=PortalLayers.active;$('#inventory-controls').hidden=!l;
+ const choices=Array.from(PortalLayers.layers.values()).filter(x=>x.cfg.type!=='raster');$('#inventory-layer').innerHTML=choices.map(x=>'<option value="'+x.id+'" '+(x.id===l?.id?'selected':'')+'>'+esc(x.cfg.name)+'</option>').join('');
+ if(!l){rows=[];if(!$('#attribute-table').hidden)render();return;}
+ if(lastLayer!==l.id){lastLayer=l.id;page=0;$('#table-search').value='';}
+ rows=records(l);$('#visible-records').textContent=rows.length.toLocaleString()+(rows.length===20000?'+':'');$('#height-records').textContent=rows.filter(f=>height(f,l)!==null).length.toLocaleString();
+ $('#inventory-scope').textContent=l.cfg.type==='pmtiles'?'Loaded tile records · geometries may be simplified':'Features visible in this map view';
+ $('#inventory-color').value=l.colorMode;$('#inventory-color').querySelector('[value=height]').disabled=!l.heightField;$('#inventory-color').querySelector('[value=source]').disabled=!l.fields?.some(f=>['bf_source','source'].includes(f));
+ const pool=map.getSource(l.id)?map.querySourceFeatures(l.id,l.cfg.sourceLayer?{sourceLayer:l.cfg.sourceLayer}:{}):[];l.sourceValues=Array.from(new Set([...(l.sourceValues||[]),...pool.slice(0,20000).map(source).filter(x=>x!=='Not provided')])).sort();
+ $('#inventory-source').innerHTML='<option value="">All sources</option>'+l.sourceValues.map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join('');$('#inventory-source').value=l.sourceFilter;$('#inventory-source').disabled=!l.sourceValues.length;
+ $('#inventory-area').value=l.minArea;$('#inventory-area').disabled=!l.fields?.includes('area_in_meters');
+ $('#inventory-height-note').textContent=l.heightField?'3D uses the supplied '+l.heightField+' field in metres. Missing heights stay missing.':'This source does not supply building height. 3D tilts the map; no height is invented.';
+ if(!$('#attribute-table').hidden)render();
+}
+function schedule(){clearTimeout(timer);timer=setTimeout(refresh,150);}
+function render(){
+ const l=PortalLayers.active;if(!l){$('#attribute-rows').innerHTML='<tr><td>No active data layer.</td></tr>';return;}
+ const query=$('#table-search').value.trim().toLowerCase(),selection=PortalLayers.selection;
+ filtered=rows.filter(f=>(!$('#selected-only').checked||(selection?.layer===l.id&&key(selection.feature)===key(f)))&&(!query||JSON.stringify(f.properties).toLowerCase().includes(query)));
+ const sort=$('#table-sort').value;if(sort==='area-desc')filtered.sort((a,b)=>(area(b)??-Infinity)-(area(a)??-Infinity));else if(sort==='height-desc')filtered.sort((a,b)=>(height(b,l)??-Infinity)-(height(a,l)??-Infinity));else filtered.sort((a,b)=>String(source(a)).localeCompare(String(source(b))));
+ page=Math.min(page,Math.max(0,Math.ceil(filtered.length/size)-1));const p=page*size;
+ $('#table-layer-name').textContent=l.cfg.name;$('#table-kind').textContent=l.cfg.type==='pmtiles'?'TILE VIEW':'IN VIEW';$('#table-count').textContent=filtered.length.toLocaleString()+' visible records';$('#table-scope-note').textContent=l.cfg.type==='pmtiles'?'Clipped / simplified tiles · not full dataset':'Map view · source attributes';
+ $('#attribute-head').innerHTML='<tr><th>Record / ID</th><th>Footprint source</th><th>Area · m²</th><th>Height · m</th><th>Country</th></tr>';
+ $('#attribute-rows').innerHTML=filtered.slice(p,p+size).map((f,i)=>{const v=f.properties||{};return '<tr tabindex="0" data-table-record="'+(p+i)+'" class="'+(selection&&selection.layer===l.id&&key(selection.feature)===key(f)?'selected':'')+'"><td>'+esc(v.usbf_id??v.building_id??v.id??v.geohash??f.id??('Record '+(p+i+1)))+'</td><td>'+esc(source(f))+'</td><td>'+format(area(f))+'</td><td>'+format(height(f,l))+'</td><td>'+esc(v.country_iso??'—')+'</td></tr>';}).join('')||'<tr><td colspan="5">No matching visible records. Zoom in or adjust the filters.</td></tr>';
+ $('#table-page').textContent=(filtered.length?p+1:0)+'–'+Math.min(p+size,filtered.length)+' of '+filtered.length.toLocaleString();$('#table-prev').disabled=page===0;$('#table-next').disabled=p+size>=filtered.length;
+}
+function toggleTable(){const t=$('#attribute-table');t.hidden=!t.hidden;$('#table-toggle').setAttribute('aria-expanded',String(!t.hidden));$('#table-toggle').classList.toggle('active',!t.hidden);refresh();setTimeout(()=>map.resize(),10);}
+function saveFile(name,data,type){const url=URL.createObjectURL(new Blob([data],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function exportDialog(){const l=PortalLayers.active;if(!l){PortalLayers.open();return;}refresh();render();$('#export-scope-note').textContent=l.cfg.type==='pmtiles'?'Exports contain the currently loaded, filtered tile fragments. For complete original building geometries, use the source download.':'Exports contain visible, filtered features. The original GeoJSON remains available from the layer details.';const a=$('#export-source-link');a.href=l.cfg.page||l.cfg.url||'#';a.hidden=!l.cfg.page&&!l.cfg.url;$('#inventory-export-dialog').showModal();}
+function exportTable(type){const l=PortalLayers.active;if(!l)return;refresh();render();const scope=l.cfg.type==='pmtiles'?'visible-tile-fragments':'visible-features';
+ if(type==='geojson'){saveFile(scope+'.geojson',JSON.stringify({type:'FeatureCollection',name:l.cfg.name,scope:l.cfg.type==='pmtiles'?'Visible simplified/clipped tile fragments; not complete building geometries':'Visible source features',features:filtered.map(f=>({type:'Feature',properties:f.properties,geometry:f.geometry,...(f.id===undefined?{}:{id:f.id})}))}),'application/geo+json');}
+ else{const fields=Array.from(new Set(filtered.flatMap(f=>Object.keys(f.properties||{}))));const cell=x=>{let s=x===null||x===undefined?'':typeof x==='object'?JSON.stringify(x):String(x);if(typeof x==='string'&&/^[=+@\-]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';};saveFile(scope+'.csv',[fields.map(cell).join(','),...filtered.map(f=>fields.map(k=>cell(f.properties?.[k])).join(','))].join('\r\n'),'text/csv;charset=utf-8');}
+}
+function search(query){if(!query)return [];let result=places.map((p,i)=>({label:p[0],note:'Indexed place · jump to map',action:'place-'+i})).filter(x=>x.label.toLowerCase().includes(query));
+ const coords=query.split(/[,\s]+/).map(Number);if(coords.length===2&&coords.every(Number.isFinite)&&Math.abs(coords[0])<=180&&Math.abs(coords[1])<=85)result.unshift({label:coords.join(', '),note:'Longitude, latitude',action:'coords:'+coords.join(',')});
+ if(window.PortalModels?.manifest)for(const m of PortalModels.manifest.models)if((m.id+' '+m.label+' '+m.city).toLowerCase().includes(query))result.push({label:m.label+' · '+m.city,note:m.kind,action:'model:'+m.id});
+ result=result.slice(0,8);if(result.length){$('#search-results').innerHTML=result.map(x=>'<button type="button" data-search-result="'+esc(x.action)+'">'+esc(x.label)+'<small>'+esc(x.note)+'</small></button>').join('');$('#search-results').hidden=false;}return result;}
+function navigate(action){if(action.startsWith('model:')){PortalModels.open(action.slice(6));return true;}if(action.startsWith('coords:')){window.PortalModels?.hide();const c=action.slice(7).split(',').map(Number);map.jumpTo({center:c,zoom:16,pitch:0});$('#map-place-name').textContent='Custom location';return true;}if(!action.startsWith('place-'))return false;const p=places[Number(action.slice(6))];if(!p)return false;window.PortalModels?.hide();api.setViewMode(false,false);map.jumpTo({center:p.slice(1,3),zoom:p[3],pitch:0,bearing:0});$('#map-place-name').textContent=p[0];$('#welcome-card').hidden=true;return true;}
+function selectRow(i){const f=filtered[i],l=PortalLayers.active;if(f&&l)PortalLayers.inspect(l,f);render();}
+function init(portal){api=portal;map=api.map;map.on('moveend',schedule);map.on('idle',schedule);['portal-layers-changed','portal-selection-changed','portal-style-changed'].forEach(e=>document.addEventListener(e,schedule));
+ $('#inventory-layer').onchange=e=>PortalLayers.selectLayer(e.target.value);$('#inventory-color').onchange=e=>PortalLayers.setStyle(PortalLayers.active.id,{colorMode:e.target.value});$('#inventory-source').onchange=e=>PortalLayers.setStyle(PortalLayers.active.id,{sourceFilter:e.target.value});$('#inventory-area').onchange=e=>{const n=Number(e.target.value);PortalLayers.setStyle(PortalLayers.active.id,{minArea:Number.isFinite(n)?Math.max(0,n):0});};$('#reset-filters').onclick=()=>{if(PortalLayers.active)PortalLayers.setStyle(PortalLayers.active.id,{colorMode:'uniform',sourceFilter:'',minArea:0});};
+ $('#table-search').oninput=()=>{page=0;render();};$('#table-sort').onchange=()=>{page=0;render();};$('#table-prev').onclick=()=>{page--;render();};$('#table-next').onclick=()=>{page++;render();};$('#selected-only').addEventListener('change',render);$('#close-inventory-export').onclick=()=>$('#inventory-export-dialog').close();
+ document.addEventListener('click',e=>{const b=e.target.closest('[data-table-record],[data-export-table],[data-place]');if(!b)return;if(b.dataset.tableRecord!==undefined)selectRow(Number(b.dataset.tableRecord));if(b.dataset.exportTable)exportTable(b.dataset.exportTable);if(b.dataset.place){const i=places.findIndex(p=>p[0]===b.dataset.place);if(i>=0)navigate('place-'+i);}});
+ document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('[data-table-record]')){e.preventDefault();selectRow(Number(e.target.dataset.tableRecord));}});refresh();
+}
+window.PortalInventory={init,refresh:schedule,toggleTable,exportDialog,search,navigate,get rows(){return rows;},get filtered(){return filtered;}};
+})();
