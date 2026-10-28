@@ -6,7 +6,13 @@ A map for the published USBF U.S. building inventory, comparison datasets and
 research roof models. Search a place, inspect buildings, summarize an area and
 save a map or data. Advanced controls stay in the tools and layer menus.
 
-## Workspace 1.3
+## Workspace 1.4
+
+- USBF uses its own PMTiles display publication for map navigation. Opening the
+  map, zooming, panning, and saving a map image do not read building GeoParquet.
+  Statistics, spatial tools, charts, original-data downloads and LoD1 creation
+  load original records only when requested, for the captured map area, study
+  boundary or selected building. Repeated requests reuse bounded source caches.
 
 - A compact header and toolbar. Statistics, spatial tools, charts, drawing,
   coordinate settings and map styling open from **Tools**. Layer opacity,
@@ -86,7 +92,8 @@ The display and analysis paths have different contracts:
 | Input | Map display | Statistics and spatial analysis |
 |---|---|---|
 | Full imported vector | Browser GeoJSON tiles | Frozen complete source geometry, or whole features intersecting a chosen extent |
-| Live USBF / GBA / government batch | Current neighborhood | Frozen actual loaded records, with bounds, timestamp, release, filters and any limit preserved |
+| USBF with its analytical source | Versioned PMTiles with renderer tile caching | Explicit tools request original GeoParquet records for a fixed area or selected ID; scope, release, limits and rights are frozen |
+| GBA / government batch | Current neighborhood | Frozen actual loaded records, with bounds, timestamp, release, filters and any limit preserved |
 | PMTiles / MVT | Fast, clipped/simplified tiles | Explicit field preview only; fragment observations are not unique building totals; geometry analysis and original-data exports are blocked |
 | Raster tiles / raster image preview | Georeferenced display | Excluded from vector analysis; GeoTIFF details expose clearly labelled preview sample summaries rather than claiming full-resolution pixel statistics |
 
@@ -104,10 +111,13 @@ are recovered for full-geometry layers before selection or export; use **Downloa
 geometry exports. Overlapping datasets are not automatically reconciled into a
 single building inventory.
 
-A future USBF PMTiles publication can use this display path while the existing
-GeoParquet reader supplies bounded analytical batches. Source version, stable
-record identifiers, query scope and data licenses must remain associated; a
-rendered tile alone is never an analytical original.
+The USBF display archive contains stable `usbf_id`, source `cx`/`cy`, available
+height, footprint source and component terms. A selected tile can request its
+complete original building by ID and its published ownership coordinates. The
+attribute table remains a clearly labelled tile preview, including after an
+analytical source batch has been cached. Original-building cards and downloads
+use only actual source records. Display and analytical release dates are kept
+separately when the source publication advances before a new display archive.
 
 ## Working with data
 
@@ -167,25 +177,29 @@ restore up to 64 text labels per layer and 128 across a saved map.
   16-million-pixel layout limit. Model/viewport availability and network limits
   remain visible rather than being replaced with synthetic data.
 
-## Live USBF and automatic updates (0.6)
+## Live USBF and automatic updates
 
 The dataset entry is [opengeos/us-buildings](https://source.coop/opengeos/us-buildings).
-The reader follows the stable `USBF_v1/manifest.json` URL at Source Cooperative;
-no publication manifest or tile list is copied into this repository.
+The viewer follows `USBF_display/manifest.json` for the display archive and
+`USBF_v1/manifest.json` for original analytical records. Neither national index
+nor source tile list is bundled in this repository.
 
-- Opening USBF fetches the current manifest with browser caching disabled and a
-  fresh check URL. The manifest's tile bounds, filenames, sizes, checksums,
-  publication date and counts drive the viewer.
+- Opening USBF fetches the small display manifest and the requested PMTiles
+  ranges. Map navigation uses MapLibre's tile cache and never starts a source
+  GeoParquet worker. Original-data metadata is requested when a data tool needs it.
 - A visible layer in a visible browser tab checks every five minutes. Returning
   to a foreground tab checks again if the last check was over 30 seconds ago.
   Hidden layers and background tabs pause automatic checks.
-- **Check updates** checks immediately and reloads the current neighborhood.
-  A changed manifest automatically refreshes the view and coverage grid while
-  retaining the camera, layer styles and opacity.
-- Data URLs include each tile's current SHA256 as a cache version. File-length
+- **Refresh data** checks the display publication immediately. A changed archive
+  updates the map source while retaining camera, styles and opacity. Existing
+  analytical results retain the original release and area used by that calculation.
+- Data URLs include each file's current SHA256 as a cache version. File-length
   and exposed ETag changes during a range read reject mixed publication bytes.
   SHA256 is a cache version, not a whole-file integrity verification: the viewer
-  reads only selected byte ranges.
+  reads only selected byte ranges. The persistent analytical worker caches up to
+  64 MiB of ranges with their ETags. The source layer retains at most three
+  analytical batches within a 24 MiB serialized-memory estimate. Selection-only
+  batches cannot answer area queries; truncated batches cannot cover a new area.
 - A failed update check retains the last successfully loaded view, displays its
   original publication date and shows an explicit warning. It does not label
   old data as the new release.
@@ -193,27 +207,32 @@ no publication manifest or tile list is copied into this repository.
 Shared USBF links follow the current publication; they do not freeze a data
 snapshot. Record the publication date and selected tile checksums for citations.
 
-Future data updates need **no website push** when publication keeps the same
-manifest URL and layout. Publish accepted tile files first, update each file's
-size/checksum and the inventory counts, and publish the manifest last. New tile
-names are discovered automatically. A different endpoint or incompatible schema
-needs a viewer adapter change. The viewer does not alter the publication
-pipeline, running production, source objects or scientific outputs.
+Future data updates need **no website push** when these publication URLs and
+schemas stay compatible. Publish accepted original files and their index first;
+publish an immutable display archive and update the display pointer after its
+verification. A new source publication does not automatically rebuild PMTiles.
+An older displayed release is recorded separately from newer analytical data.
+The website reader never modifies scientific outputs or source publication files.
 
-At national zoom the map shows a labelled **publication grid**, not building
-polygons or proof of completed refinement. At zoom 14+ it loads buildings whose
-published `cx`/`cy` ownership coordinates lie in the map extent plus a 0.002-degree
-buffer. Full polygons are retained; this is an ownership-view selection, not an
-exhaustive intersection query for very large buildings centered outside that
-buffer. Actual per-file bounds select candidate files, including grid-edge
-footprints. Requests are capped at nine files, 32 MiB of ranges and 12,000
-features; zoom in if a view exceeds those limits.
+Buildings appear at the display archive's declared zoom levels. Below that,
+search for a place or zoom into a city. When no display archive is available,
+the publication grid and an explicit **Load original buildings for this area**
+action remain available; panning still does not fetch source data.
+
+An analytical request selects original records whose published `cx`/`cy` lie in
+the fixed requested bounds plus a 0.002-degree buffer. Full polygons are retained.
+This is an ownership-view selection, not an exhaustive intersection query for
+very large buildings centered outside that buffer. Actual per-file bounds select
+candidate files, including grid-edge footprints. Requests are capped at nine
+files, 32 MiB of ranges and 12,000 records; use a smaller area when needed.
+Cancelling a tool or opening another map rejects pending metadata and data reads
+immediately. Late responses cannot update the replacement project.
 
 The worker reads the core identity, source, state, inherited height, edit,
 coverage, snapshot and component-license fields. It does not download the large
-`original_geometry` column or all production diagnostic columns on every pan;
-the full published schema and source downloads remain linked. Table records,
-identification and exports recover full loaded source features by `usbf_id`,
+`original_geometry` column or every production diagnostic column; the full
+published schema and source downloads remain linked. Original-data actions
+recover full source features by `usbf_id`,
 retaining original nulls. `modified = null` remains unknown, separately from
 `false`; the recorded-change color style uses a distinct unknown color.
 `height_m` accepts positive source `height` values only. Those heights are
@@ -237,7 +256,7 @@ A local HTTP server is required for ES modules and browser file APIs.
 - `local-models.js`: user-supplied OBJ/GLB placement and shared-WebGL rendering.
 - `model-asset-guard.js`: GLB structural and memory checks before parsing.
 - `model-browser.js`: verified experimental and training model collections.
-- `usbf-source.js` / `usbf-worker.js`: live publication and bounded source reads.
+- `usbf-source.js` / `usbf-analysis-worker.js`: display publication, explicit bounded original reads and separate caches. `usbf-worker.js` is retained for old cached viewer versions.
 
 Run the source-contract checks:
 
@@ -254,6 +273,10 @@ node tools/outputs-models-qa.cjs
 node tools/geoparquet-import-qa.cjs
 node tools/legend-qa.cjs
 node tools/model-asset-guard-qa.cjs
+node tools/usbf-lazy-qa.cjs
+node tools/usbf-lazy-worker-qa.cjs
+node tools/lazy-analysis-qa.cjs
+node tools/lazy-browsing-qa.cjs
 ```
 
 Use Node 22 or newer for the complete suite. GeoParquet parser checks use tiny

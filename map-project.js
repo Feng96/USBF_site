@@ -67,7 +67,7 @@
   }
   async function restore(prepared){
     const {project:p,files}=prepared,oldRows=Array.from(PortalLayers.layers.values()),oldIDs=new Set(oldRows.map(l=>l.id)),previous={view:state(),active:PortalLayers.active?.id,place:$('#map-place-name').textContent,name:$('#workspace-document').textContent,research:currentResearch()},added=new Map(),token=++serial;
-    document.querySelectorAll('dialog[open]').forEach(d=>{if(d.id!=='map-project-dialog')d.close();});portal.cancelPlaceSearch?.();root.PortalLoD1?.cancel?.({clear:true});root.PortalLocalModels?.cancelPending?.();root.PortalImport?.cancelPending?.();root.PortalLayers.invalidatePending?.();await root.PortalAnalysis?.cancel({clear:true});root.PortalDraw?.cancel();root.PortalExplorer?.clearLocation();portal.clearSelection();PortalLayers.clearExternalSelection();root.PortalModels?.hide();
+    document.querySelectorAll('dialog[open]').forEach(d=>{if(d.id!=='map-project-dialog')d.close();});portal.cancelPlaceSearch?.();root.PortalLoD1?.cancel?.({clear:true});root.PortalLocalModels?.cancelPending?.();root.PortalImport?.cancelPending?.();root.PortalLayers.invalidatePending?.();for(const l of oldRows)l.cancelAnalysis?.();await root.PortalAnalysis?.cancel({clear:true});root.PortalDraw?.cancel();root.PortalExplorer?.clearLocation();portal.clearSelection();PortalLayers.clearExternalSelection();root.PortalModels?.hide();
     try{
       setView(p.view);
       for(const e of p.layers){setMessage('Opening '+e.name+'…');let l;try{l=await addEntry(e,files,token);}catch(error){error.restoreImportType=e.kind==='raster'?e.import.type:null;error.restoreLayer=e.name;throw error;}added.set(e.key,l);root.PortalDraw?.restoreLayerLabels?.(l);}

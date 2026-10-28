@@ -12,13 +12,15 @@
   try{const stored=JSON.parse(localStorage.getItem(storage)||'{}');if(stored&&typeof stored==='object'&&!Array.isArray(stored))preferences=stored;}catch(e){}
   function remember(){try{preferences={...preferences,chartOptions:{...preferences.chartOptions,[$('chart-kind').value]:{field:$('chart-field').value,y:$('chart-y').value,group:$('chart-group').value}},scope:$('scope').value,numeric:$('numeric-field').value,category:$('group-field').value,chartKind:$('chart-kind').value,chartField:$('chart-field').value,chartY:$('chart-y').value,chartGroup:$('chart-group').value,operation:$('operation').value,distance:$('distance').value};localStorage.setItem(storage,JSON.stringify(preferences));}catch(e){}}
   function identity(object){if(!object||typeof object!=='object')return null;if(!objects.has(object))objects.set(object,++objectSequence);return objects.get(object);}
+  function selectedKey(selection){const id=selection?.feature?.properties?.usbf_id;return [selection?.layer,id!==null&&id!==undefined&&String(id).trim()!==''?String(id):identity(selection?.feature)];}
   function layer(){return root.PortalLayers?.layers.get($('layer')?.value);}
   function studyLayer(){return root.PortalLayers?.layers.get($('study-area')?.value);}
-  function available(){const l=layer(),c=A().capabilities(l);return !!(c.supported&&(!c.attributePreview||$('tile-optin').checked)&&!(l.cfg.type==='viewport'&&(l.viewLoading||!l.loaded||l.error))&&($('scope').value!=='study-area'||A().isBuildingLayer(l)&&studyLayer()));}
+  function available(){const l=layer(),c=A().capabilities(l);return !!(c.supported&&(!c.attributePreview||$('tile-optin').checked)&&!(c.kind!=='on-demand'&&l.cfg.type==='viewport'&&(l.viewLoading||!l.loaded||l.error))&&($('scope').value!=='study-area'||A().isBuildingLayer(l)&&studyLayer()));}
   function bounds(){const b=root.portal?.map.getBounds();return b?[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()]:null;}
   function inputBinding(){
     const l=layer();if(!l)return '';
     const scope=$('scope').value,selected=root.PortalLayers.selection,area=scope==='study-area'?studyLayer():null;
+    if(A().capabilities(l).kind==='on-demand')return JSON.stringify([l.id,identity(l),l.sourceFilter||'',l.cfg.fixedSource||'',l.minArea||0,scope,['view','layer'].includes(scope)?bounds():null,scope==='selection'?selectedKey(selected):null,area?[area.id,identity(area.data),area.data?.features.length]:null]);
     return JSON.stringify([l.id,identity(l.data),l.data?.features.length,l.sourceFilter||'',l.cfg.fixedSource||'',l.minArea||0,l.viewLoadedAt,l.release?[l.release.name,l.release.updated,l.release.tiles,l.release.buildings]:null,l.viewLoading,scope,scope==='view'||l.cfg.type==='viewport'?bounds():null,scope==='selection'?[selected?.layer,identity(selected?.feature)]:null,area?[area.id,identity(area.data),area.data?.features.length]:null,$('tile-optin').checked]);
   }
   function fieldLabel(key){
@@ -32,6 +34,7 @@
   function sourceNote(l,c){
     if(!l)return 'Choose a dataset, or add a file to the map.';
     if(!c.supported)return 'This layer is an image. Choose building footprints or another vector layer for these tools.';
+    if(c.kind==='on-demand')return 'Original buildings are loaded for your chosen area when you run a tool. Results keep the area you requested.';
     if(c.attributePreview)return 'This map uses display tiles. Open the original outlines for building counts, areas and spatial analysis.';
     if(l.cfg.type==='viewport'&&l.viewLoading)return 'Buildings are loading for this area.';
     if(l.cfg.type==='viewport'&&l.error)return 'Buildings could not be loaded here. Return to the map and try another area.';
@@ -40,11 +43,11 @@
   }
   function scopeLabel(p){
     if(p.fragmentCount!==undefined)return 'Display samples from the current map';
-    if(p.studyArea)return p.studyArea.name+(p.sourceType==='viewport'?' · loaded neighborhood':'');
+    if(p.studyArea)return p.studyArea.name+(p.sourceType==='viewport'?' · available original records':'');
     if(p.operation)return 'Study-area result';
     if(p.requestedScope==='selection'||p.scope==='selection')return 'Selected feature';
     if(p.scope==='whole-layer')return 'Whole dataset';
-    if(p.scope==='view-intersection'||p.requestedView)return 'Current map area';
+    if(p.scope==='view-intersection'||p.requestedView)return 'Captured map area';
     return 'Loaded neighborhood';
   }
   function featureWord(s=snapshot){return s?.provenance.featureRole==='buildings'?'buildings':'features';}
@@ -83,10 +86,10 @@
     if(busy)return activeJob;
     controller=new AbortController();const own=controller,token=++generation;
     jobs.set(own.signal,{generation:token,snapshot,binding});setBusy(true);lastError='';message('Calculating…');
-    activeJob=(async()=>{try{await task(own.signal);if(token===generation&&!own.signal.aborted)message('');}catch(e){if(token===generation){lastError=e.message||String(e);message(friendlyError(e),e.name!=='AbortError');}}finally{if(controller===own){controller=null;setBusy(false);maybeAuto();}}})();
+    activeJob=(async()=>{try{await task(own.signal);if(token===generation&&!own.signal.aborted)message('');}catch(e){own.abort();if(token===generation){lastError=e.message||String(e);message(friendlyError(e),e.name!=='AbortError');}}finally{if(controller===own){controller=null;setBusy(false);maybeAuto();}}})();
     return activeJob;
   }
-  function progress(done,total){message('Calculating… '+Math.round(done/Math.max(total,1)*100)+'%');}
+  function progress(done,total){if(Number.isFinite(done)&&Number.isFinite(total)&&total>0)message('Calculating… '+Math.round(done/total*100)+'%');}
   function clearProducts(){summary=null;lastStats=null;lastChart=null;lastResult=null;$('overview').innerHTML='';$('stats-result').innerHTML='';$('geometry-result').innerHTML='';$('chart-result').innerHTML='';$('spatial-result').innerHTML='';}
   function clearSnapshot(){invalidate();snapshot=null;binding=null;clearProducts();$('snapshot').hidden=true;$('changed').hidden=true;updateButtons();}
   function fieldsForSource(){
@@ -131,8 +134,8 @@
   function updateScope(){
     if(!dialog||busy)return;
     const l=layer(),c=A().capabilities(l),tiles=c.kind==='tile-preview',previous=$('scope').value||preferences.scope||'view';
-    $('source-note').textContent=sourceNote(l,c);$('tile-preview').hidden=!tiles;$('original-data').hidden=!(tiles||!l||!c.supported);$('return-map').hidden=!(lastError||l?.cfg.type==='viewport'&&!l.loaded);
-    const choices=tiles?[['tile-preview','Map display samples']]:c.wholeLayer?[['view','Current map area'],['layer','Whole dataset'],['selection','Selected feature']]:[['view','Current map area'],['layer','Loaded neighborhood'],['selection','Selected feature']];
+    $('source-note').textContent=sourceNote(l,c);$('tile-preview').hidden=!tiles;$('original-data').hidden=!(tiles||!l||!c.supported);$('return-map').hidden=!(lastError||c.kind!=='on-demand'&&l?.cfg.type==='viewport'&&!l.loaded);
+    const choices=tiles?[['tile-preview','Map display samples']]:c.wholeLayer?[['view','Current map area'],['layer','Whole dataset'],['selection','Selected feature']]:[['view','Current map area'],['layer',c.kind==='on-demand'?'Available records in this map area':'Loaded neighborhood'],['selection','Selected feature']];
     if(!tiles&&A().isBuildingLayer(l)&&$('study-area').options.length)choices.push(['study-area','Drawn or saved study area']);
     fillSelect('scope',choices,previous);
     $('study-wrap').hidden=$('scope').value!=='study-area';$('study-note').hidden=$('scope').value!=='study-area';
@@ -156,7 +159,7 @@
     ['stats','chart','spatial'].forEach(t=>$('panel-'+t).hidden=t!==tab);
   }
   function renderSnapshot(){
-    const p=snapshot.provenance,word=featureWord(),count=p.fragmentCount!==undefined?fmt(p.fragmentCount,0)+' display samples':fmt(p.featureCount,0)+' '+word;
+    const p=snapshot.provenance,word=featureWord(),count=p.fragmentCount!==undefined?fmt(p.fragmentCount,0)+' display '+(p.fragmentCount===1?'sample':'samples'):fmt(p.featureCount,0)+' '+(p.featureCount===1?word.replace(/s$/,''):word);
     $('snapshot').hidden=false;$('snapshot-name').textContent=p.name;$('snapshot-scope').textContent=count+' · '+scopeLabel(p);
     $('snapshot-time').textContent='Data used: '+new Date(p.capturedAt).toLocaleString();$('snapshot-limit').hidden=!p.limited;
     $('snapshot-provenance').innerHTML=sourceFacts(p);populateFields();
@@ -165,6 +168,7 @@
     const rows=[['Dataset',p.name],['Area',scopeLabel(p)],['Data used',new Date(p.capturedAt).toLocaleString()]];
     if(p.release?.updated)rows.push(['Published',new Date(p.release.updated).toLocaleString()]);
     if(p.sourceUrl)rows.push(['Source',p.sourceUrl]);
+    if(p.selectionRule)rows.push(['Source coverage',typeof p.selectionRule==='string'?p.selectionRule:JSON.stringify(p.selectionRule)]);
     if(p.heightBasis)rows.push(['Height source',p.sourceDriver==='usbf'||p.sourceDriver==='gba'?'GlobalBuildingAtlas estimates':p.heightBasis]);
     if(p.studyArea){rows.push(['Study area',p.studyArea.name],['Included',p.studyArea.geometryRule]);if(p.studyArea.withinLoadedBounds===false)rows.push(['Area coverage','Part of this area is outside the loaded neighborhood']);}
     if(p.licenses?.length)rows.push(['Terms',p.licenses.join(' · ')]);
@@ -173,6 +177,7 @@
   }
   async function prepare(signal){
     const l=layer();if(!l)throw Error('Add a dataset to the map first.');
+    if(A().capabilities(l).kind==='on-demand')message('Loading original buildings for this area…');
     const start=inputBinding(),captured=await A().capture(l,{scope:$('scope').value,studyArea:studyLayer(),map:root.portal.map,selection:root.PortalLayers.selection,allowTilePreview:$('tile-optin').checked,signal,onProgress:progress});
     const own=currentJob(signal);if(binding!==start)clearProducts();own.snapshot=captured;own.binding=start;snapshot=captured;binding=start;renderSnapshot();return captured;
   }
@@ -257,15 +262,19 @@
     const notes={buffer:'Create an area around each outline. For example, 50 m around every building.',filter:'Keep whole features that touch or lie within your study area.',clip:'Cut the outlines at the study-area boundary. Buildings crossing the edge are trimmed.',intersect:'Split outlines where they overlap the selected areas. A building can appear in more than one overlapping area.',aggregate:'Count features and add their footprint areas inside each study area. Overlapping areas can share the same building.',measure:'Add footprint area and boundary length to each record.',centroid:'Create a center point for each feature. For irregular shapes the center can be outside the outline.'};
     $('operation-note').textContent=notes[op];$('run-spatial').textContent=op==='aggregate'?'Summarize areas':op==='buffer'?'Create surrounding areas':'Run';
   }
-  async function spatial(signal,definition){
-    const data=inputFor(signal),def=definition||{operation:$('operation').value,distance:Number($('distance').value),reference:$('reference').value,predicate:$('predicate').value,mapBounds:bounds()},options={signal,onProgress:progress,distance:def.distance,predicate:def.predicate};
+  async function referenceSnapshot(def,signal){
     if(['clip','intersect','filter','aggregate'].includes(def.operation)){
       let reference;
       if(def.reference==='__map__'){if(!def.mapBounds||def.mapBounds[0]>=def.mapBounds[2])throw Error('Choose a map area within one longitude range.');reference={id:'current-map-area',cfg:{type:'geojson',name:'Current map area'},data:root.turf.featureCollection([root.turf.bboxPolygon(def.mapBounds)])};}
       else reference=root.PortalLayers.layers.get(def.reference);
       if(!reference)throw Error('Choose a study area first.');
-      options.reference=await A().capture(reference,{scope:'layer',respectFilters:true,signal,onProgress:progress});currentJob(signal);
+      return A().capture(reference,{scope:'layer',respectFilters:true,signal,onProgress:progress});
     }
+    return null;
+  }
+  async function spatial(signal,definition){
+    const data=inputFor(signal),def=definition||{operation:$('operation').value,distance:Number($('distance').value),reference:$('reference').value,predicate:$('predicate').value,mapBounds:bounds()},options={signal,onProgress:progress,distance:def.distance,predicate:def.predicate};
+    if(['clip','intersect','filter','aggregate'].includes(def.operation)){options.reference=def.referenceSnapshot||await referenceSnapshot(def,signal);currentJob(signal);}
     const output=await A().run(data,def.operation,options);currentJob(signal);lastResult=output;
     $('spatial-result').innerHTML='<h3>'+esc(operationLabels[def.operation])+'</h3><p>'+fmt(lastResult.features.length,0)+' result features from '+fmt(data.features.length,0)+' '+featureWord(data)+'.</p>'+(lastResult.provenance.limited?'<p class="analysis-warning">Some source data was unavailable. This result covers the available features only.</p>':'')+'<div class="analysis-actions"><button type="button" data-analysis-add-result>Add to map</button><button type="button" data-analysis-download-result>Download result</button></div><details><summary>Data sources and area</summary><dl class="analysis-source-facts">'+sourceFacts(lastResult.provenance)+'</dl></details>';updateButtons();
   }
@@ -329,7 +338,7 @@
     $('run-groups').onclick=()=>{const field=$('group-field').value;remember();job(async signal=>{await prepare(signal);groups(field,signal);});};
     $('run-geometry').onclick=()=>job(async signal=>{await prepare(signal);await geometry(signal);});
     $('run-chart').onclick=()=>{const definition=chartDefinition();remember();job(async signal=>{await prepare(signal);await chart(signal,definition);});};
-    $('run-spatial').onclick=()=>{const definition={operation:$('operation').value,distance:Number($('distance').value),reference:$('reference').value,predicate:$('predicate').value,mapBounds:bounds()};remember();job(async signal=>{await prepare(signal);await spatial(signal,definition);});};
+    $('run-spatial').onclick=()=>{const definition={operation:$('operation').value,distance:Number($('distance').value),reference:$('reference').value,predicate:$('predicate').value,mapBounds:bounds()};remember();job(async signal=>{[definition.referenceSnapshot]=await Promise.all([referenceSnapshot(definition,signal),prepare(signal)]);currentJob(signal);await spatial(signal,definition);});};
     $('operation').onchange=()=>{remember();updateOperation();};$('chart-kind').onchange=()=>{updateChartFields();remember();};
     ['numeric-field','group-field','chart-field','chart-y','chart-group'].forEach(id=>$(id).onchange=()=>{remember();updateButtons();});
     $('snapshot-download').onclick=()=>snapshot&&save('data-sources.json',JSON.stringify(snapshot.provenance,null,2),'application/json');
