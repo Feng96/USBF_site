@@ -37,9 +37,12 @@
   const boxesIntersect=(a,b)=>a&&b&&a[0]<=b[2]&&a[2]>=b[0]&&a[1]<=b[3]&&a[3]>=b[1];
   function boundsOf(map){if(!map)return null;const b=map.getBounds();return [b.getWest(),b.getSouth(),b.getEast(),b.getNorth()];}
   function filterFeature(f,l){const p=f.properties||{},sourceField=['bf_source','source','geom_source','SOURCE'].find(k=>l.fields?.includes(k)||Object.prototype.hasOwnProperty.call(p,k));if(l.sourceFilter && String(p[sourceField])!==l.sourceFilter)return false;if(l.cfg?.fixedSource && String(p[sourceField]).toLowerCase()!==l.cfg.fixedSource)return false;const a=number(p.area_in_meters??p.area_m2);return !(l.minArea>0 && (a===null||a<l.minArea));}
-  function sameFeature(a,b){if(a===b)return true;const ap=a?.properties||{},bp=b?.properties||{};for(const key of ['usbf_id','model_id','doitt_id','OBJECTID','objectid','building_id'])if(ap[key]!==undefined && bp[key]!==undefined)return String(ap[key])===String(bp[key]);if(ap.source!==undefined&&ap.id!==undefined&&bp.source!==undefined&&bp.id!==undefined)return ap.source===bp.source&&String(ap.id)===String(bp.id);if(a?.id!==undefined&&b?.id!==undefined)return String(a.id)===String(b.id)&&JSON.stringify(a.geometry)===JSON.stringify(b.geometry);return JSON.stringify([a?.geometry,ap])===JSON.stringify([b?.geometry,bp]);}
+  function stableID(value){return typeof value==='string'&&value.trim()!==''||typeof value==='number'&&Number.isFinite(value);}
+  function sameFeature(a,b){if(a===b)return true;const ap=a?.properties||{},bp=b?.properties||{};for(const key of ['usbf_id','model_id','doitt_id','OBJECTID','objectid','building_id'])if(stableID(ap[key])&&stableID(bp[key]))return String(ap[key])===String(bp[key]);if(stableID(ap.source)&&stableID(ap.id)&&stableID(bp.source)&&stableID(bp.id))return ap.source===bp.source&&String(ap.id)===String(bp.id);if(stableID(a?.id)&&stableID(b?.id))return String(a.id)===String(b.id)&&JSON.stringify(a.geometry)===JSON.stringify(b.geometry);return JSON.stringify([a?.geometry,ap])===JSON.stringify([b?.geometry,bp]);}
   function collectLicenses(features,layer){const licenses=new Set();if(layer.cfg?.license)licenses.add(layer.cfg.license);for(const f of features)for(const [key,value] of Object.entries(f.properties||{}))if(/licen[cs]e|copyright|attribution/i.test(key)&&value!==null&&value!=='')licenses.add(typeof value==='string'?value:JSON.stringify(value));return Array.from(licenses);}
   async function capture(layer, options={}) {
+    const capturedAt=new Date().toISOString();
+    if(layer)layer={...layer,cfg:{...layer.cfg,provenance:layer.cfg?.provenance?clone(layer.cfg.provenance):null},fields:layer.fields?.slice(),release:layer.release?clone(layer.release):null,viewBounds:layer.viewBounds?.slice(),data:layer.data?{...layer.data,features:layer.data.features?.slice(),provenance:layer.data.provenance?clone(layer.data.provenance):null}:null};
     const cap=capabilities(layer);if(!cap.supported)throw Error(cap.note);
     const map=options.map||root.portal?.map,requested=options.scope==='all'?'layer':options.scope||'layer',isTiles=tiled(layer),isFragments=cap.kind==='tile-preview';
     if(isFragments && (!options.allowTilePreview||requested!=='tile-preview'))throw Error('PMTiles/MVT and their exports are display fragments. Connect original GeoJSON or a full-geometry source before analysis or data download. You can explicitly enable a tile field preview in Statistics.');
@@ -50,7 +53,7 @@
     if(isTiles){if(!map)throw Error('The map is not ready.');const ids=(layer.renderIds||[]).filter(id=>!map.getLayer||map.getLayer(id));raw=map.queryRenderedFeatures({layers:ids});}
     else raw=layer.data.features.slice();
     if(raw.length>limits.features && requested!=='view' && requested!=='selection')throw Error('This analysis can use up to '+limits.features.toLocaleString()+' records. Choose the current view or a smaller source file.');
-    if(requested==='selection'){if(!selected||selected.layer!==layer.id)throw Error('Select a feature from this layer first.');raw=raw.filter(f=>sameFeature(f,selected.feature));}
+    if(requested==='selection'){if(!selected||selected.layer!==layer.id)throw Error('Select a feature from this layer first.');const direct=raw.find(f=>f===selected.feature);raw=direct?[direct]:raw.filter(f=>sameFeature(f,selected.feature));if(raw.length>1)throw Error('This selection matches more than one source feature. Select the feature on the map again.');}
     let viewPolygon;
     if(requested==='view'){
       if(!viewBounds||viewBounds[0]>=viewBounds[2]||viewBounds[1]>=viewBounds[3]||viewBounds[0]<-180||viewBounds[2]>180)throw Error('Choose a map view within one longitude range before capturing it.');
@@ -70,7 +73,9 @@
     const sourceScope=isFragments?'tile-preview':local?'loaded-view':requested==='view'?'view-intersection':requested==='selection'?'selection':'whole-layer';
     const limited=local && (layer.viewLimited===true||layer.viewLimited===undefined&&/limit reached/i.test(layer.viewNote||''));
     const scopeLabel=isFragments?'Tile field preview — fragments, not unique buildings':local?'Loaded neighborhood records'+(requested==='view'?' intersecting the current view':requested==='selection'?' restricted to the selected record':'')+(limited?' (source limit reached)':''):requested==='view'?'Whole source features intersecting the captured map view':requested==='selection'?'Selected source feature':'Complete loaded vector layer';
-    const provenance={version:1,layerId:layer.id,name:layer.cfg.name,sourceType:layer.cfg.type,sourceDriver:layer.cfg.driver||null,sourceUrl:layer.cfg.page||layer.cfg.url||null,capturedAt:new Date().toISOString(),scope:sourceScope,scopeLabel,geometryQuality:isFragments?'clipped-or-simplified-tile-fragments':'full-loaded-source-geometry',spatialEligible:cap.geometryAnalysis&&!isFragments,limited,extent:extentOf(features),requestedView:requested==='view'?viewBounds:null,loadedView:local?clone(layer.viewBounds||viewBounds):null,loadedAt:local?layer.viewLoadedAt||null:null,release:layer.release?clone(layer.release):null,filters:{source:layer.sourceFilter||'',fixedSource:layer.cfg.fixedSource||'',minArea:layer.minArea||0,respected:options.respectFilters!==false},licenses:collectLicenses(features,layer),lineage:baseProvenance?[clone(baseProvenance)]:[],vertexCount};
+    const knownBuildings=!baseProvenance?.operation&&!layer.data?.analysis?.operation&&(['usbf','gba','nyc'].includes(layer.cfg.driver)||['dc-government','training-heights'].includes(layer.cfg.id)||layer.cfg.dataRole==='buildings'||features.every(f=>polygon(f)&&(typeof f.properties?.usbf_id==='string'&&f.properties.usbf_id.trim()!==''||typeof f.properties?.usbf_id==='number'&&Number.isFinite(f.properties.usbf_id))));
+    const autoHeight=layer.cfg.allowHeight!==false&&!baseProvenance?.operation&&!layer.data?.analysis?.operation;
+    const provenance={version:1,layerId:layer.id,name:layer.cfg.name,sourceType:layer.cfg.type,sourceDriver:layer.cfg.driver||null,sourceUrl:layer.cfg.page||layer.cfg.url||null,capturedAt,scope:sourceScope,requestedScope:requested,scopeLabel,featureRole:knownBuildings?'buildings':'features',autoHeight,heightField:autoHeight?(layer.heightField||['height_m','height','render_height'].find(k=>features.some(f=>Object.prototype.hasOwnProperty.call(f.properties||{},k)))||null):null,heightBasis:layer.cfg.driver==='usbf'?'Inherited GlobalBuildingAtlas height; lidar input coverage is separate':layer.cfg.driver==='gba'?'Estimated GlobalBuildingAtlas height':layer.cfg.driver==='nyc'?'Source roof height converted from feet to metres':baseProvenance?.heightBasis||null,geometryQuality:isFragments?'clipped-or-simplified-tile-fragments':'full-loaded-source-geometry',spatialEligible:cap.geometryAnalysis&&!isFragments,limited,extent:extentOf(features),requestedView:requested==='view'?viewBounds:null,loadedView:local?clone(layer.viewBounds||viewBounds):null,loadedAt:local?layer.viewLoadedAt||null:null,release:layer.release?clone(layer.release):null,filters:{source:layer.sourceFilter||'',fixedSource:layer.cfg.fixedSource||'',minArea:layer.minArea||0,respected:options.respectFilters!==false},licenses:collectLicenses(features,layer),lineage:baseProvenance?[clone(baseProvenance)]:[],vertexCount};
     if(baseProvenance){provenance.derived=true;provenance.scopeLabel=scopeLabel+' · inherited scope: '+(baseProvenance.scopeLabel||baseProvenance.scope||'see lineage');provenance.licenses=Array.from(new Set([...provenance.licenses,...(baseProvenance.licenses||[])]));}
     if(isFragments)provenance.fragmentCount=features.length;else provenance.featureCount=features.length;
     if(local && layer.viewSelection)provenance.selectionRule=layer.viewSelection;
@@ -81,8 +86,9 @@
   }
   function numericFields(snapshot){return snapshot.fields.filter(k=>snapshot.features.some(f=>number(f.properties?.[k])!==null));}
   function geometryValue(feature,field){const t=turf(),g=feature.geometry;if(!g)return null;if(field==='$area_m2')return polygon(feature)?t.area(feature):null;if(field==='$length_m'){if(polygon(feature))return t.length(t.polygonToLine(feature),{units:'meters'});return ['LineString','MultiLineString'].includes(g.type)?t.length(feature,{units:'meters'}):null;}throw Error('Unknown geometry measure.');}
-  function values(snapshot,field){if(field==='$area_m2'||field==='$length_m'){if(!snapshot.capabilities.geometryAnalysis)throw Error('Geometry measures are unavailable for tile field previews.');return snapshot.features.map(f=>geometryValue(f,field));}return snapshot.features.map(f=>number(f.properties?.[field]));}
-  async function valuesAsync(snapshot,field,options={}){if(field==='$area_m2'||field==='$length_m')requireGeometry(snapshot);const out=[];for(let i=0;i<snapshot.features.length;i++){abort(options.signal);const f=snapshot.features[i];out.push(field==='$area_m2'||field==='$length_m'?geometryValue(f,field):number(f.properties?.[field]));if(i%128===127){options.onProgress?.(i+1,snapshot.features.length);await tick();}}return out;}
+  function fieldNumber(snapshot,field,value){const n=number(value);return snapshot.provenance.featureRole==='buildings'&&field===snapshot.provenance.heightField&&!(n>0)?null:n;}
+  function values(snapshot,field){if(field==='$area_m2'||field==='$length_m'){if(!snapshot.capabilities.geometryAnalysis)throw Error('Geometry measures are unavailable for tile field previews.');return snapshot.features.map(f=>geometryValue(f,field));}return snapshot.features.map(f=>fieldNumber(snapshot,field,f.properties?.[field]));}
+  async function valuesAsync(snapshot,field,options={}){if(field==='$area_m2'||field==='$length_m')requireGeometry(snapshot);const out=[];for(let i=0;i<snapshot.features.length;i++){abort(options.signal);const f=snapshot.features[i];out.push(field==='$area_m2'||field==='$length_m'?geometryValue(f,field):fieldNumber(snapshot,field,f.properties?.[field]));if(i%128===127){options.onProgress?.(i+1,snapshot.features.length);await tick();}}return out;}
   function summarize(input){const data=input.map(number).filter(v=>v!==null);if(!data.length)return {observations:input.length,valid:0,missing:input.length,sum:0,mean:null,median:null,min:null,max:null,stddev:null};let sum=0,correction=0,mean=0,m2=0,min=Infinity,max=-Infinity;for(let i=0;i<data.length;i++){const x=data[i],y=x-correction,next=sum+y;correction=(next-sum)-y;sum=next;const delta=x-mean;mean+=delta/(i+1);m2+=delta*(x-mean);min=Math.min(min,x);max=Math.max(max,x);}if(![sum,mean,m2].every(Number.isFinite))throw Error('Values exceed the supported numeric range. Choose a different field.');const sorted=data.slice().sort((a,b)=>a-b),middle=Math.floor(sorted.length/2);return {observations:input.length,valid:data.length,missing:input.length-data.length,sum,mean,median:sorted.length%2?sorted[middle]:(sorted[middle-1]/2+sorted[middle]/2),min,max,stddev:Math.sqrt(Math.max(0,m2/data.length))};}
   function frequencies(snapshot,field,maxGroups=25){const groups=new Map();for(const f of snapshot.features){const value=f.properties?.[field],key=JSON.stringify([typeof value,value??null]),label=value===null||value===undefined?'Not provided':value===''?'Empty string':typeof value==='object'?JSON.stringify(value):String(value);const row=groups.get(key)||{label,count:0};row.count++;groups.set(key,row);}const rows=Array.from(groups.values()).sort((a,b)=>b.count-a.count||a.label.localeCompare(b.label));if(rows.length>maxGroups){const extra=rows.splice(maxGroups-1);rows.push({label:'Other categories ('+extra.length+')',count:extra.reduce((n,r)=>n+r.count,0)});}return rows;}
   function histogram(input,bins=10){const data=input.map(number).filter(v=>v!==null);if(!data.length)return [];bins=Math.min(30,Math.max(2,Math.floor(bins)));let low=Infinity,high=-Infinity;for(const x of data){low=Math.min(low,x);high=Math.max(high,x);}if(low===high){const padding=Math.max(Math.abs(low)*.05,1);low-=padding;high+=padding;}const step=(high-low)/bins;if(!Number.isFinite(step)||step<=0)throw Error('Values exceed the supported chart range.');const rows=Array.from({length:bins},(_,i)=>({low:low+step*i,high:low+step*(i+1),count:0}));for(const x of data)rows[Math.min(bins-1,Math.max(0,Math.floor((x-low)/step)))].count++;return rows;}
@@ -138,5 +144,46 @@
     const provenance=provenanceFor(snapshot,reference,operation,parameters);provenance.featureCount=features.length;provenance.vertexCount=outputVertices;provenance.extent=extentOf(features);
     return {type:'FeatureCollection',name:operation+' — '+snapshot.provenance.name,features,provenance,analysis:{operation,parameters,createdAt:provenance.capturedAt,inputRecords:snapshot.features.length,outputRecords:features.length,referenceRecords:reference?.features.length||0}};
   }
-  root.PortalAnalysisData={limits,capabilities,capture,numericFields,values,valuesAsync,summarize,frequencies,histogram,measure,run,number,vertices};
+  async function overview(snapshot,options={}){
+    if(!snapshot?.features)throw Error('Choose some data first.');
+    if(snapshot.capabilities.attributePreview)return {kind:'display-preview',records:null,fragments:snapshot.features.length,polygonRecords:null,height:null,area:null,provenance:snapshot.provenance};
+    const heightField=snapshot.provenance.autoHeight===false?null:options.heightField||snapshot.provenance.heightField||['height_m','height','render_height'].find(k=>snapshot.fields.includes(k))||null;
+    const heights=[],areas=[],coverage={recorded:0,missing:0,unknown:0};let polygonRecords=0;
+    for(let i=0;i<snapshot.features.length;i++){
+      abort(options.signal);const f=snapshot.features[i],p=f.properties||{},v=heightField?number(p[heightField]):null;
+      heights.push(v!==null&&v>0?v:null);
+      if(polygon(f)){polygonRecords++;areas.push(geometryValue(f,'$area_m2'));}
+      if(p.height_missing===true)coverage.missing++;else if(p.height_missing===false)coverage.recorded++;else coverage.unknown++;
+      if(i%128===127){options.onProgress?.(i+1,snapshot.features.length);await tick();}
+    }
+    const height=heightField?{field:heightField,...summarize(heights),basis:snapshot.provenance.heightBasis||null}:null;
+    return {kind:snapshot.provenance.featureRole==='buildings'?'buildings':'features',records:snapshot.features.length,polygonRecords,height,area:areas.length?{...summarize(areas),units:'m2',overlapRule:'Per-feature areas are added; overlapping polygons may overlap.'}:null,lidarInputCoverage:coverage,provenance:snapshot.provenance};
+  }
+  async function scatter(snapshot,xField,yField,options={}){
+    const xs=await valuesAsync(snapshot,xField,options),ys=await valuesAsync(snapshot,yField,options),pairs=[];
+    let meanX=0,meanY=0,m2x=0,m2y=0,cov=0,xmin=Infinity,xmax=-Infinity,ymin=Infinity,ymax=-Infinity;
+    for(let i=0;i<xs.length;i++){
+      abort(options.signal);const x=number(xs[i]),y=number(ys[i]);if(x===null||y===null)continue;
+      const n=pairs.length+1,dx=x-meanX,dy=y-meanY;meanX+=dx/n;meanY+=dy/n;m2x+=dx*(x-meanX);m2y+=dy*(y-meanY);cov+=dx*(y-meanY);
+      xmin=Math.min(xmin,x);xmax=Math.max(xmax,x);ymin=Math.min(ymin,y);ymax=Math.max(ymax,y);pairs.push({x,y});
+      if(i%256===255)await tick();
+    }
+    if(!pairs.length)throw Error('No records have values for both fields. Choose another pair of fields.');
+    const maxPoints=Math.max(100,Math.min(5000,Math.floor(number(options.maxPoints)||3000))),points=pairs.length<=maxPoints?pairs:pairs.filter((_,i)=>Math.floor(i*maxPoints/pairs.length)!==Math.floor((i-1)*maxPoints/pairs.length));
+    const correlation=m2x>0&&m2y>0?Math.max(-1,Math.min(1,cov/Math.sqrt(m2x)/Math.sqrt(m2y))):null;
+    if(![meanX,meanY,m2x,m2y,cov,xmin,xmax,ymin,ymax].every(Number.isFinite))throw Error('Values exceed the supported chart range.');
+    return {kind:'scatter',xField,yField,valid:pairs.length,missing:snapshot.features.length-pairs.length,pairs,points,drawn:points.length,sampled:points.length<pairs.length,sampling:'Evenly spaced records in source order; plot sampling only. Counts and correlation use all valid records.',correlation,range:{xmin,xmax,ymin,ymax},provenance:snapshot.provenance};
+  }
+  async function groupedStatistics(snapshot,groupField,valueField,options={}){
+    const input=await valuesAsync(snapshot,valueField,options),groups=new Map(),maximum=Math.max(2,Math.min(25,Math.floor(number(options.maxGroups)||12)));
+    for(let i=0;i<snapshot.features.length;i++){
+      abort(options.signal);const value=snapshot.features[i].properties?.[groupField],key=value===null||value===undefined?'missing':JSON.stringify([typeof value,value]),label=value===null||value===undefined?'Not provided':value===''?'Empty string':typeof value==='object'?JSON.stringify(value):String(value);
+      if(!groups.has(key))groups.set(key,{label,values:[]});groups.get(key).values.push(input[i]);
+      if(i%256===255)await tick();
+    }
+    const rows=Array.from(groups.values()).sort((a,b)=>b.values.length-a.values.length||a.label.localeCompare(b.label));
+    if(rows.length>maximum){const other=rows.splice(maximum-1);rows.push({label:'Other categories ('+other.length+')',values:other.flatMap(g=>g.values)});}
+    return {kind:'grouped',groupField,valueField,rows:rows.map(g=>({label:g.label,...summarize(g.values)})),provenance:snapshot.provenance};
+  }
+  root.PortalAnalysisData={limits,capabilities,capture,numericFields,values,valuesAsync,summarize,frequencies,histogram,measure,run,number,vertices,overview,scatter,groupedStatistics};
 })(globalThis);

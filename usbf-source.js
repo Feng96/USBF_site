@@ -9,7 +9,7 @@
   const validBox=b=>Array.isArray(b)&&b.length===4&&b.every(Number.isFinite)&&b[0]<=b[2]&&b[1]<=b[3]&&b[0]>=-180&&b[2]<=180&&b[1]>=-90&&b[3]<=90;
   const empty=()=>({type:'FeatureCollection',features:[]});
   function parseManifest(data){
-    if(data?.release!=='USBF_v1'||data.layout!=='flat_half_degree_geographic_tiles'||data.crs!=='EPSG:4326'||data.tile_degrees!==.5||data.scope!=='CONUS48+DC'||!Array.isArray(data.files)||data.files.length>100000)throw Error('The USBF publication format has changed. This viewer needs an adapter update.');
+    if(data?.release!=='USBF_v1'||data.layout!=='flat_half_degree_geographic_tiles'||data.crs!=='EPSG:4326'||data.tile_degrees!==.5||data.scope!=='CONUS48+DC'||!Array.isArray(data.files)||data.files.length>100000)throw Error('The USBF publication format has changed. Open the source page for the latest download.');
     const seen=new Set(),tiles=[];let rows=0;
     for(const f of data.files){
       if(typeof f.path!=='string'||!/^USBF_x[+-]\d+_y[+-]\d+\.parquet$/.test(f.path))continue;
@@ -37,27 +37,27 @@
     function bounds(){const b=map.getBounds();return [b.getWest(),b.getSouth(),b.getEast(),b.getNorth()];}
     function loadView(){
       cancel();if(stopped||!map.getSource(l.id))return;coverageVisibility();
-      if(!l.visible){clear('Hidden · automatic checks paused');return;}
-      if(!manifest){clear('Connecting to the live USBF publication…');return;}
+      if(!l.visible){clear('Layer hidden');return;}
+      if(!manifest){clear('Loading USBF…');return;}
       const box=bounds();l.error=false;
-      if(!validBox(box)||!intersects(box,[-125,24,-66,50])){clear('Outside published CONUS48 + DC coverage');return;}
-      if(map.getZoom()<14||(box[2]-box[0])*(box[3]-box[1])>.04){clear('Publication grid · zoom to a neighborhood (14+) for footprints');return;}
+      if(!validBox(box)||!intersects(box,[-125,24,-66,50])){clear('USBF covers the contiguous United States and Washington, DC');return;}
+      if(map.getZoom()<14||(box[2]-box[0])*(box[3]-box[1])>.04){clear('Coverage map · choose a place or zoom in to see buildings');return;}
       const tiles=selectTiles(manifest,box);if(!tiles.length){clear('No published USBF tile in this view');return;}
-      if(tiles.length>9){clear('Zoom in to request fewer USBF tiles');return;}
-      clear('Loading the current USBF view…');l.viewLoading=true;update();const rev=revision;
+      if(tiles.length>9){clear('Zoom in to a smaller area to see buildings');return;}
+      clear('Loading buildings…');l.viewLoading=true;update();const rev=revision;
       worker=new Worker(new URL('./usbf-worker.js?v=1.0',document.baseURI),{type:'module'});
-      queryTimeout=setTimeout(()=>{if(rev!==revision)return;worker?.terminate();worker=null;l.error=true;note('USBF read timed out. Use Check updates to retry.');},60000);
+      queryTimeout=setTimeout(()=>{if(rev!==revision)return;worker?.terminate();worker=null;l.error=true;note('Loading is taking longer than usual. Refresh data or choose a smaller area.');},60000);
       worker.onmessage=e=>{
         if(stopped||rev!==revision)return;clearTimeout(queryTimeout);worker?.terminate();worker=null;
-        if(e.data.error){l.error=true;note(e.data.error);if(e.data.code==='RELEASE_CHANGED')checkUpdates();return;}
+        if(e.data.error){l.error=true;l.errorDetail=e.data.error;note(/32 MB|limit|fewer|budget/i.test(e.data.error)?'There are too many buildings to open at once. Zoom in and try again.':e.data.code==='RELEASE_CHANGED'?'The data is being updated. Try again in a moment.':e.data.error);if(e.data.code==='RELEASE_CHANGED')checkUpdates();return;}
         const d=e.data;l.data=d.data;l.featureById=new Map(d.data.features.map(f=>[String(f.properties.usbf_id),f]));l.loaded=true;l.error=false;l.viewBytes=d.bytes;l.viewLimited=!!d.limited;l.viewBounds=box.slice();l.viewLoadedAt=new Date().toISOString();l.viewSelection='Published cx/cy ownership coordinates within the loaded bounds plus a 0.002-degree buffer';
         l.fields=Array.from(new Set([...entry.fields,...d.data.features.flatMap(f=>Object.keys(f.properties))]));map.getSource(l.id).setData(l.data);l.onDataChanged?.();
-        note(d.data.features.length.toLocaleString()+' buildings in buffered ownership view'+(d.limited?' · view limit reached; zoom in':'')+' · '+(d.bytes/1048576).toFixed(1)+' MB read');
+        note(d.data.features.length.toLocaleString()+' buildings loaded'+(d.limited?' · zoom in to see more':''));
       };
       worker.onerror=e=>{if(rev!==revision||stopped)return;clearTimeout(queryTimeout);worker?.terminate();worker=null;l.error=true;note(e.message||'USBF reader could not start.');};
       worker.postMessage({bounds:box,tiles});
     }
-    function schedule(){cancel();if(stopped)return;clear('Updating the USBF map view…');coverageVisibility();queryTimer=setTimeout(loadView,450);}
+    function schedule(){cancel();if(stopped)return;clear('Loading buildings in this view…');coverageVisibility();queryTimer=setTimeout(loadView,450);}
     async function checkUpdates(force=false){
       if(stopped)return;if(checking)return checking;
       l.checkingRelease=true;update();manifestController=new AbortController();
@@ -74,7 +74,7 @@
           }
           const pub=document.querySelector('#usbf-publication');if(pub)pub.textContent=next.buildings.toLocaleString()+' published buildings · '+next.count.toLocaleString()+' tiles';
           if(changed||force||!l.loaded)loadView();else update();
-        }catch(e){if(stopped)return;l.releaseWarning='Update check failed: '+(e.name==='AbortError'?'source timeout':e.message);if(!manifest){l.error=true;const pub=document.querySelector('#usbf-publication');if(pub)pub.textContent='Publication check unavailable. Retry from the layer controls.';note('USBF publication unavailable. Use Check updates to retry.');}else update();}
+        }catch(e){if(stopped)return;l.releaseWarning='Update check failed: '+(e.name==='AbortError'?'source timeout':e.message);if(!manifest){l.error=true;const pub=document.querySelector('#usbf-publication');if(pub)pub.textContent='Publication check unavailable. Retry from the layer controls.';note('USBF is unavailable right now. Refresh data or try another place.');}else update();}
         finally{clearTimeout(timeout);l.checkingRelease=false;checking=null;if(!stopped)update();}
       })();return checking;
     }

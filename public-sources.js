@@ -11,8 +11,8 @@
     {id:'nyc-government',name:'NYC government · Footprints & roof heights',type:'viewport',driver:'nyc',url:'https://data.cityofnewyork.us/resource/5zhs-2jue.geojson',fields:['bin','doitt_id','objectid','height_roof','ground_elevation','height_m','geom_source'],heightField:'height_m',color:'#817246',category:'Government data',description:'Official NYC OTI outlines and supplied roof heights above ground. Feet are converted to metres for LoD1 display; original values and geometry-source fields remain available.',scope:'New York City · live official API',attribution:'City of New York · Office of Technology and Innovation (OTI) · NYC Open Data',page:'https://data.cityofnewyork.us/Housing-Development/BUILDING/5zhs-2jue',license:'NYC Open Data terms of use',provider:'NYC government / OTI',bounds:[[-74.26,40.49],[-73.69,40.92]],start:[-73.985,40.748,16],minViewZoom:14,sourceNote:'height_m = positive height_roof × 0.3048. Original height fields are preserved. The generated shape_area field is retained without a ground-area conversion.',links:[['Official field definitions','https://github.com/CityOfNewYork/nyc-geo-metadata/blob/main/Metadata/Metadata_BuildingFootprints.md']]}
   ];
   const resources=[
-    {name:'Microsoft Building Footprints · HDX mirror',scope:'Source Cooperative · independent Microsoft files',description:'Newer Microsoft GlobalMLBuildingFootprints repackaged as GeoParquet, partitioned by country and quadkey. Includes UnitedStates. These files are independent of VIDA; this browser does not yet stream this mirror.',page:'https://source.coop/hdx/microsoft-open-buildings',license:'See HDX mirror and Microsoft release terms'},
-    {name:'FEMA / ORNL · USA Structures',scope:'Federal government · nationwide inventory',description:'Official inventory of structures larger than 450 square feet. Downloads and documentation are available; the live feature query failed verification, so it is not offered as a working map layer.',page:'https://gis-fema.hub.arcgis.com/pages/usa-structures',license:'Federal government works / source terms'}
+    {name:'Microsoft Building Footprints · HDX mirror',scope:'Source Cooperative · independent Microsoft files',description:'Newer Microsoft GlobalMLBuildingFootprints repackaged as GeoParquet, partitioned by country and quadkey. Includes UnitedStates. Choose UnitedStates for U.S. downloads. These files are independent of VIDA.',page:'https://source.coop/hdx/microsoft-open-buildings',license:'See HDX mirror and Microsoft release terms'},
+    {name:'FEMA / ORNL · USA Structures',scope:'Federal government · nationwide inventory',description:'Official inventory of structures larger than 450 square feet. Download national structure files and read the source documentation.',page:'https://gis-fema.hub.arcgis.com/pages/usa-structures',license:'Federal government works / source terms'}
   ];
   async function json(url,signal){const r=await fetch(url,{signal,credentials:'omit'});if(!r.ok)throw Error('Source returned HTTP '+r.status+'.');const d=await r.json();if(d.error)throw Error(d.error.message||'The provider rejected this map query.');return d;}
   function intersects(a,b){return a[0]<=b[2]&&a[2]>=b[0]&&a[1]<=b[3]&&a[3]>=b[1];}
@@ -36,12 +36,12 @@
     function clear(note){l.loaded=false;l.viewBytes=0;l.viewLimited=false;l.viewBounds=null;l.viewLoadedAt=null;l.data=empty();map.getSource(l.id)?.setData(l.data);l.error=false;status(note);}
     async function load(){
       cancel();const rev=revision;if(stopped||!map.getSource(l.id))return;
-      if(!l.visible){clear('Hidden · map queries paused');return;}
+      if(!l.visible){clear('Layer hidden');return;}
       const b=extent(map),coverage=(cfg.coverageBounds||cfg.bounds).flat();
       if(b[0]>=b[2]||!intersects(b,coverage)){clear('Outside this source’s coverage');return;}
-      if(map.getZoom()<cfg.minViewZoom||(b[2]-b[0])*(b[3]-b[1])>.04){clear('Zoom to a neighborhood (level '+cfg.minViewZoom+'+) to load footprints');return;}
+      if(map.getZoom()<cfg.minViewZoom||(b[2]-b[0])*(b[3]-b[1])>.04){clear('Choose a place or zoom in to see buildings');return;}
       // Clear the previous view before requesting, so stale geometry is never exported as this view.
-      clear('Loading current map view…');l.viewLoading=true;update();
+      clear('Loading buildings…');l.viewLoading=true;update();
       controller=new AbortController();const timeout=requestTimer=setTimeout(()=>{if(rev!==revision)return;controller?.abort();workerReject?.(Error('The provider timed out. Retry this view.'));worker?.terminate();},60000);
       try{
         let result;
@@ -58,11 +58,11 @@
         l.data=result.data;l.loaded=true;l.error=false;l.viewBytes=result.bytes||0;l.viewLimited=!!result.limited;l.viewBounds=b.slice();l.viewLoadedAt=new Date().toISOString();
         l.fields=Array.from(new Set([...l.fields,...result.data.features.flatMap(f=>Object.keys(f.properties||{}))]));
         map.getSource(l.id).setData(l.data);
-        status(result.data.features.length.toLocaleString()+' features in requested view'+(result.limited?' · view limit reached; zoom in':'')+(result.bytes?' · '+(result.bytes/1048576).toFixed(1)+' MB read':''));
+        status(result.data.features.length.toLocaleString()+' buildings loaded'+(result.limited?' · zoom in to see more':''));
       }catch(e){if(!stopped&&rev===revision){l.error=true;status(e.name==='AbortError'?'Request timed out. Retry this view.':e.message);}}
       finally{clearTimeout(timeout);if(rev===revision){workerReject=null;worker?.terminate();worker=null;l.viewLoading=false;update();}}
     }
-    const schedule=()=>{cancel();clear('Updating current map view…');timer=setTimeout(load,450);};map.on('moveend',schedule);l.reload=load;l.stop=()=>{stopped=true;cancel();map.off('moveend',schedule);};schedule();
+    const schedule=()=>{cancel();clear('Loading buildings in this view…');timer=setTimeout(load,450);};map.on('moveend',schedule);l.reload=load;l.stop=()=>{stopped=true;cancel();map.off('moveend',schedule);};schedule();
   }
   window.PortalPublicSources={catalog,resources,attach,empty};
 })();

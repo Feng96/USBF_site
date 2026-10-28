@@ -1,0 +1,38 @@
+/* PDF and placed-model export checks; artifacts stay in the supplied scratch directory. */
+const fs=require('fs'),path=require('path'),vm=require('vm'),assert=require('assert'),cp=require('child_process');
+const root=path.resolve(__dirname,'..'),checks=[],context={console,Date,Map,Set,JSON,Number,String,Array,Math,Error,URL,Uint8Array,ArrayBuffer,DataView,TextEncoder,TextDecoder,setTimeout,clearTimeout,document:{addEventListener(){},querySelector(){return null;}}};
+context.globalThis=context;vm.createContext(context);for(const file of ['map-composer.js','local-model-core.js'])vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),context,{filename:file});
+const out=context.PortalComposer,core=context.PortalLocalModelCore,ok=(value,name)=>{assert(value,name);checks.push(name);console.log('PASS',name);},near=(a,b,t=1e-5)=>Math.abs(a-b)<t;
+let page=out.pageLayout({paper:'letter',orientation:'landscape',margin:12},1600,900);ok(near(page.widthPt,792)&&near(page.heightPt,612),'US Letter landscape uses real 11 × 8.5 inch page dimensions');
+page=out.pageLayout({paper:'letter',orientation:'portrait',margin:12},900,1600);ok(near(page.widthPt,612)&&near(page.heightPt,792),'US Letter portrait swaps paper axes without changing the map ratio');
+page=out.pageLayout({paper:'a4',orientation:'landscape',margin:20},1600,900);ok(near(page.widthMm,297)&&near(page.heightMm,210)&&page.image.xMm>=20-1e-9&&page.image.yMm>=20-1e-9,'A4 uses millimetres and keeps the requested margins');ok(near(page.image.widthMm/page.image.heightMm,1600/900),'Paper fitting preserves the map aspect ratio');
+page=out.pageLayout({paper:'a3',orientation:'portrait',margin:6},600,400);ok(near(page.widthMm,297)&&near(page.heightMm,420),'A3 portrait has its actual physical page size');
+assert.throws(()=>out.pageLayout({paper:'unknown'},1,1),/Choose/);assert.throws(()=>out.pageLayout({margin:-1},1,1),/margin/);assert.throws(()=>out.pageLayout({},5000,5000),/valid/);ok(true,'Invalid paper settings and excessive image sizes are rejected');
+const jpeg=cp.execFileSync('python3',['-c',`from PIL import Image,ImageDraw
+import sys
+im=Image.new('RGB',(600,400),'white');d=ImageDraw.Draw(im)
+d.rectangle((0,0,299,199),fill=(205,55,50));d.rectangle((300,0,599,199),fill=(35,145,80))
+d.rectangle((0,200,299,399),fill=(45,90,195));d.rectangle((300,200,599,399),fill=(230,190,35))
+d.rectangle((0,365,599,399),fill='white');d.text((12,376),'Synthetic map fixture | US Buildings | source credit preserved',fill=(20,45,30))
+im.save(sys.stdout.buffer,format='JPEG',quality=95)`]);
+const metadata={title:'Washington DC — 建筑',createdAt:'2026-10-28T05:30:00.000Z',capture:{partial:false},camera:{center:[-77.071,38.912],bounds:[-77.08,38.90,-77.06,38.92],displayCRS:'EPSG:3857'},sources:{layers:[{name:'USBF fixture',attribution:'Synthetic test data',release:{updated:'2026-10-28'},licenses:['ODbL 1.0','CC BY-NC 4.0']}],localModels:[{name:'house.obj',sourceSha256:'a'.repeat(64)}]}};
+const fixtures=[];
+for(const options of [{paper:'letter',orientation:'landscape',margin:12},{paper:'letter',orientation:'portrait',margin:20},{paper:'a4',orientation:'landscape',margin:6},{paper:'a3',orientation:'portrait',margin:12}]){
+ const result=out.makePDFBytes(new Uint8Array(jpeg),600,400,metadata,options),buffer=Buffer.from(result.bytes),ascii=buffer.toString('latin1');
+ ok(ascii.startsWith('%PDF-1.7')&&ascii.endsWith('%%EOF\n'),'PDF has a complete header and trailer: '+options.paper+' '+options.orientation);
+ const xref=Number(/startxref\n(\d+)\n%%EOF/.exec(ascii)[1]);assert(ascii.slice(xref).startsWith('xref\n0 9\n'));const entries=ascii.slice(xref).split('\n').slice(3,11);for(let n=1;n<=8;n++){const offset=Number(entries[n-1].slice(0,10));assert(ascii.slice(offset).startsWith(n+' 0 obj\n'));}ok(true,'Cross-reference byte offsets resolve all eight PDF objects: '+options.paper+' '+options.orientation);
+ const image=ascii.indexOf('/Subtype /Image'),start=ascii.indexOf('stream\n',image)+7,length=Number(/\/Length (\d+)/.exec(ascii.slice(image,start))[1]);ok(buffer.subarray(start,start+length).equals(jpeg),'PDF embeds the complete original JPEG bytes: '+options.paper+' '+options.orientation);
+ const embedded=ascii.indexOf('/Type /EmbeddedFile'),detailsStart=ascii.indexOf('stream\n',embedded)+7,detailsLength=Number(/\/Length (\d+)/.exec(ascii.slice(embedded,detailsStart))[1]),details=JSON.parse(buffer.subarray(detailsStart,detailsStart+detailsLength).toString('utf8'));ok(details.sources.layers[0].licenses[1]==='CC BY-NC 4.0'&&details.camera.bounds.length===4&&details.pdf.widthMm===result.page.widthMm,'PDF attachments retain source rights, view and paper settings: '+options.paper+' '+options.orientation);
+ fixtures.push({name:options.paper+'-'+options.orientation+'.pdf',bytes:buffer,page:result.page,title:metadata.title});
+}
+assert.throws(()=>out.makePDFBytes(new Uint8Array([0,1,2]),1,1,metadata),/JPEG/);ok(true,'Incomplete images cannot be labelled as a generated PDF');
+const f=.6096,matrix=[0,-f,0,0,0,0,f,0,-f,0,0,0,30*f,10.5*f,-20*f,1],positions=[10,20,30,11,20,30,10,21,30];
+const baked=core.placedOBJ([{name:'Y-up feet',positions,matrix}],{altitude:7}),verts=baked.text.split('\n').filter(s=>s.startsWith('v ')).map(s=>s.split(' ').slice(1).map(Number));
+ok(baked.triangles===1&&baked.vertices===3&&near(verts[0][0],0)&&near(verts[0][1],.3048)&&near(verts[0][2],7)&&near(verts[1][1],-.3048)&&near(verts[2][2],7.6096),'Placed OBJ bakes feet, scale, Y-up, centering, clockwise turn and elevation into real coordinates');
+const joined=core.placedOBJ([{positions:[0,0,0,1,0,0,0,1,0]},{positions:[0,0,1,1,0,1,0,1,1]}]);ok(joined.text.includes('f 1 2 3\n')&&joined.text.includes('f 4 5 6\n'),'OBJ faces use correct global vertex offsets across meshes');
+assert.throws(()=>core.placedOBJ([{positions:[0,0,0,1,0,0,0,1,0],indices:[0,1,9]}]),/outside/);assert.throws(()=>core.placedOBJ([{positions,matrix:[...matrix.slice(0,15),0]}]),/non-affine/);ok(true,'Invalid face references and perspective transforms cannot enter a placed OBJ');
+ok(core.crc32(new TextEncoder().encode('123456789'))===0xcbf43926,'ZIP CRC32 matches the standard check value');
+const location={format:'US Buildings model location 2',anchorWGS84:[-77.071,38.912],geometryBaked:true,sourceUnits:'feet',sourceUpAxis:'y',scale:2,headingDegrees:90,baseElevationMetres:7,objCoordinates:{axes:['east','north','up'],units:'metres',nativeGISCRS:false}},zip=core.zipFiles([{name:'建筑.obj',data:baked.text},{name:'location.json',data:JSON.stringify(location)},{name:'README.txt',data:'Synthetic model test. Use location.json for its geographic anchor.'}],new Date('2026-10-28T05:30:00Z'));
+ok(new DataView(zip.buffer).getUint32(0,true)===0x04034b50&&new DataView(zip.buffer).getUint32(zip.length-22,true)===0x06054b50,'Placed model ZIP has standard local and central directory records');assert.throws(()=>core.zipFiles([{name:'../model.obj',data:'x'}]),/filename/);assert.throws(()=>core.zipFiles([{name:'a',data:'x'},{name:'a',data:'y'}]),/filename/);ok(true,'Archive paths and duplicate names cannot overwrite unrelated files');
+if(process.env.PORTAL_QA_OUTPUT){const dir=process.env.PORTAL_QA_OUTPUT;fs.mkdirSync(dir,{recursive:true});for(const file of fixtures)fs.writeFileSync(path.join(dir,file.name),file.bytes);fs.writeFileSync(path.join(dir,'map-fixture.jpg'),jpeg);fs.writeFileSync(path.join(dir,'placed-model.zip'),zip);fs.writeFileSync(path.join(dir,'outputs-models.json'),JSON.stringify({passed:true,checks,pdf:fixtures.map(({bytes,...f})=>f),model:{file:'placed-model.zip',vertices:verts,metadata:location}},null,2));}
+console.log(JSON.stringify({passed:true,checks:checks.length}));

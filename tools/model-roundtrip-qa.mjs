@@ -1,0 +1,32 @@
+/* Actual Three.js and OBJ/GLB loader checks; no browser or WebGL stub rendering. */
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import {File} from 'node:buffer';
+import {createHash,webcrypto} from 'node:crypto';
+const checks=[],elements=new Map(),events=new Map(),counts={camera:0,panel:0,toast:0};
+function element(id){if(!elements.has(id))elements.set(id,{id,value:'',checked:false,textContent:'',innerHTML:'',open:false,classList:{toggle(){},add(){},remove(){}},click(){counts.panel++;},setAttribute(){},append(){},prepend(){},addEventListener(){}});return elements.get(id);}
+globalThis.window=globalThis;globalThis.document={querySelector:element,addEventListener(name,fn){events.set(name,fn);},createElement(){return element('created-'+elements.size);}};globalThis.innerWidth=1440;globalThis.File=File;if(!globalThis.crypto)globalThis.crypto=webcrypto;
+globalThis.portal={ready:true,map:{addLayer(){},triggerRepaint(){},fitBounds(){counts.camera++;}},setViewMode(){counts.camera++;},toast(){counts.toast++;}};
+await import('../local-models.js');
+const api=globalThis.PortalLocalModels,ok=(value,name)=>{assert(value,name);checks.push(name);console.log('PASS',name);},near=(a,b)=>Math.abs(a-b)<1e-8;
+const text='o Y_up_house\nv 10 20 30\nv 11 20 30\nv 10 21 30\nf 1 2 3\n',file=new File([text],'house.obj',{type:'text/plain'}),hash=createHash('sha256').update(text).digest('hex');
+const placement={anchorWGS84:[-77.071,38.912],baseElevationMetres:7,sourceUnits:'feet',sourceUpAxis:'y',scale:2,headingDegrees:90,sourceSha256:hash,attribution:'Synthetic model fixture'};
+const first=await api.importPlacedModel(file,placement,{fit:false,keepPanel:true,quiet:true});
+ok(first.originalFile===file&&first.sourceSha256===hash,'Actual model import retains the exact original File and its SHA256');
+ok(counts.camera===0&&counts.panel===0&&counts.toast===0,'Quiet project restoration does not pan, switch panels or repeat messages');
+const result=api.exportPlaced(first.id),vertices=result.obj.split('\n').filter(v=>v.startsWith('v ')).map(v=>v.split(' ').slice(1).map(Number));
+ok(vertices.length===3&&near(vertices[0][0],0)&&near(vertices[0][1],.3048)&&near(vertices[0][2],7)&&near(vertices[1][1],-.3048)&&near(vertices[2][2],7.6096),'Actual Three.js hierarchy and OBJ loader export the expected centred, Y-up, feet-scaled, clockwise-rotated world vertices');
+ok(result.metadata.geometryBaked&&result.metadata.objCoordinates.nativeGISCRS===false&&result.metadata.anchorWGS84[0]===-77.071,'Placed model metadata declares local metres and its separate geographic anchor');
+const saved=api.serializeModelEntries()[0];ok(!Object.hasOwn(saved,'originalFile')&&saved.sourceSha256===hash&&saved.placement.sourceUnits==='feet','Serializable entries exclude binary and GPU objects while retaining original placement parameters');
+ok(api.serializeModelEntries({includeOriginal:true})[0].originalFile===file,'Project packaging can request the original File reference explicitly');
+ok(new TextDecoder().decode(await first.originalFile.arrayBuffer())===text,'Placed geometry export does not modify original model bytes');
+api.remove(first.id);ok(api.models.size===0,'Removing an imported model clears its registration');
+const restored=await api.importPlacedModel(file,saved.placement,{fit:false,keepPanel:true,quiet:true});ok(api.exportPlaced(restored.id).obj===result.obj,'Saving and restoring the original model and placement reproduces identical placed OBJ geometry');
+await assert.rejects(()=>api.importPlacedModel(file,{...placement,sourceSha256:'0'.repeat(64)},{fit:false,quiet:true}),/does not match/);ok(api.models.size===1,'A mismatched reattached model is rejected without replacing the already restored model');
+await assert.rejects(()=>api.importPlacedModel(file,result.metadata,{fit:false,quiet:true}),/original model/);ok(true,'Already-baked model coordinates cannot accidentally receive the placement transform twice');
+const gltf={asset:{version:'2.0',copyright:'Synthetic GLB fixture copyright'},scene:0,scenes:[{nodes:[0]}],nodes:[{mesh:0}],meshes:[{primitives:[{attributes:{POSITION:0}}]}],buffers:[{byteLength:36}],bufferViews:[{buffer:0,byteOffset:0,byteLength:36}],accessors:[{bufferView:0,componentType:5126,count:3,type:'VEC3',min:[0,0,0],max:[8,12,0]}]},json=Buffer.from(JSON.stringify(gltf)),n=Math.ceil(json.length/4)*4,glb=Buffer.alloc(28+n+36);glb.writeUInt32LE(0x46546c67,0);glb.writeUInt32LE(2,4);glb.writeUInt32LE(glb.length,8);glb.writeUInt32LE(n,12);glb.writeUInt32LE(0x4e4f534a,16);glb.fill(32,20,20+n);json.copy(glb,20);glb.writeUInt32LE(36,20+n);glb.writeUInt32LE(0x004e4942,24+n);[0,0,0,8,0,0,0,12,0].forEach((value,i)=>glb.writeFloatLE(value,28+n+i*4));
+const binary=await api.importPlacedModel(new File([glb],'house.glb'),{anchorWGS84:[-77,39],sourceUnits:'metres',sourceUpAxis:'y'},{fit:false,keepPanel:true,quiet:true}),binaryExport=api.exportPlaced(binary.id);
+ok(binary.triangles===1&&binaryExport.metadata.triangles===1&&binary.attribution==='Synthetic GLB fixture copyright','Actual GLB parsing retains geometry and its original copyright in the placed export');
+if(process.env.PORTAL_QA_OUTPUT){const out=process.env.PORTAL_QA_OUTPUT;fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,'three-placed-model.zip'),result.archive);fs.writeFileSync(path.join(out,'three-glb-model.zip'),binaryExport.archive);fs.writeFileSync(path.join(out,'model-roundtrip.json'),JSON.stringify({passed:true,checks,placedOBJ:result.obj,placement:result.metadata,glb:binaryExport.metadata},null,2));}
+api.clear();ok(api.models.size===0,'A full project reset releases all registered models');console.log(JSON.stringify({passed:true,checks:checks.length}));

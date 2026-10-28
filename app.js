@@ -40,28 +40,23 @@
     if((kind==='catalog'||kind==='connections')&&window.PortalLayers){PortalLayers.open();return;}
     var title='',content='',eyebrow='US BUILDINGS · WORKSPACE';
     if(kind==='demo') {
-      title='A working template. Synthetic data.';
+      title='Sample shapes';
       content='<p>The optional synthetic demo layer contains generated footprints, heights and edit flags for testing the interface.</p><p>The USBF and public catalog layers contain source-attributed published data. LoD2 samples remain experimental.</p><p>合成演示层用于测试界面；USBF 图层直接读取已发布的数据。</p>';
     } else if(kind==='bookmarks') {
       title='Places to start';
       content='<p>Return to the demo area, or explore the reference basemap.</p><button class="dialog-option" data-bookmark="demo">'+icon('layers')+'<span><strong>Georgetown · Demo workspace</strong><small>Washington, DC · synthetic building features</small></span>'+icon('arrow-right')+'</button><button class="dialog-option" data-bookmark="conus">'+icon('map')+'<span><strong>Continental United States</strong><small>Explore the US map and added layers</small></span>'+icon('arrow-right')+'</button>';
     } else if(kind==='basemap') {
-      title='Choose your canvas';
+      title='Background map';
       content='<p>Reference maps give context to the layers you explore.</p>'+Object.keys(basemaps).map(function(k){return '<button class="dialog-option '+(k===activeBasemap?'selected':'')+'" data-basemap="'+k+'">'+icon('map')+'<span><strong>'+basemaps[k].name+'</strong><small>'+basemaps[k].description+'</small></span>'+(k===activeBasemap?'<span class="pill">Active</span>':icon('arrow-right'))+'</button>';}).join('');
     } else if(kind==='lod2') {if(window.PortalModels){PortalModels.open();return;}
-      title='Roof models, in context';
-      content='<p>The map’s <strong>3D demo</strong> extrudes synthetic footprint heights as LoD1 blocks. Actual <strong>LoD2 roof models and point clouds are not connected</strong> to this map yet.</p><p>Your existing research viewer provides interactive roof examples and method comparisons.</p><a class="primary-button" href="https://feng96.github.io/research-daily/lod2/" target="_blank" rel="noopener">Open LoD2 research '+icon('external')+'</a><p style="margin-top:16px">The coverage layer is a synthetic sample boundary, not verified LoD2 availability.</p>';
+      title='3D models';content='<p>The model list is loading. Try again in a moment.</p>';
     } else if(kind==='connections') {
-      title='Bring your data into view';
-      content='<p>The interface is ready for three product connections:</p><ul><li><strong>USBF:</strong> published footprint tiles, stable identifiers and original/final geometry.</li><li><strong>Heights:</strong> source height tables, linked identifiers and coverage status.</li><li><strong>LoD2:</strong> sample models first, then tiled city models.</li></ul><p>No data endpoint, upload, authentication or production-job access is configured in this public template.</p><p>Implementation entry: <code>data-adapter.js → PortalData.load()</code></p>';
-    } else if(kind==='catalog') {
-      title='The building data catalog';
-      content='<p>A common map for your building data products. Live data will be connected after this interface review.</p><button class="dialog-option" data-layer-info="footprints">'+icon('layers')+'<span><strong>USBF footprints</strong><small>Geometry, lineage and revisions</small></span><span class="pill">Planned</span></button><button class="dialog-option" data-layer-info="height">'+icon('height')+'<span><strong>Building height</strong><small>Height attributes and source coverage</small></span><span class="pill">Planned</span></button><button class="dialog-option" data-modal="lod2">'+icon('cube')+'<span><strong>LoD2 roof models</strong><small>Research models and comparisons</small></span>'+icon('external')+'</button>';
+      title='Add data';content='<p>Choose a dataset, open a local file or paste a link to data.</p>';
     } else if(kind==='help') {
-      title='A familiar way to explore';
-      content='<p>Add data from the catalog, a public URL or a local file.</p><dl class="help-grid"><dt>Layers</dt><dd>Choose a dataset; open its settings for opacity, source details and updates. Style &amp; filters stays collapsed until needed.</dd><dt>Tools</dt><dd>Open the attribute table, measure, draw an analysis boundary, calculate statistics, make charts or run spatial analysis.</dd><dt>Analysis data</dt><dd>Capture a frozen source snapshot first. USBF analysis covers the loaded neighborhood. PMTiles are display fragments: connect original vector data for geometry analysis and complete downloads.</dd><dt>3D models</dt><dd>Browse experimental US roofs and training references, or place your own OBJ / GLB using explicit units and a geographic anchor.</dd><dt>CRS</dt><dd>Settings changes coordinate readouts and actual import / export conversions. The map renders in Web Mercator.</dd><dt>Create map</dt><dd>Generate a PNG with title, legend, scale, north arrow and sources. Download the image and metadata or print to PDF.</dd><dt>Download</dt><dd>Export full loaded vector geometry, a scoped source batch or the original raster. Local files and models stay in your browser; download them before closing.</dd></dl>';
+      title='Help';
+      content='<p>Add data from the catalog, a public URL or a local file.</p><dl class="help-grid"><dt>Layers</dt><dd>Choose a dataset; open its settings for opacity, source details and updates. Change colors or filter the buildings you want to see.</dd><dt>Tools</dt><dd>Open the attribute table, measure, draw an analysis boundary, calculate statistics, make charts or run spatial analysis.</dd><dt>Analysis data</dt><dd>Choose an area and a dataset, then view statistics or analyze it. Results describe that area. Use original data when a map layer only contains display tiles.</dd><dt>3D models</dt><dd>Browse experimental US roofs and training references, or place your own OBJ / GLB using explicit units and a geographic anchor.</dd><dt>CRS</dt><dd>Settings changes coordinate readouts and actual import / export conversions. The map renders in Web Mercator.</dd><dt>Create map</dt><dd>Generate a PNG with title, legend, scale, north arrow and sources. Download the image and metadata or print to PDF.</dd><dt>Download</dt><dd>Export full loaded vector geometry, the buildings in your chosen area or the original raster. Local files and models stay in your browser; download them before closing.</dd></dl>';
     } else {
-      title='US Buildings · Open workspace';
+      title='About USBF';
       content='<p>An open GIS workspace for <strong>building footprints, heights and roof models</strong>.</p><p>USBF reads our current Source Cooperative publication and checks for updates automatically. Inspect published footprints, inherited GBA heights and recorded edit attributes, or compare other datasets. Models contains experimental US roofs and actual 3DBAG training references.</p><p>Created for Yinan Feng.</p><a class="primary-button" href="https://feng96.github.io/research-daily/" target="_blank" rel="noopener">Research updates '+icon('external')+'</a>';
     }
     $('#dialog-title').textContent=title;$('#dialog-eyebrow').textContent=eyebrow;$('#dialog-content').innerHTML=content;
@@ -178,14 +173,26 @@
     if(q.get('mode')==='3d'){setViewMode(true,false);var bearing=Number(q.get('bearing')),pitch=Number(q.get('pitch'));map.jumpTo({bearing:q.has('bearing')&&Number.isFinite(bearing)?Math.max(-180,Math.min(180,bearing)):-20,pitch:q.has('pitch')&&Number.isFinite(pitch)?Math.max(0,Math.min(60,pitch)):55});}
     if(featuresById.has(q.get('feature')))selectFeature(q.get('feature'),false);
   }
+  var searchRevision=0;
+  function showSearchResults(results,emptyText) {
+    $('#search-results').innerHTML=results.length?results.map(function(r){return '<button type="button" role="option" data-search-result="'+escapeHTML(r.action).replace(/"/g,'&quot;')+'">'+escapeHTML(r.label)+'<small>'+escapeHTML(r.note||'')+'</small></button>';}).join(''):'<p>'+escapeHTML(emptyText||'Enter a U.S. city, state or street address, then press Enter.')+'</p>';
+    $('#search-results').hidden=false;$('#place-search').setAttribute('aria-expanded','true');return results;
+  }
   function search() {
-    var query=$('#place-search').value.trim().toLowerCase(),results=[];if(window.PortalInventory){var found=PortalInventory.search(query);if(found.length)return found;}
-    if(!query){$('#search-results').hidden=true;return results;}
-    if(/george|wash|dc|demo area/.test(query))results.push({label:'Georgetown, Washington, DC',note:'Synthetic demo area',action:'demo'});
-    if(/united|usa|conus|america/.test(query))results.push({label:'Continental United States',note:'Reference basemap only',action:'conus'});
-    if(collection)collection.features.filter(function(f){return f.id.toLowerCase().includes(query);}).slice(0,7).forEach(function(f){results.push({label:f.id,note:'Synthetic demonstration feature',action:f.id});});
-    $('#search-results').innerHTML=results.length?results.map(function(r){return '<button type="button" data-search-result="'+r.action+'">'+r.label+'<small>'+r.note+'</small></button>';}).join(''):'<p>Try an indexed city, longitude/latitude, or a sample model ID.</p>';
-    $('#search-results').hidden=false;return results;
+    searchRevision++;var query=$('#place-search').value.trim(),results=[],seen=new Set();
+    if(!query){$('#search-results').hidden=true;$('#place-search').setAttribute('aria-expanded','false');return results;}
+    var local=window.PortalExplorer?.searchLocal(query)||[],other=window.PortalInventory?.search(query.toLowerCase())||[];
+    local.concat(other.filter(function(r){return !local.length||!r.action.startsWith('place-');})).forEach(function(r){var k=r.action+'|'+r.label;if(!seen.has(k)){seen.add(k);results.push(r);}});
+    return showSearchResults(results.slice(0,10));
+  }
+  async function submitSearch() {
+    var query=$('#place-search').value.trim(),results=search();if(!query)return;
+    var address=/\d/.test(query)&&/[a-z]/i.test(query)&&!/^[-+\d.,\s]+$/.test(query);
+    if(results.length&&(!address||/^(model:|coords:)/.test(results[0].action))){$('#search-results [data-search-result]').click();return;}
+    if(!window.PortalExplorer){showSearchResults(results,'Choose a city, or enter longitude and latitude.');return;}
+    var revision=++searchRevision;showSearchResults([],'Searching for this address…');
+    try{var found=await PortalExplorer.searchAddress(query);if(revision!==searchRevision)return;showSearchResults(found,'No matching address. Include the street number, city and state.');if(found.length===1)$('#search-results [data-search-result]').click();}
+    catch(e){if(revision===searchRevision)showSearchResults([],e.message||'Address search is unavailable. Try a city or enter coordinates.');}
   }
   function bookmark(place) {
     if(!map)return;
@@ -229,10 +236,10 @@
     if(el.dataset.basemap){setBasemap(el.dataset.basemap);$('#workspace-dialog').close();}
     if(el.dataset.bookmark){bookmark(el.dataset.bookmark);$('#workspace-dialog').close();}
     if(el.dataset.feature)selectFeature(el.dataset.feature,true);
-    if(el.dataset.searchResult){if(window.PortalInventory?.navigate(el.dataset.searchResult)){$('#search-results').hidden=true;return;}if(el.dataset.searchResult.startsWith('DEMO-'))selectFeature(el.dataset.searchResult,true);else bookmark(el.dataset.searchResult);$('#search-results').hidden=true;$('#place-search').value='';}
+    if(el.dataset.searchResult){if(window.PortalExplorer?.navigate(el.dataset.searchResult)){$('#search-results').hidden=true;$('#place-search').setAttribute('aria-expanded','false');return;}if(window.PortalInventory?.navigate(el.dataset.searchResult)){$('#search-results').hidden=true;$('#place-search').setAttribute('aria-expanded','false');return;}if(el.dataset.searchResult.startsWith('DEMO-'))selectFeature(el.dataset.searchResult,true);else bookmark(el.dataset.searchResult);$('#search-results').hidden=true;$('#place-search').value='';}
   });
   document.addEventListener('keydown',function(e){
-    if(e.key==='Escape') {if($('#workspace-dialog').open)$('#workspace-dialog').close();else{setTool('explore');$('#search-results').hidden=true;$('#sidebar').classList.remove('is-open');$('[data-action=layers]').setAttribute('aria-expanded','false');}}
+    if(e.key==='Escape') {if($('#workspace-dialog').open)$('#workspace-dialog').close();else{setTool('explore');$('#search-results').hidden=true;$('#place-search').setAttribute('aria-expanded','false');$('#sidebar').classList.remove('is-open');$('[data-action=layers]').setAttribute('aria-expanded','false');}}
     if(e.key==='/'&&!/input|textarea/i.test(document.activeElement.tagName)&&!$('#workspace-dialog').open){e.preventDefault();$('[data-tab=layers]').click();$('#sidebar').classList.add('is-open');$('[data-action=layers]').setAttribute('aria-expanded','true');$('#layer-filter').focus();}
     if((e.key==='Enter'||e.key===' ')&&e.target.matches('[data-feature]')){e.preventDefault();selectFeature(e.target.dataset.feature,true);}
     if((e.key==='ArrowLeft'||e.key==='ArrowRight')&&e.target.matches('[data-tab]')){e.preventDefault();var tabs=['layers','models'],next=tabs[(tabs.indexOf(e.target.dataset.tab)+1)%2];$('[data-tab='+next+']').click();$('[data-tab='+next+']').focus();}
@@ -242,8 +249,10 @@
   ['footprints','original','height','lod2'].forEach(function(k){$('#layer-'+k).addEventListener('change',syncLayers);});
   $('#opacity').addEventListener('input',syncLayers);$('#selected-only').addEventListener('change',renderTable);
   $('#place-search').addEventListener('input',search);
-  $('#search-form').addEventListener('submit',function(e){e.preventDefault();var results=search();if(results.length)$('[data-search-result]').click();});
-  document.addEventListener('click',function(e){if(!e.target.closest('.place-search'))$('#search-results').hidden=true;});
+  $('#search-form').addEventListener('submit',function(e){e.preventDefault();submitSearch();});
+  $('#place-search').addEventListener('keydown',function(e){if(e.key==='ArrowDown'&&!$('#search-results').hidden){var first=$('#search-results [data-search-result]');if(first){e.preventDefault();first.focus();}}});
+  $('#search-results').addEventListener('keydown',function(e){var rows=Array.from(this.querySelectorAll('[data-search-result]')),i=rows.indexOf(document.activeElement);if(['ArrowDown','ArrowUp'].includes(e.key)&&rows.length){e.preventDefault();rows[(i+(e.key==='ArrowDown'?1:rows.length-1)+rows.length)%rows.length].focus();}if(e.key==='Escape'){$('#place-search').focus();this.hidden=true;$('#place-search').setAttribute('aria-expanded','false');}});
+  document.addEventListener('click',function(e){if(!e.target.closest('.place-search')){$('#search-results').hidden=true;$('#place-search').setAttribute('aria-expanded','false');}});
 
   function featureBounds(f) {
     var ring=f.geometry.coordinates[0];

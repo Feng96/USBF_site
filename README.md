@@ -2,24 +2,34 @@
 
 [Open the workspace](https://feng96.github.io/USBF_site/).
 
-A browser GIS for the published USBF building inventory, comparison datasets,
-research roof models and your own data. Add data is the primary action; the map
-and layer list stay visible while detailed tools open on demand.
+A map for the published USBF U.S. building inventory, comparison datasets and
+research roof models. Search a place, inspect buildings, summarize an area and
+save a map or data. Advanced controls stay in the tools and layer menus.
 
-## Workspace 1.0
+## Workspace 1.1
 
 - A compact header and toolbar. Statistics, spatial tools, charts, drawing,
   coordinate settings and map styling open from **Tools**. Layer opacity,
   publication status and source details live in each layer’s settings.
+- A local list of 821 U.S. cities, states and coverage entries; street addresses
+  use an explicitly submitted U.S. Census Bureau query. Address points are
+  approximate locations along a street range, separate from identified buildings.
+  Building cards show readable height, footprint source, area and edit status;
+  original fields and component licenses remain under details.
 - Local and HTTPS imports: GeoJSON, CSV/TSV points, KML, zipped Shapefiles,
   GeoTIFF/COG, georeferenced PNG/JPG/WebP and vector/raster PMTiles. Network
   connections also accept XYZ vector/raster tiles and WMS 1.1.1 in EPSG:3857.
 - Building heights render as LoD1 only when a real positive source height exists.
   The existing eight US experimental LoD2 buildings and twenty Dutch training
   roofs remain separate collections. Import static OBJ or self-contained GLB
-  models with explicit placement, up axis, units, elevation and scale.
+  models with explicit placement, up axis, units, elevation and scale. Download
+  original files or a ZIP containing placed OBJ geometry and its location file.
+  Model export actually applies units, orientation, scale and elevation.
 - A frozen data snapshot drives numeric summaries, category frequencies,
-  histograms and SVG charts. Nulls and booleans never become numeric zero.
+  histograms, scatter plots and grouped averages. Statistics prepare their inputs
+  automatically; explicit refresh marks a new calculation. PNG charts embed their
+  exact source, area and licenses; SVG and CSV are also available. Nulls, missing
+  building-height codes and booleans never become measured zero height.
 - Metre-based buffers, polygon clipping, intersection overlay, spatial selection,
   counts and intersection-area summaries within polygons, centroids and geometry
   measurements. Results become independent, downloadable vector layers.
@@ -34,7 +44,9 @@ and layer list stay visible while detailed tools open on demand.
 - Map layouts include the current rendered vectors, raster previews and 3D
   models, plus title, dataset legend, scale, north arrow, date, extent and source
   credits. Download PNG at standard or true 2× rendering resolution, download
-  map metadata, or print/save PDF. Pending/failed data require explicit consent
+  map metadata, or download a PDF directly. PDF supports Letter/A4/A3, portrait
+  or landscape and page margins, plus an attached source-details JSON.
+  Pending/failed data require explicit consent
   to make a clearly labelled partial map.
 - Download complete loaded source geometry as WGS84 GeoJSON, declared projected
   JSON or CSV with WKT. Original local raster files remain available unchanged.
@@ -73,11 +85,12 @@ rendered tile alone is never an analytical original.
 1. Choose **Add data** → Catalog, From URL or Local File. Declare the source CRS
    when the file does not embed it. CSV requires valid x/y columns; images need
    bounds or a world file. ZIPs need matching `.prj` files or a declared CRS.
-2. Select a layer and open **Tools → Statistics**. Choose the full loaded layer,
-   current extent or selection, then **Capture snapshot**. Verify the scope
-   before calculating or making a chart.
-3. For a clip or zone summary, add/draw a complete polygon layer, select the
-   source snapshot and choose that polygon layer as the reference. Overlapping
+2. Select a layer and open **Tools → Statistics**. The current area is summarized
+   automatically. Choose the full loaded layer or one selected feature when
+   needed. Change the area or source, then **Refresh data** for new statistics.
+3. For a clip or zone summary, use the current map area or add/draw a complete
+   polygon layer as a study area. The chosen source is frozen when each operation
+   starts. Overlapping
    clip masks are unioned; intersection overlays and zone summaries explicitly
    describe how overlapping zones contribute.
 4. Use **Create map** for images and **Download** for vector data/original files.
@@ -171,6 +184,7 @@ This is a buildless static site; GitHub Pages serves the repository root.
 A local HTTP server is required for ES modules and browser file APIs.
 `?empty=1` starts without a default catalog layer.
 
+- `buildings-explorer.js`: U.S. places, explicit Census address lookup and readable building facts.
 - `data-manager.js`: map layers, source state, visibility, opacity and styles.
 - `data-import.js` / `import-worker.js`: vector/raster parsing and reprojection.
 - `analysis-data.js` / `analysis-ui.js`: scoped snapshots, analysis and charts.
@@ -190,6 +204,9 @@ node tools/analysis-qa.cjs
 node tools/crs-export-qa.cjs
 node tools/local-models-qa.cjs
 node tools/pmtiles-qa.cjs
+node tools/explorer-qa.cjs
+node tools/analysis-export-qa.cjs
+node tools/outputs-models-qa.cjs
 ```
 
 `tools/workspace-qa.cjs` uses Playwright, real WebGL and real parsers with explicit
@@ -216,3 +233,9 @@ Library references: [Turf](https://turfjs.org/),
 Application MIT licensing does not replace dataset licensing. Each provider and
 model retains its source attribution and component terms. US experimental LoD2
 results remain experiments and are not a national production roof inventory.
+
+The 1.1 beginner flows were informed by the official [GeoLibre guide](https://geolibre.app/)
+and [QGIS interface / print layout documentation](https://docs.qgis.org/3.40/en/docs/user_manual/print_composer/overview_composer.html).
+The application remains centered on the published U.S. building data rather than
+exposing every GIS operation on the starting map. Internal processing parameters
+stay in source metadata and developer documentation.

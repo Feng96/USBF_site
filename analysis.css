@@ -47,3 +47,47 @@
 .analysis-workspace .analysis-chart-result{margin-top:20px;max-width:100%;overflow:hidden}
 .analysis-workspace .analysis-chart-result svg{display:block;width:100%;height:auto;border:1px solid #e0e8e2;border-radius:8px}
 @media(max-width:620px){.analysis-workspace{width:calc(100vw - 18px);max-height:calc(100dvh - 18px);border-radius:10px}.analysis-workspace .analysis-header{padding:19px 17px 15px}.analysis-workspace .analysis-tabs{padding:0 17px;gap:18px}.analysis-workspace .analysis-tabs button{font-size:12px}.analysis-workspace .analysis-body{padding:18px 17px 24px}.analysis-workspace .analysis-grid{grid-template-columns:minmax(0,1fr);gap:14px}.analysis-workspace .analysis-actions{gap:8px}.analysis-workspace button{font-size:12px;padding:10px 12px}.analysis-workspace h2{font-size:21px}.analysis-workspace td,.analysis-workspace th{padding:9px}.analysis-workspace .analysis-chart-result{overflow-x:auto}.analysis-workspace .analysis-chart-result svg{min-width:540px}.analysis-workspace .analysis-snapshot{padding:12px}}
+
+/* A concise overview for people who do not use GIS every day. */
+.analysis-workspace{width:min(860px,calc(100vw - 32px));border-radius:10px;box-shadow:0 18px 65px #1737292e}
+.analysis-workspace .analysis-header{padding:21px 25px 17px;align-items:center}
+.analysis-workspace h2{font-size:21px;letter-spacing:-.4px;margin:0}
+.analysis-workspace .analysis-tabs{padding:0 25px;gap:25px}
+.analysis-workspace .analysis-tabs button{font-size:13px}
+.analysis-workspace .analysis-body{padding:20px 25px 25px}
+.analysis-workspace .analysis-inputs{padding-bottom:13px;margin-bottom:15px}
+.analysis-workspace .analysis-input-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.analysis-workspace .analysis-text-button{padding:5px 0;min-height:28px;border:0;background:transparent;color:#2c725a;font-size:12px;text-decoration:underline;text-underline-offset:3px}
+.analysis-workspace .analysis-text-button:hover:enabled{background:transparent;border:0}
+.analysis-workspace .analysis-snapshot{padding:11px 14px;background:#f8faf8;border-color:#e0e8e2;border-radius:6px;margin-bottom:16px}
+.analysis-workspace .analysis-snapshot>strong{font-size:12px}
+.analysis-workspace .analysis-snapshot .analysis-note{font-size:10px;color:#809184}
+.analysis-workspace .analysis-snapshot details{margin:7px 0 0}
+.analysis-workspace .analysis-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;margin:6px 0 12px}
+.analysis-workspace .analysis-metric{padding:16px 13px;background:#fff;border:1px solid #dbe5de;border-radius:7px;min-width:0}
+.analysis-workspace .analysis-metric>strong{display:block;font-size:25px;letter-spacing:-.6px;line-height:1.2;font-weight:600;color:#275e48}
+.analysis-workspace .analysis-metric>span{display:block;font-size:11px;color:#536f5c;margin-top:8px}
+.analysis-workspace .analysis-metric>small{display:block;font-size:10px;color:#849287;margin-top:5px}
+.analysis-workspace .analysis-more-statistics{border-top:1px solid #e2e9e4;border-bottom:1px solid #e2e9e4;padding:13px 0;margin:18px 0 8px}
+.analysis-workspace .analysis-more-statistics>summary{font-size:13px;font-weight:550}
+.analysis-workspace .analysis-more-statistics[open]>summary{margin-bottom:16px}
+.analysis-workspace .analysis-source-facts{margin:9px 0 3px;font-size:11px}
+.analysis-workspace .analysis-source-facts>div{display:grid;grid-template-columns:85px 1fr;gap:13px;padding:6px 0;border-bottom:1px solid #e5ece6}
+.analysis-workspace .analysis-source-facts dt{color:#829185}
+.analysis-workspace .analysis-source-facts dd{margin:0;color:#526e5b;overflow-wrap:anywhere}
+.analysis-workspace .analysis-source-facts>div:last-child{border-bottom:0}
+.analysis-workspace .analysis-note{font-size:11px;line-height:1.65}
+.analysis-workspace .analysis-result>p{font-size:12px;color:#617867}
+.analysis-workspace .analysis-warning{font-size:11px;line-height:1.65}
+.analysis-workspace .analysis-chart-result svg{border-radius:6px}
+@media(max-width:620px){
+ .analysis-workspace{width:calc(100vw - 16px);max-height:calc(100dvh - 16px)}
+ .analysis-workspace .analysis-header{padding:18px 16px 15px}
+ .analysis-workspace h2{font-size:19px}
+ .analysis-workspace .analysis-tabs{padding:0 16px;gap:20px}
+ .analysis-workspace .analysis-body{padding:17px 16px 22px}
+ .analysis-workspace .analysis-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .analysis-workspace .analysis-metric{padding:13px 11px}
+ .analysis-workspace .analysis-metric>strong{font-size:22px}
+ .analysis-workspace .analysis-source-facts>div{grid-template-columns:65px 1fr;gap:9px}
+}
