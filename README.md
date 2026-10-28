@@ -6,7 +6,7 @@ A map for the published USBF U.S. building inventory, comparison datasets and
 research roof models. Search a place, inspect buildings, summarize an area and
 save a map or data. Advanced controls stay in the tools and layer menus.
 
-## Workspace 1.2
+## Workspace 1.3
 
 - A compact header and toolbar. Statistics, spatial tools, charts, drawing,
   coordinate settings and map styling open from **Tools**. Layer opacity,
@@ -19,15 +19,19 @@ save a map or data. Advanced controls stay in the tools and layer menus.
   approximate locations along a street range, separate from identified buildings.
   Building cards show readable height, footprint source, area and edit status;
   original fields and component licenses remain under details.
-- Local and HTTPS imports: GeoJSON, CSV/TSV points, KML, zipped Shapefiles,
+- Local and HTTPS imports: GeoJSON, GeoParquet, CSV/TSV points, KML, zipped Shapefiles,
   GeoTIFF/COG, georeferenced PNG/JPG/WebP and vector/raster PMTiles. Network
   connections also accept XYZ vector/raster tiles and WMS 1.1.1 in EPSG:3857.
+  GeoParquet keeps exact identifiers, dates, nulls, original files and source
+  licenses. Embedded horizontal CRS definitions are used when supported;
+  an unknown CRS prompts for a declaration before adding the data.
 - Building heights render as LoD1 only when a real positive source height exists.
   The existing eight US experimental LoD2 buildings and twenty Dutch training
   roofs remain separate collections. Import static OBJ or self-contained GLB
   models with explicit placement, up axis, units, elevation and scale. Download
   original files or a ZIP containing placed OBJ geometry and its location file.
   Model export actually applies units, orientation, scale and elevation.
+  GLB structure and allocation sizes are checked before the 3D loader runs.
 - **Models → Create from buildings** produces genuine flat-roof LoD1 OBJ/GLB
   files from complete original footprints and positive supplied heights. Holes,
   multipart buildings and exact geographic placement are retained. Missing
@@ -57,7 +61,9 @@ save a map or data. Advanced controls stay in the tools and layer menus.
   unchanged.
 - Map layouts include the current rendered vectors, raster previews and 3D
   models, plus title, dataset legend, scale, north arrow, date, extent and source
-  credits. Download PNG at standard or true 2× rendering resolution, download
+  credits. Legends use the same colors and classes as the map, including source,
+  change status and the continuous building-height scale. Download PNG at standard
+  or true 2× rendering resolution, download
   map metadata, or download a PDF directly. PDF supports Letter/A4/A3, portrait
   or landscape and page margins. Paper text uses readable physical sizes; long
   source credits continue on additional pages. A source-details JSON stays attached.
@@ -68,6 +74,8 @@ save a map or data. Advanced controls stay in the tools and layer menus.
   files, source rights, derived-result scope, styles, order, camera and CRS.
   Catalog sources reconnect to the latest publication. Embedded files are checked
   before replacement; a staging failure keeps the previous map intact.
+  GeoTIFF windows retain their original read extent when a saved map opens or
+  its palette changes.
 - Download complete loaded source geometry as WGS84 GeoJSON, declared projected
   JSON or CSV with WKT. Original local raster files remain available unchanged.
 
@@ -135,6 +143,10 @@ restore up to 64 text labels per layer and 128 across a saved map.
   Ground elevation and roof shape are not inferred.
 - Direct vector/image inputs: 32 MiB; vectors: 50,000 features / one million
   coordinate positions. Zipped Shapefile expansion is checked before parsing.
+- GeoParquet: bounded local files and HTTPS downloads, GeoParquet 1.0/1.1 WKB
+  geometry in XY or XYZ. Spherical non-point geometry, GeoArrow encoding and
+  unsupported compression are rejected with an explanation. Memory limits apply
+  before page decoding; a failed or cancelled import never adds a partial layer.
 - GeoTIFF/COG: range-based access, bounded native decode memory, overview/window
   selection, maximum 1536 × 1536 preview. NoData is retained. GeoTIFF extra-sample
   alpha is currently not applied and is recorded in metadata; PNG/JPG/WebP alpha
@@ -216,11 +228,14 @@ A local HTTP server is required for ES modules and browser file APIs.
 - `buildings-explorer.js`: U.S. places, explicit Census address lookup and readable building facts.
 - `data-manager.js`: map layers, source state, visibility, opacity and styles.
 - `data-import.js` / `import-worker.js`: vector/raster parsing and reprojection.
+- `geoparquet-import-core.js` / `geoparquet-import-worker.js`: bounded GeoParquet reads.
 - `analysis-data.js` / `analysis-ui.js`: scoped snapshots, analysis and charts.
 - `workspace-crs.js`: actual coordinate conversion and settings.
 - `map-composer.js`: rendered map layouts and analytical source downloads.
+- `map-legend.js` / `map-paper.js`: shared map colors and physical PDF layouts.
 - `workspace-tools.js`: compact toolbar and geographic drawing/annotations.
 - `local-models.js`: user-supplied OBJ/GLB placement and shared-WebGL rendering.
+- `model-asset-guard.js`: GLB structural and memory checks before parsing.
 - `model-browser.js`: verified experimental and training model collections.
 - `usbf-source.js` / `usbf-worker.js`: live publication and bounded source reads.
 
@@ -236,7 +251,16 @@ node tools/pmtiles-qa.cjs
 node tools/explorer-qa.cjs
 node tools/analysis-export-qa.cjs
 node tools/outputs-models-qa.cjs
+node tools/geoparquet-import-qa.cjs
+node tools/legend-qa.cjs
+node tools/model-asset-guard-qa.cjs
 ```
+
+Use Node 22 or newer for the complete suite. GeoParquet parser checks use tiny
+synthetic files: generate them with
+`python3 tools/geoparquet-fixtures.py /path/to/scratch/fixtures` (requires PyArrow),
+then pass that directory to `node tools/geoparquet-qa.cjs` and
+`node tools/geoparquet-worker-qa.cjs` as their first argument.
 
 `tools/workspace-qa.cjs` uses Playwright, real WebGL and real parsers with explicit
 network fixtures to exercise import, CRS, statistics/charts, spatial results,

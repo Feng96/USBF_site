@@ -53,4 +53,18 @@ ok(safe.body.includes('"A,""B""\nC"'),'Quotes, commas and newlines receive valid
 const local=layer(buildings.data.features,{type:'viewport',driver:'usbf',name:'Current USBF'});local.release={name:'USBF_v1',updated:'2026-10-27'};local.viewBounds=[-77,38,-76,39];local.viewLimited=true;local.viewLoadedAt='2026-10-28T08:00:00Z';local.cfg.license='Component terms';local.data.provenance={scope:'loaded-view',scopeLabel:'Loaded neighborhood',studyArea:{name:'Research boundary'},licenses:['Component license']};
 const localMeta=T.metadata(local);ok(localMeta.scope.includes('loaded neighborhood')&&localMeta.release.name==='USBF_v1'&&localMeta.limited&&localMeta.studyArea==='Research boundary','Live table exports retain neighborhood scope, release, incompleteness and the original study-area context');
 ok(T.metadata(layer([],{type:'pmtiles',id:'vida-usa'})).scope.includes('not unique buildings'),'Tiled table exports explicitly retain fragment scope rather than claiming building totals');
+const many=Array.from({length:20001},(_,i)=>point({record:i})),large=layer(many),exact=T.collect(large,many.slice(0,20000),f=>f);
+ok(exact.features.length===20000&&!exact.limited&&!T.metadata(large).tableLimited,'Exactly 20,000 visible records are complete when no additional unique record exists');
+const repeated=T.collect(large,[...many.slice(0,20000),many[0],many[19999]],f=>f);
+ok(!repeated.limited&&repeated.features.length===20000,'Repeated render fragments do not falsely mark the table as truncated');
+const capped=T.collect(large,[...many,many[0]],f=>f),capMeta=T.metadata(large);
+ok(capped.features.length===20000&&capped.limited&&capMeta.limited&&capMeta.tableLimited&&!capMeta.sourceLimited,'The 20,001st unique source record marks a table cap independently of a complete original layer');
+ok(capMeta.scope.includes('first 20,000')&&capMeta.scope.includes('search and sorting apply to this subset'),'A capped table scope explicitly states the search and sort subset');
+const cappedCSV=T.csv(large,capped.features.slice(0,1),capMeta);
+ok(cappedCSV.fields.includes('__map_table_partial')&&cappedCSV.fields.includes('__map_table_record_limit')&&cappedCSV.metadata.limited,'Table CSV records both incompleteness and the independent table record cap');
+const csvLines=cappedCSV.body.split('\r\n'),parseRow=line=>Array.from(line.matchAll(/"((?:[^"]|"")*)"(?:,|$)/g),m=>m[1].replace(/""/g,'"')),csvHeader=parseRow(csvLines[0]),csvRow=parseRow(csvLines[1]);
+ok(csvRow[csvHeader.indexOf('__map_partial')]==='true'&&csvRow[csvHeader.indexOf('__map_table_partial')]==='true','The actual table CSV row serializes partial markers as true');
+T.collect(large,many.slice(0,5),f=>f);
+ok(!T.metadata(large).limited&&!T.metadata(large).tableLimited,'A later uncapped view clears the table-only partial marker');
+ok(T.metadata(local).limited&&!T.metadata(local).tableLimited,'An original source limit remains true independently of another layer’s table cap');
 console.log(JSON.stringify({passed:true,checks:checks.length}));

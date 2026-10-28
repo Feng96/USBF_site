@@ -1,6 +1,6 @@
 /* Flat-roof models from complete source footprints and supplied heights. */
 import * as THREE from './vendor/three.module.js';
-import './local-model-core.js?v=1.2';
+import './local-model-core.js?v=1.3';
 
 const root=globalThis,clone=value=>JSON.parse(JSON.stringify(value));
 export const limits=Object.freeze({buildings:2000,vertices:75000,geometryVertices:4000,topologyComparisons:20000000,triangles:150000,radiusMetres:10000,heightMetres:12000});

@@ -25,7 +25,7 @@
         if(!object(l.data)||l.data.type!=='FeatureCollection'||!Array.isArray(l.data.features)||!l.data.features.length||l.data.features.length>50000||!object(l.meta))fail('A saved vector layer is invalid.');options.validateVector?.(l.data);
         for(const k of ['page','sourceUrl'])if(l.meta[k])https(l.meta[k]);
       }else if(l.kind==='raster'){
-        if(!object(l.import)||!['geotiff','image'].includes(l.import.type)||!l.asset&&!l.import.url)fail('A saved raster is missing its source.');if(l.import.url)https(l.import.url);
+        if(!object(l.import)||!['geotiff','image'].includes(l.import.type)||!l.asset&&!l.import.url)fail('A saved raster is missing its source.');if(l.import.url)https(l.import.url);if(l.import.readExtentWGS84!==undefined){const b=l.import.readExtentWGS84;if(!Array.isArray(b)||b.length!==4||!b.every(Number.isFinite)||b[0]>=b[2]||b[1]>=b[3]||Math.abs(b[0])>180||Math.abs(b[2])>180||Math.abs(b[1])>85.05113||Math.abs(b[3])>85.05113)fail('A saved raster has an invalid read area.');}
       }else if(l.kind==='image-preview'){
         if(!l.asset||!Array.isArray(l.coordinates)||l.coordinates.length!==4||!l.coordinates.every(c=>Array.isArray(c)&&c.length===2&&c.every(Number.isFinite)&&Math.abs(c[0])<=180&&Math.abs(c[1])<=85.05113))fail('A saved image preview has invalid map corners.');
       }else if(l.kind==='connection'){

@@ -174,6 +174,7 @@
     if(featuresById.has(q.get('feature')))selectFeature(q.get('feature'),false);
   }
   var searchRevision=0;
+  function cancelPlaceSearch(){searchRevision++;$('#place-search').value='';$('#search-results').hidden=true;$('#search-results').innerHTML='';$('#place-search').setAttribute('aria-expanded','false');}
   function showSearchResults(results,emptyText) {
     $('#search-results').innerHTML=results.length?results.map(function(r){return '<button type="button" role="option" data-search-result="'+escapeHTML(r.action).replace(/"/g,'&quot;')+'">'+escapeHTML(r.label)+'<small>'+escapeHTML(r.note||'')+'</small></button>';}).join(''):'<p>'+escapeHTML(emptyText||'Enter a U.S. city, state or street address, then press Enter.')+'</p>';
     $('#search-results').hidden=false;$('#place-search').setAttribute('aria-expanded','true');return results;
@@ -323,7 +324,7 @@
     $('#feature-count').textContent=collection.features.length;renderTable();saveView();
     $('#zoom-label').textContent='Zoom '+map.getZoom().toFixed(1);
     window.portal={engine:'MapLibre GL JS',get map(){return map;},get data(){return collection;},get selected(){return selected;},get view3d(){return view3d;},selectFeature:selectFeature};
-    window.portal.setTool=setTool;window.portal.getTool=function(){return tool;};window.portal.toast=toast;window.portal.clearSelection=clearSelection;window.portal.saveView=saveView;window.portal.setViewMode=setViewMode;window.portal.setBasemap=setBasemap;window.portal.getBasemap=function(){return activeBasemap;};window.portal.initialHash=initialHash;
+    window.portal.cancelPlaceSearch=cancelPlaceSearch;window.portal.setTool=setTool;window.portal.getTool=function(){return tool;};window.portal.toast=toast;window.portal.clearSelection=clearSelection;window.portal.saveView=saveView;window.portal.setViewMode=setViewMode;window.portal.setBasemap=setBasemap;window.portal.getBasemap=function(){return activeBasemap;};window.portal.initialHash=initialHash;
     if(window.PortalLayers)await PortalLayers.init(window.portal,initialHash);
     window.PortalInventory?.init(window.portal);window.portal.ready=true;document.dispatchEvent(new CustomEvent('portal-ready'));
     if(!initialHash&&!new URLSearchParams(location.search).has('empty')){PortalLayers.add(PortalLayers.catalog[0],{restore:true});}

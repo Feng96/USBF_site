@@ -6,11 +6,23 @@
   const $=s=>document.querySelector(s);
   const normalize=code=>{const s=String(code||WGS84).trim();return /^\d+$/.test(s)?'EPSG:'+s:/^epsg:\d+$/i.test(s)?s.toUpperCase():/^(WGS84|CRS:84)$/i.test(s)?WGS84:s;};
   function library(){if(typeof globalThis.proj4!=='function')throw Error('The coordinate conversion library has not loaded.');return globalThis.proj4;}
+  function horizontalProjection(p,key){
+    let parsed;if(key.startsWith('+')){
+      // Proj4js parses repeated +proj tokens as the final one, rather than a
+      // PROJ pipeline. A chain must not sneak through as its last 2D step.
+      const tokens=key.split('+').map(s=>s.trim());if(tokens.filter(t=>/^proj=/i.test(t)).length!==1||tokens.some(t=>/^(?:proj=pipeline|step)$/i.test(t)))throw Error('Projection pipelines are not supported by this horizontal coordinate tool. Reproject the source to a horizontal 2D CRS first.');
+      const temporary='__us_buildings_horizontal_crs_check__',existed=Object.prototype.hasOwnProperty.call(p.defs,temporary),previous=p.defs(temporary);
+      try{p.defs(temporary,key);parsed=p.defs(temporary);}finally{if(existed)p.defs(temporary,previous);else delete p.defs[temporary];}
+    }else parsed=p.defs(key);
+    const check=projection=>{if(projection&&Object.prototype.hasOwnProperty.call(projection,'step'))throw Error('Projection pipelines are not supported by this horizontal coordinate tool. Reproject the source to a horizontal 2D CRS first.');const name=String(projection?.projName||'').toLowerCase().replace(/[\s_-]/g,'');if(['geocent','geocentric','topocent','topocentric','cart'].includes(name))throw Error('This workspace does not support this 3D coordinate conversion. Reproject geocentric / topocentric data to a horizontal CRS first.');};
+    check(parsed);check(new p.Proj(key));
+  }
   function definition(code=WGS84){
     const p=library(),key=normalize(code),utm=/^EPSG:(326|327)(\d\d)$/.exec(key);
     if(utm){const zone=Number(utm[2]);if(zone<1||zone>60)throw Error('UTM zone must be between 1 and 60.');if(!p.defs(key))p.defs(key,'+proj=utm +zone='+zone+(utm[1]==='327'?' +south':'')+' +datum=WGS84 +units=m +no_defs');}
-    if(key.startsWith('+')){if(!/(?:^|\s)\+proj=/.test(key))throw Error('Enter a complete PROJ definition beginning with +proj=.');if(key.length>4000)throw Error('The custom CRS definition is too long.');try{new p.Proj(key);}catch(e){throw Error('Invalid custom CRS: '+(e.message||e));}return key;}
+    if(key.startsWith('+')){if(!/(?:^|\s)\+proj=/.test(key))throw Error('Enter a complete PROJ definition beginning with +proj=.');if(key.length>4000)throw Error('The custom CRS definition is too long.');try{horizontalProjection(p,key);}catch(e){throw Error('Invalid custom CRS: '+(e.message||e));}return key;}
     if(!p.defs(key))throw Error('Unknown CRS '+key+'. Use EPSG:4326, EPSG:3857, a WGS84 UTM code, or a custom PROJ definition.');
+    horizontalProjection(p,key);
     return key;
   }
   function point(value){if(!Array.isArray(value)||value.length<2||!Number.isFinite(value[0])||!Number.isFinite(value[1]))throw Error('Coordinates must be finite numbers in x, y order.');return value;}

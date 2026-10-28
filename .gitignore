@@ -2,3 +2,5 @@
 .DS_Store
 node_modules/
 qa-output/
+__pycache__/
+*.pyc

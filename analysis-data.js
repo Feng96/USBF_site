@@ -181,11 +181,11 @@
   async function overview(snapshot,options={}){
     if(!snapshot?.features)throw Error('Choose some data first.');
     if(snapshot.capabilities.attributePreview)return {kind:'display-preview',records:null,fragments:snapshot.features.length,polygonRecords:null,height:null,area:null,provenance:snapshot.provenance};
-    const heightField=snapshot.provenance.autoHeight===false?null:options.heightField||snapshot.provenance.heightField||['height_m','height','render_height'].find(k=>snapshot.fields.includes(k))||null;
+    const buildingSource=snapshot.provenance.featureRole==='buildings',heightField=snapshot.provenance.autoHeight===false?null:options.heightField||(buildingSource?(snapshot.provenance.heightField||['height_m','height','render_height'].find(k=>snapshot.fields.includes(k))||null):null);
     const heights=[],areas=[],coverage={recorded:0,missing:0,unknown:0};let polygonRecords=0;
     for(let i=0;i<snapshot.features.length;i++){
       abort(options.signal);const f=snapshot.features[i],p=f.properties||{},v=heightField?number(p[heightField]):null;
-      heights.push(v!==null&&v>0?v:null);
+      heights.push(v!==null&&(!buildingSource||v>0)?v:null);
       if(polygon(f)){polygonRecords++;areas.push(geometryValue(f,'$area_m2'));}
       if(p.height_missing===true)coverage.missing++;else if(p.height_missing===false)coverage.recorded++;else coverage.unknown++;
       if(i%128===127){options.onProgress?.(i+1,snapshot.features.length);await tick();}

@@ -1,0 +1,36 @@
+/* Real public publication reads, reusing the supervisor's browser and local server.
+ * Basemap fixtures stay separate from actual USBF records; timing is this host only. */
+const fs=require('fs'),path=require('path');
+module.exports=async qa=>{
+ const p=qa.page,start=qa.checks.length,network=[],controllers=new Set(),cities=[],pattern='https://data.source.coop/opengeos/us-buildings/USBF_v1/**';
+ let current='publication',manifest=null;
+ const route=async route=>{
+  const url=route.request().url(),range=route.request().headers().range,controller=new AbortController(),started=Date.now(),timer=setTimeout(()=>controller.abort(),45000);controllers.add(controller);
+  try{const response=await fetch(url,{headers:range?{Range:range}:{},signal:controller.signal}),headers=Object.fromEntries(response.headers);delete headers['content-encoding'];delete headers['content-length'];delete headers['transfer-encoding'];const body=Buffer.from(await response.arrayBuffer());network.push({city:current,status:response.status,range:range||null,bytes:body.length,ms:Date.now()-started,url});if(url.includes('manifest.json')&&response.ok)manifest=JSON.parse(body.toString());await route.fulfill({status:response.status,headers,body});}
+  catch(error){network.push({city:current,range:range||null,error:error.message,url,ms:Date.now()-started});await route.abort('failed').catch(()=>{});}
+  finally{clearTimeout(timer);controllers.delete(controller);}
+ };
+ await p.route(pattern,route);
+ try{
+  await qa.open();await p.evaluate(async()=>{await PortalLayers.add(PortalLayers.catalog[0],{restore:true});});
+  await p.waitForFunction(()=>{const l=PortalLayers.active;if(l?.error)throw Error(l.viewNote);return l?.release;},null,{timeout:90000});
+  const publication=await p.evaluate(()=>({release:PortalLayers.active.release,nationalFeatures:PortalLayers.active.data.features.length,grid:portal.map.getSource(PortalLayers.active.id+'-publication')._data.features.length}));
+  qa.ok(publication.release.buildings>1000000&&publication.release.tiles>1000&&publication.grid===publication.release.tiles&&publication.nationalFeatures===0,'The real national publication is a coverage index, separate from individual building records');
+  for(const [name,center] of [['Washington DC',[-77.071,38.912]],['New York',[-73.985,40.748]],['Chicago',[-87.6298,41.8781]],['Knoxville',[-83.9207,35.9606]],['Los Angeles',[-118.2437,34.0522]],['Seattle',[-122.335,47.608]]]){
+   current=name;qa.liveProgress={city:name,started:new Date().toISOString(),completed:cities.length};const began=Date.now();
+   await p.evaluate(({center,name})=>{PortalModels.hide();portal.clearSelection();PortalLayers.clearExternalSelection();portal.setViewMode(false,false);portal.map.jumpTo({center,zoom:18,pitch:0,bearing:0});document.querySelector('#map-place-name').textContent=name;},{center,name});
+   await p.waitForFunction(({center,began})=>{const l=PortalLayers.active;if(l?.error)throw Error(l.viewNote+' '+(l.errorDetail||''));const b=l?.viewBounds;return l?.loaded&&!l.viewLoading&&l.data.features.length>0&&b&&Math.abs((b[0]+b[2])/2-center[0])<.005&&Math.abs((b[1]+b[3])/2-center[1])<.005&&Date.parse(l.viewLoadedAt)>=began;},{center,began},{timeout:90000});
+   await p.waitForFunction(()=>{const l=PortalLayers.active;return portal.map.queryRenderedFeatures({layers:[l.id+'-fill']}).length>0;},null,{timeout:30000});
+   const result=await p.evaluate(async()=>{const l=PortalLayers.active,s=await PortalAnalysisData.capture(l,{scope:'view',map:portal.map}),o=await PortalAnalysisData.overview(s),rendered=portal.map.queryRenderedFeatures({layers:[l.id+'-fill']}).slice(0,20),restored=rendered.map(f=>PortalLayers.sourceFeature(l,f));return {count:l.data.features.length,bytes:l.viewBytes,limited:l.viewLimited,bounds:l.viewBounds,loadedAt:l.viewLoadedAt,sourceIds:l.data.features.every(f=>typeof f.properties.usbf_id==='string'&&f.properties.usbf_id.trim())&&new Set(l.data.features.map(f=>f.properties.usbf_id)).size===l.data.features.length,heights:l.data.features.every(f=>f.properties.height_m===null||typeof f.properties.height_m==='number'&&f.properties.height_m>0&&f.properties.height_m===f.properties.height),flags:l.data.features.every(f=>['height_missing','modified'].every(k=>f.properties[k]===null||f.properties[k]===undefined||typeof f.properties[k]==='boolean')),heightWithMissingInput:l.data.features.filter(f=>f.properties.height_missing===true&&f.properties.height_m>0).length,wholeSourceSelection:restored.every(f=>f&&l.data.features.includes(f)),overview:{kind:o.kind,records:o.records,height:o.height},scope:s.provenance,sample:{type:'FeatureCollection',name:'USBF validation sample',features:s.features.slice(0,10),provenance:{...s.provenance,scope:'validation-sample-of-loaded-view',scopeLabel:'First up to 10 complete source records from the loaded view; validation sample only',featureCount:Math.min(10,s.features.length),limited:s.provenance.limited||s.features.length>10,sampling:{method:'First records in source order; not a representative population sample',inputRecords:s.features.length,outputRecords:Math.min(10,s.features.length)},lineage:[s.provenance]}}};});
+   result.city=name;result.ms=Date.now()-began;cities.push(result);qa.liveProgress={city:name,completed:cities.length,count:result.count,ms:result.ms};
+   qa.ok(result.sourceIds&&result.heights&&result.flags&&result.wholeSourceSelection,'Real '+name+' buildings retain original identities, full geometry, height and nullable flags');
+   qa.ok(result.bytes<=32*1024*1024&&result.overview.kind==='buildings'&&result.overview.records>0&&result.scope.scope==='loaded-view'&&result.scope.release.buildings===publication.release.buildings,'Real '+name+' statistics use a bounded neighborhood with explicit local scope and publication lineage');
+   fs.writeFileSync(path.join(qa.out,'live-usbf-'+name.toLowerCase().replace(/\s+/g,'-')+'-sample.geojson'),JSON.stringify(result.sample));delete result.sample;
+   if(name==='Washington DC'){await p.evaluate(()=>portal.setViewMode(true,true));await p.waitForFunction(()=>{const l=PortalLayers.active;return portal.map.queryRenderedFeatures({layers:[l.id+'-fill-extrusion']}).length>0;});await qa.screenshot('live-usbf-dc-heights.png');await p.evaluate(()=>portal.setViewMode(false,false));}
+  }
+  qa.ok(network.some(r=>r.status===206&&r.range&&r.url.includes('?v=')),'Real source bytes arrive as HTTP ranges keyed by the published tile checksums');
+  const report={passed:true,checks:qa.checks.slice(start),publication,cities,network,networkMode:'Actual public Source Cooperative data relayed without modification through the test host; synthetic basemap only. Timings reflect this host, not a user performance guarantee.',errors:qa.errors};
+  fs.writeFileSync(path.join(qa.out,'live-usbf-workflow.json'),JSON.stringify(report,null,2));if(manifest)fs.writeFileSync(path.join(qa.out,'live-usbf-manifest.json'),JSON.stringify(manifest));qa.liveProgress={completed:cities.length,passed:true};return report;
+ }catch(error){fs.writeFileSync(path.join(qa.out,'live-usbf-failure.json'),JSON.stringify({error:error.stack,cities,network,state:await qa.state().catch(()=>({}))},null,2));await qa.screenshot('live-usbf-failure.png').catch(()=>{});throw error;}
+ finally{for(const controller of controllers)controller.abort();await p.unroute(pattern,route);}
+};
