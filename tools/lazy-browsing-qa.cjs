@@ -1,0 +1,66 @@
+/* Execute the real table, explorer, capture, and project APIs without a browser. */
+'use strict';
+const assert=require('assert'),fs=require('fs'),path=require('path'),vm=require('vm');
+const base=path.resolve(__dirname,'..'),turf=require(path.join(base,'vendor/turf-7.2.0.min.js')),checks=[];
+const ok=(value,message)=>{assert(value,message);checks.push(message);console.log('PASS',message);};
+const copy=value=>JSON.parse(JSON.stringify(value)),settle=()=>new Promise(resolve=>setImmediate(resolve));
+const nodes=new Map(),events=new Map(),notices=[],downloads=[],timers=new Map();let nextTimer=0;
+function element(tag='div'){
+ const el={tagName:tag.toUpperCase(),innerHTML:'',textContent:'',hidden:false,dataset:{},setAttribute(){},addEventListener(){},append(){},querySelector(){return null;},classList:{toggle(){},remove(){}},click(){if(tag==='a')downloads.push(this.download);}};
+ Object.defineProperty(el,'id',{set(value){this._id=value;nodes.set('#'+value,this);},get(){return this._id;}});return el;
+}
+const document={baseURI:'http://localhost/',querySelector:s=>nodes.get(s)||null,querySelectorAll:()=>[],createElement:element,addEventListener(name,handler){if(!events.has(name))events.set(name,[]);events.get(name).push(handler);}};
+const displayed={type:'Feature',id:1,properties:{usbf_id:'building-1',height_m:12,source:'osm',cx:-77,cy:39},geometry:{type:'Polygon',coordinates:[[[-77,39],[-76.9999,39],[-77,39.0001],[-77,39]]]}};
+const original={...copy(displayed),properties:{...displayed.properties,originalOnly:'The complete record'},geometry:{type:'Polygon',coordinates:[[[-77.001,38.999],[-76.999,38.999],[-76.999,39.001],[-77.001,39.001],[-77.001,38.999]]]}};
+let rawRequests=0,failRaw=false,inspectCalls=0,exportSnapshot=null,viewEvents=[];
+const bounds=[-77.01,38.99,-76.99,39.01],map={getBounds:()=>({getWest:()=>bounds[0],getSouth:()=>bounds[1],getEast:()=>bounds[2],getNorth:()=>bounds[3]}),getZoom:()=>17,getCenter:()=>({lng:-77,lat:39}),getPitch:()=>0,getBearing:()=>0,getStyle:()=>({layers:[]}),getSource(){return null;},addSource(){},addLayer(){},on(){},jumpTo(){viewEvents.push('camera');},getLayer:()=>true,queryRenderedFeatures:()=>[displayed]};
+const layer={id:'lazy-buildings',cfg:{id:'usbf-live',name:'USBF',type:'viewport',driver:'usbf',analysisMode:'on-demand',dataRole:'buildings',page:'https://example.org/source',license:'Source terms'},visible:true,loaded:true,renderTiled:true,displayMode:'pmtiles',fields:['usbf_id','height_m','source','originalOnly'],heightField:'height_m',color:'#287f76',opacity:1,colorMode:'height',data:{type:'FeatureCollection',features:[]},analysisState:{cached:false},renderIds:['lazy-buildings-fill'],cancelAnalysis(){viewEvents.push('cancel-originals');}};
+layer.ensureData=async request=>{rawRequests++;if(failRaw)throw Error('Original data is unavailable');assert.strictEqual(request.scope,'selection');assert.strictEqual(request.selection.feature.properties.usbf_id,'building-1');layer.data={type:'FeatureCollection',features:[original],provenance:{spatialEligible:true,geometryQuality:'original-source-geometry'}};layer.featureById=new Map([['building-1',original]]);layer.analysisState.cached=true;return {data:layer.data,fields:layer.fields,loaded:true,viewBounds:bounds,viewLimited:false,viewLoadedAt:'2026-10-28T12:00:00Z'};};
+const layers=new Map([[layer.id,layer]]),catalog=[copy(layer.cfg)];let chosen={layer:layer.id,feature:displayed};
+const ctx={console,document,turf,URL:class extends URL{static createObjectURL(){return 'blob:test';}static revokeObjectURL(){}},Blob,Intl,AbortController,Date,Map,Set,URLSearchParams,innerWidth:1200,setTimeout(fn,ms){timers.set(++nextTimer,{fn,ms});return nextTimer;},clearTimeout:id=>timers.delete(id),fetch:async()=>{throw Error('Place lookup is outside this test');},portal:{ready:false,map,view3d:false,toast:message=>notices.push(message),getBasemap:()=> 'light',setBasemap(){},setViewMode(){},clearSelection(){},saveView(){}},PortalCRS:{get:()=> 'EPSG:4326',set(){}},PortalLayers:{layers,catalog,get active(){return layer;},get selection(){return chosen;},isRaster:()=>false,sourceFeature:()=>original,inspect(l,f){inspectCalls++;assert.strictEqual(l,layer);assert.strictEqual(f.properties.originalOnly,original.properties.originalOnly);},clearExternalSelection(){},invalidatePending(){},setStyle(){},selectLayer(){},syncOrder(){},refresh(){},remove(id){layers.delete(id);},async add(cfg){const next={...layer,id:cfg.id,cfg:{...cfg},data:{type:'FeatureCollection',features:[]}};layers.set(next.id,next);return next;}},PortalComposer:{prepareExport(snapshot){exportSnapshot=snapshot;return {name:'building.geojson',body:JSON.stringify(snapshot.features),mime:'application/geo+json'};}}};
+ctx.window=ctx;ctx.globalThis=ctx;vm.createContext(ctx);
+for(const file of ['analysis-data.js','inventory.js','buildings-explorer.js','map-project-core.js','map-project.js'])vm.runInContext(fs.readFileSync(path.join(base,file),'utf8'),ctx,{filename:file});
+const E=ctx.PortalExplorer,T=ctx.PortalInventory.tableData;
+function click(attribute){const button={dataset:{},hasAttribute:name=>name===attribute,closest(selector){return selector.split(',').includes('['+attribute+']')?this:null;}};for(const handler of events.get('click')||[])handler({target:button});}
+(async()=>{
+ let summary=E.summaryFor(layer,17),card=E.renderFeature(layer,displayed);
+ ok(rawRequests===0&&summary.title==='Buildings on the map'&&!('count' in summary)&&summary.canAnalyze,'Browsing the logical USBF layer needs no originals and exposes data actions before a raw cache exists');
+ ok(summary.note.includes('when you analyze or download')&&!card.includes('Footprint area'),'Tile browsing gives a clear lazy-data explanation and never computes full area from a clipped outline');
+ ok(card.includes('tile preview')&&card.includes('12 <small>m</small>')&&card.includes('OpenStreetMap')&&card.includes('building-1'),'A tile building card preserves the display height, source and stable ID');
+ ok(card.includes('Load original building')&&card.includes('Download building')&&card.includes('Tile preview attributes'),'The preview offers explicit original-record actions before any raw read');
+ const fragment2=copy(displayed);fragment2.geometry.coordinates[0][1][0]-=.00001;
+ const collected=T.collect(layer,[displayed,displayed,fragment2],()=>original);
+ ok(collected.features.length===2&&collected.features[0]===displayed&&!collected.features.includes(original),'A renderTiled viewport table keeps distinct display fragments and cannot silently substitute an analytical cache');
+ ok(T.columns(layer,collected.features).find(c=>c.kind==='feature-id').label==='Tile feature ID'&&!T.columns(layer,collected.features).some(c=>c.key==='originalOnly'),'The tile table uses tile IDs and only attributes actually supplied by the display');
+ const metadata=T.metadata(layer),csv=T.csv(layer,collected.features,metadata);
+ ok(metadata.scope.includes('not unique buildings')&&metadata.limited&&metadata.spatialEligible===false&&metadata.geometryQuality.includes('fragments'),'Table metadata preserves fragment restrictions for logical viewport layers rendered by PMTiles');
+ ok(csv.name==='visible-tile-fragments.csv'&&csv.fields.includes('__map_geometry_quality')&&csv.fields.includes('__map_spatial_eligible')&&!csv.fields.includes('originalOnly'),'CSV preview remains labelled and carries the geometry restriction without inventing raw attributes');
+ layer.release={name:'USBF_v1',updated:'2026-10-28T00:00:00Z'};layer.displayRelease={name:'USBF_v1',updated:'2026-10-26T00:00:00Z'};
+ ok(T.metadata(layer).release.updated===layer.displayRelease.updated,'A tile table attributes the displayed publication even after analytical metadata advances to another release');
+ click('data-explorer-load-building');await settle();
+ ok(rawRequests===1&&inspectCalls===1&&E.originalFeature(layer,displayed)===original,'Explicitly loading a selected tile fetches its raw record and opens the complete original');
+ card=E.renderFeature(layer,original);ok(card.includes('Footprint area')&&card.includes('All building attributes')&&!card.includes('tile preview'),'Only a known raw original unlocks full footprint area and original attributes');
+ summary=E.summaryFor(layer,17);ok(!('count' in summary)&&!('meanHeight' in summary)&&summary.note.includes('when you analyze or download'),'An analytical cache never turns the map summary into an automatic statistic for another area');
+ const staleMap={...layer,data:{type:'FeatureCollection',features:[]}};ok(E.originalFeature(staleMap,displayed)===null,'An ID-only cache pointer outside the actual original collection cannot certify complete geometry');
+ let finishSelection;const selectionEnsure=layer.ensureData;layer.ensureData=()=>new Promise(resolve=>{finishSelection=()=>resolve({data:{type:'FeatureCollection',features:[original]},fields:layer.fields,loaded:true});});
+ const oldChoice=chosen,oldInspects=inspectCalls;click('data-explorer-load-building');chosen={layer:layer.id,feature:{...copy(displayed),properties:{...displayed.properties,usbf_id:'another-building'}}};finishSelection();await settle();
+ ok(inspectCalls===oldInspects,'A delayed original fetch cannot replace a different building selected while it was loading');chosen=oldChoice;layer.ensureData=selectionEnsure;
+ click('data-explorer-download-building');await settle();
+ ok(rawRequests===2&&downloads.includes('building.geojson')&&exportSnapshot.features[0].properties.originalOnly===original.properties.originalOnly,'Download building performs an explicit selection capture and exports the original record');
+ failRaw=true;const beforeDownloads=downloads.length;click('data-explorer-download-building');await settle();
+ ok(downloads.length===beforeDownloads&&notices.at(-1)==='Original data is unavailable','A failed original download reports its error and cannot export a tile fragment or stale cache');failRaw=false;
+ const bad={...layer,analysisState:{error:Error('Offline')}};ok(E.summaryFor(bad,17).note.includes('Original data could not load')&&!('count' in E.summaryFor(bad,17)),'An analytical error stays explicit without displaying a stale raw count');
+ layer.displayMode='coverage';ctx.portal.ready=true;E.init();const body=nodes.get('#explorer-neighborhood').innerHTML;
+ ok(body.includes('Load original buildings for this area')&&body.includes('Summarize area')&&body.includes('Download buildings'),'Coverage fallback exposes original-area loading and both data tools before records exist');
+ let areaRequest=null;const priorEnsure=layer.ensureData;layer.ensureData=async request=>{areaRequest=request;return {data:{type:'FeatureCollection',features:[]},loaded:true};};click('data-explorer-load-area');await settle();
+ ok(areaRequest?.scope==='view'&&JSON.stringify(areaRequest.bounds)===JSON.stringify(bounds),'Coverage fallback reads originals only after the explicit area button with the current requested bounds');layer.ensureData=priorEnsure;layer.displayMode='pmtiles';
+ nodes.set('#map-place-name',{textContent:'Test place'});nodes.set('#workspace-document',{textContent:'Test map'});nodes.set('#welcome-card',{hidden:true});
+ const beforeSave=rawRequests,saved=await ctx.PortalProject.collect('Lazy saved map');
+ ok(rawRequests===beforeSave&&saved.project.layers[0].kind==='catalog'&&saved.project.layers[0].catalogId==='usbf-live'&&!saved.json.includes('originalOnly')&&!saved.json.includes('building-1'),'Save map records the logical catalog connection without fetching or embedding the analytical cache');
+ const oldAdd=ctx.PortalLayers.add;let detached=false;layer.stop=()=>{detached=true;};ctx.PortalLayers.add=async()=>{throw Error('Replacement unavailable');};viewEvents=[];
+ await assert.rejects(ctx.PortalProject.restore({project:saved.project,files:new Map()}),/Replacement unavailable/);
+ ok(layers.get(layer.id)===layer&&!detached&&viewEvents[0]==='cancel-originals','A failed restore cancels original reads while keeping the existing layer attached and usable');ctx.PortalLayers.add=oldAdd;
+ viewEvents=[];await ctx.PortalProject.restore({project:saved.project,files:new Map()});
+ ok(viewEvents[0]==='cancel-originals'&&viewEvents.includes('camera')&&rawRequests===beforeSave,'Restore cancels pending original reads before moving the view and reconnects without loading GeoParquet');
+ console.log(JSON.stringify({passed:true,checks:checks.length}));
+})().catch(error=>{console.error(error.stack);process.exitCode=1;});

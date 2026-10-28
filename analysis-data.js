@@ -4,6 +4,7 @@
   const limits = Object.freeze({features:20000, vertices:500000, spatialFeatures:1500, spatialVertices:200000, geometryVertices:15000, pairs:50000});
   const polygon = f => ['Polygon','MultiPolygon'].includes(f?.geometry?.type);
   const tiled = l => ['pmtiles','vector'].includes(l?.cfg?.type);
+  const onDemand = l => l?.cfg?.analysisMode==='on-demand' && typeof l.ensureData==='function';
   const clone = value => JSON.parse(JSON.stringify(value));
   const tick = () => new Promise(resolve => setTimeout(resolve, 0));
   function freeze(value) { if(value && typeof value === 'object' && !Object.isFrozen(value)){Object.values(value).forEach(freeze);Object.freeze(value);}return value; }
@@ -14,6 +15,7 @@
     if(!layer)return {supported:false,geometryAnalysis:false,wholeLayer:false,note:'Choose a vector layer first.'};
     const type=layer.cfg?.type, inherited=layer.data?.provenance||layer.cfg?.provenance;
     if(['raster','image','raster-pmtiles'].includes(type)||layer.cfg?.sourceKind==='raster')return {supported:false,geometryAnalysis:false,wholeLayer:false,kind:'display-only',note:'Raster display layers do not supply vector records. These tools require original vector data; imagery tiles cannot be used as raw analysis pixels.'};
+    if(onDemand(layer))return {supported:true,attributePreview:false,geometryAnalysis:true,wholeLayer:false,kind:'on-demand',note:'Original building records are loaded for the requested area when you run a data tool. Map navigation uses display tiles.'};
     if(tiled(layer))return {supported:true,attributePreview:true,geometryAnalysis:false,wholeLayer:false,kind:'tile-preview',note:'Rendered tiles contain clipped or simplified fragments. Field previews are possible; building totals, geometry analysis and full-data exports require original vector data.'};
     if(['geojson','viewport'].includes(type) && Array.isArray(layer.data?.features)){
       const eligible=inherited?.spatialEligible!==false&&!/tile[ -]fragments|clipped-or-simplified-tile/i.test([inherited?.geometryQuality,layer.data?.scope].join(' '));
@@ -56,31 +58,47 @@
   }
   async function capture(layer, options={}) {
     const capturedAt=new Date().toISOString();
+    abort(options.signal);
+    const source=layer,manager=root.PortalLayers,registered=source&&manager?.layers?.get(source.id)===source,lazy=onDemand(source);
+    function stillCurrent(){abort(options.signal);if(registered&&(root.PortalLayers!==manager||manager.layers.get(source.id)!==source)){const error=Error('The source layer changed. Run this tool again with the current dataset.');error.name='AbortError';throw error;}}
     if(layer)layer={...layer,cfg:{...layer.cfg,provenance:layer.cfg?.provenance?clone(layer.cfg.provenance):null},fields:layer.fields?.slice(),release:layer.release?clone(layer.release):null,viewBounds:layer.viewBounds?.slice(),data:layer.data?{...layer.data,features:layer.data.features?.slice(),provenance:layer.data.provenance?clone(layer.data.provenance):null}:null};
     const cap=capabilities(layer);if(!cap.supported)throw Error(cap.note);
-    const map=options.map||root.portal?.map,requested=options.scope==='all'?'layer':options.scope||'layer',isTiles=tiled(layer),isFragments=cap.kind==='tile-preview';
+    const map=options.map||root.portal?.map,requested=options.scope==='all'?'layer':options.scope||'layer',viewScope=requested==='view'||lazy&&requested==='layer',isTiles=tiled(layer)&&!lazy,isFragments=cap.kind==='tile-preview';
     if(isFragments && (!options.allowTilePreview||requested!=='tile-preview'))throw Error('PMTiles/MVT and their exports are display fragments. Connect original GeoJSON or a full-geometry source before analysis or data download. You can explicitly enable a tile field preview in Statistics.');
     if(!['layer','view','selection','tile-preview','study-area'].includes(requested))throw Error('Unknown analysis scope.');
-    if(!isTiles && layer.cfg.type==='viewport' && (layer.viewLoading||!layer.loaded||layer.error))throw Error('Wait for this neighborhood to finish loading, then capture a fresh snapshot.');
+    if(!isTiles && !lazy && layer.cfg.type==='viewport' && (layer.viewLoading||!layer.loaded||layer.error))throw Error('Wait for this neighborhood to finish loading, then capture a fresh snapshot.');
     const studyArea=requested==='study-area'?captureBoundary(options.studyArea,capturedAt):null;
     if(studyArea&&!isBuildingLayer(layer))throw Error('Choose an original building footprint layer. Drawings and other polygon layers are study areas, rather than building datasets.');
-    const viewBounds=boundsOf(map),selected=options.selection||root.PortalLayers?.selection;
+    const viewBounds=options.bounds?Array.from(options.bounds):boundsOf(map),selection=options.selection||root.PortalLayers?.selection;
+    const selected=selection?{layer:selection.layer,feature:selection.feature?clone(selection.feature):null}:null,directSelection=selection?.feature;
+    if(requested==='selection'&&(!selected?.feature||selected.layer!==layer.id))throw Error('Select a feature from this layer first.');
+    if(viewScope&&(!viewBounds||viewBounds[0]>=viewBounds[2]||viewBounds[1]>=viewBounds[3]||viewBounds[0]<-180||viewBounds[2]>180))throw Error('Choose a map view within one longitude range before capturing it.');
+    if(lazy){
+      const requestBounds=studyArea?studyArea.extent.slice():viewBounds?.slice();
+      const loaded=await source.ensureData({scope:requested,bounds:requestBounds,selection:selected?freeze(selected):null,signal:options.signal,onProgress:options.onProgress});
+      stillCurrent();
+      if(!loaded||loaded.error||loaded.loaded===false||!Array.isArray(loaded.data?.features))throw Error('Original building records could not be loaded for this area. Try again.');
+      const quality=loaded.data.provenance||{};
+      if(quality.spatialEligible===false||/fragment|clipped-or-simplified-tile/i.test([quality.geometryQuality,loaded.data.scope].join(' ')))throw Error('Original vector geometry is required. Display fragments cannot be used for data tools.');
+      layer={...layer,data:loaded.data,fields:loaded.fields?.slice()||layer.fields,viewBounds:loaded.viewBounds?.slice()||requestBounds,viewLimited:loaded.viewLimited,viewLoadedAt:loaded.viewLoadedAt||null,viewSelection:loaded.viewSelection?clone(loaded.viewSelection):null,release:loaded.release?clone(loaded.release):layer.release,loaded:true,error:false,viewLoading:false};
+    }
     let raw;
     if(isTiles){if(!map)throw Error('The map is not ready.');const ids=(layer.renderIds||[]).filter(id=>!map.getLayer||map.getLayer(id));raw=map.queryRenderedFeatures({layers:ids});}
     else raw=layer.data.features.slice();
-    if(raw.length>limits.features && !['view','selection','study-area'].includes(requested))throw Error('This analysis can use up to '+limits.features.toLocaleString()+' records. Choose the current view or a smaller source file.');
+    if(raw.length>limits.features && !viewScope&&!['selection','study-area'].includes(requested))throw Error('This analysis can use up to '+limits.features.toLocaleString()+' records. Choose the current view or a smaller source file.');
     if(studyArea&&raw.length*studyArea.features.length>limits.pairs)throw Error('There are too many buildings and area polygons for this calculation. Choose a smaller study area or one boundary.');
-    if(requested==='selection'){if(!selected||selected.layer!==layer.id)throw Error('Select a feature from this layer first.');const direct=raw.find(f=>f===selected.feature);raw=direct?[direct]:raw.filter(f=>sameFeature(f,selected.feature));if(raw.length>1)throw Error('This selection matches more than one source feature. Select the feature on the map again.');}
+    if(requested==='selection'){const direct=!lazy&&raw.find(f=>f===directSelection);raw=direct?[direct]:raw.filter(f=>sameFeature(f,selected.feature));if(raw.length>1)throw Error('This selection matches more than one source feature. Select the feature on the map again.');}
+    if(!isTiles)raw=clone(raw);
     let viewPolygon;
-    if(requested==='view'){
+    if(viewScope){
       if(!viewBounds||viewBounds[0]>=viewBounds[2]||viewBounds[1]>=viewBounds[3]||viewBounds[0]<-180||viewBounds[2]>180)throw Error('Choose a map view within one longitude range before capturing it.');
       viewPolygon=turf().bboxPolygon(viewBounds);
     }
     const studyBoxes=studyArea?.features.map(f=>extentOf([f])),features=[],seen=new Set();let vertexCount=0;
     for(let i=0;i<raw.length;i++){
       if(i%128===127){options.onProgress?.(i+1,raw.length);await tick();}
-      abort(options.signal);const f=raw[i];if(options.respectFilters!==false&&!filterFeature(f,layer))continue;
-      if(requested==='view' && (!f.geometry||!boxesIntersect(extentOf([f]),viewBounds)||!turf().booleanIntersects(f,viewPolygon)))continue;
+      stillCurrent();const f=raw[i];if(options.respectFilters!==false&&!filterFeature(f,layer))continue;
+      if(viewScope && (!f.geometry||!boxesIntersect(extentOf([f]),viewBounds)||!turf().booleanIntersects(f,viewPolygon)))continue;
       if(studyArea){
         if(!polygon(f))throw Error('A record in this building layer has no polygon outline. Choose a building footprint layer with complete outlines.');
         const box=extentOf([f]);if(!boxesIntersect(box,studyArea.extent))continue;
@@ -92,20 +110,21 @@
       vertexCount+=vertices(item.geometry);if(vertexCount>limits.vertices)throw Error('This snapshot exceeds '+limits.vertices.toLocaleString()+' vertices. Use a smaller area.');features.push(item);if(features.length>limits.features)throw Error('This snapshot exceeds '+limits.features.toLocaleString()+' records. Choose a smaller area.');
     }
     if(!features.length&&!studyArea)throw Error('No records in the chosen scope. Load a neighborhood or adjust the layer filters.');
-    const local=layer.cfg.type==='viewport',baseProvenance=layer.data?.provenance||layer.cfg?.provenance||null;
+    stillCurrent();
+    const local=layer.cfg.type==='viewport'||lazy,baseProvenance=layer.data?.provenance||layer.cfg?.provenance||null;
     const sourceScope=isFragments?'tile-preview':local?'loaded-view':studyArea?'study-area-intersection':requested==='view'?'view-intersection':requested==='selection'?'selection':'whole-layer';
     const limited=local && (layer.viewLimited===true||layer.viewLimited===undefined&&/limit reached/i.test(layer.viewNote||''));
-    const scopeLabel=isFragments?'Tile field preview — fragments, not unique buildings':studyArea?'Whole buildings touching or overlapping '+studyArea.name+(local?' among loaded neighborhood records':'')+(limited?' (source limit reached)':''):local?'Loaded neighborhood records'+(requested==='view'?' intersecting the current view':requested==='selection'?' restricted to the selected record':'')+(limited?' (source limit reached)':''):requested==='view'?'Whole source features intersecting the captured map view':requested==='selection'?'Selected source feature':'Complete loaded vector layer';
+    const scopeLabel=isFragments?'Tile field preview — fragments, not unique buildings':studyArea?'Whole buildings touching or overlapping '+studyArea.name+(local?' among original records returned for this area':'')+(limited?' (source limit reached)':''):lazy?(requested==='selection'?'Selected original building':'Original building records returned for the captured map area')+(limited?' (source limit reached)':''):local?'Loaded neighborhood records'+(requested==='view'?' intersecting the current view':requested==='selection'?' restricted to the selected record':'')+(limited?' (source limit reached)':''):requested==='view'?'Whole source features intersecting the captured map view':requested==='selection'?'Selected source feature':'Complete loaded vector layer';
     const knownBuildings=isBuildingLayer(layer);
     const autoHeight=layer.cfg.allowHeight!==false&&baseProvenance?.autoHeight!==false&&!baseProvenance?.operation&&!layer.data?.analysis?.operation;
-    const provenance={version:1,layerId:layer.id,name:layer.cfg.name,sourceType:layer.cfg.type,sourceDriver:layer.cfg.driver||null,sourceUrl:layer.cfg.page||layer.cfg.url||null,capturedAt,scope:sourceScope,requestedScope:requested,scopeLabel,featureRole:knownBuildings?'buildings':'features',autoHeight,heightField:autoHeight?(layer.heightField||['height_m','height','render_height'].find(k=>features.some(f=>Object.prototype.hasOwnProperty.call(f.properties||{},k)))||null):null,heightBasis:layer.cfg.driver==='usbf'?'Inherited GlobalBuildingAtlas height; lidar input coverage is separate':layer.cfg.driver==='gba'?'Estimated GlobalBuildingAtlas height':layer.cfg.driver==='nyc'?'Source roof height converted from feet to metres':baseProvenance?.heightBasis||null,geometryQuality:isFragments?'clipped-or-simplified-tile-fragments':'full-loaded-source-geometry',spatialEligible:cap.geometryAnalysis&&!isFragments,limited,extent:extentOf(features),requestedView:requested==='view'?viewBounds:null,loadedView:local?clone(layer.viewBounds||viewBounds):null,loadedAt:local?layer.viewLoadedAt||null:null,release:layer.release?clone(layer.release):null,filters:{source:layer.sourceFilter||'',fixedSource:layer.cfg.fixedSource||'',minArea:layer.minArea||0,respected:options.respectFilters!==false},licenses:collectLicenses(features,layer),lineage:baseProvenance?[clone(baseProvenance)]:[],vertexCount};
+    const provenance={version:1,layerId:layer.id,name:layer.cfg.name,sourceType:layer.cfg.type,sourceDriver:layer.cfg.driver||null,sourceUrl:layer.cfg.page||layer.cfg.url||null,capturedAt,scope:sourceScope,requestedScope:requested,scopeLabel,featureRole:knownBuildings?'buildings':'features',autoHeight,heightField:autoHeight?(layer.heightField||['height_m','height','render_height'].find(k=>features.some(f=>Object.prototype.hasOwnProperty.call(f.properties||{},k)))||null):null,heightBasis:layer.cfg.driver==='usbf'?'Inherited GlobalBuildingAtlas height; lidar input coverage is separate':layer.cfg.driver==='gba'?'Estimated GlobalBuildingAtlas height':layer.cfg.driver==='nyc'?'Source roof height converted from feet to metres':baseProvenance?.heightBasis||null,geometryQuality:isFragments?'clipped-or-simplified-tile-fragments':'full-loaded-source-geometry',spatialEligible:cap.geometryAnalysis&&!isFragments,limited,extent:extentOf(features),requestedView:requested==='view'||lazy&&requested==='layer'?viewBounds:null,loadedView:local?clone(layer.viewBounds||viewBounds):null,loadedAt:local?layer.viewLoadedAt||null:null,release:layer.release?clone(layer.release):null,filters:{source:layer.sourceFilter||'',fixedSource:layer.cfg.fixedSource||'',minArea:layer.minArea||0,respected:options.respectFilters!==false},licenses:collectLicenses(features,layer),lineage:baseProvenance?[clone(baseProvenance)]:[],vertexCount};
     if(baseProvenance){provenance.derived=true;provenance.scopeLabel=scopeLabel+' · inherited scope: '+(baseProvenance.scopeLabel||baseProvenance.scope||'see lineage');provenance.licenses=Array.from(new Set([...provenance.licenses,...(baseProvenance.licenses||[])]));}
     if(isFragments)provenance.fragmentCount=features.length;else provenance.featureCount=features.length;
     if(local && layer.viewSelection)provenance.selectionRule=layer.viewSelection;
     else if(local && layer.cfg.driver==='usbf')provenance.selectionRule='Published cx/cy ownership coordinates inside the loaded view plus a 0.002-degree buffer; not an exhaustive intersection query for large buildings centered outside that buffer.';
     if(baseProvenance?.limited)provenance.limited=true;
     if(studyArea){
-      studyArea.sourceCoverage=local?'Loaded neighborhood records only':'Complete imported layer';
+      studyArea.sourceCoverage=lazy?'Original records returned for the requested study-area bounds':local?'Loaded neighborhood records only':'Complete imported layer';
       const b=layer.viewBounds;studyArea.withinLoadedBounds=local&&b?studyArea.extent[0]>=b[0]&&studyArea.extent[1]>=b[1]&&studyArea.extent[2]<=b[2]&&studyArea.extent[3]<=b[3]:local?null:true;
       provenance.studyArea=studyArea;provenance.licenses=Array.from(new Set([...provenance.licenses,...studyArea.licenses]));
       if(local&&studyArea.withinLoadedBounds!==true)provenance.limited=true;
