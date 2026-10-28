@@ -75,7 +75,7 @@
     }
     function status(){
       l.viewNote=l.renderTiled?'Building map · original data loads when needed':l.data.features.length?'Original building outlines · loaded area':'Choose an area to load original buildings';
-      const pub=document.querySelector('#usbf-publication');if(pub&&l.release)pub.textContent=l.release.buildings.toLocaleString()+' published buildings';
+      const pub=document.querySelector('#usbf-publication'),shownRelease=l.renderTiled?l.displayRelease:l.release;if(pub&&shownRelease)pub.textContent=shownRelease.buildings.toLocaleString()+' published buildings';
       update();
     }
     l.syncCoverageStyle=()=>{if(map.getLayer(coverageLayer)){map.setPaintProperty(coverageLayer,'line-color',l.color);map.setPaintProperty(coverageLayer,'line-opacity',l.opacity*.5);map.setLayoutProperty(coverageLayer,'visibility',l.visible?'visible':'none');}};
