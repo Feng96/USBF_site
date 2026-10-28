@@ -1,0 +1,48 @@
+/* Attribute fields remain useful for building datasets and ordinary imports. */
+.attribute-table .table-query{position:relative;gap:9px;flex-wrap:wrap}
+.attribute-table #table-sort{max-width:180px;min-width:80px}
+.attribute-table .inventory-sort-direction{border:1px solid #dce4da;border-radius:4px;width:31px;height:29px;flex-shrink:0;font-size:16px;color:#4e705b}
+.attribute-table .inventory-sort-direction:hover{background:#f0f5ef}
+.attribute-table .inventory-columns{position:relative;flex-shrink:0;font-size:11px}
+.attribute-table .inventory-columns>summary{cursor:pointer;list-style:none;padding:7px 9px;border:1px solid #dce4da;border-radius:4px;white-space:nowrap;color:#4e705b}
+.attribute-table .inventory-columns>summary::-webkit-details-marker{display:none}
+.attribute-table #table-columns-count{font-size:10px;color:#8a998c;margin-left:4px}
+.attribute-table .inventory-column-panel{position:absolute;left:0;bottom:calc(100% + 7px);width:275px;max-width:calc(100vw - 28px);padding:11px;background:#fff;border:1px solid #d3dfd4;border-radius:7px;box-shadow:0 8px 30px #203e2d2b;z-index:1300}
+.attribute-table #table-column-search{width:100%;min-width:0;border:1px solid #d4ded4;border-radius:4px;font-size:12px;padding:8px 9px;margin-bottom:8px}
+.attribute-table #table-column-options{max-height:min(280px,40dvh);overflow:auto;overscroll-behavior:contain}
+.attribute-table #table-column-options label{display:flex;align-items:flex-start;gap:8px;padding:7px 3px;font-size:11px;line-height:1.5;cursor:pointer;color:#4d6855}
+.attribute-table #table-column-options input{margin-top:2px;flex-shrink:0}
+.attribute-table #table-column-options label>span{min-width:0;overflow-wrap:anywhere}
+.attribute-table #table-column-options small{display:block;font-size:10px;color:#8c9b8c}
+.attribute-table #table-columns-reset{margin-top:8px;padding:6px 0;color:#356f51;font-size:11px;text-decoration:underline;text-underline-offset:3px}
+.attribute-table .table-scroll table{min-width:100%;width:max-content}
+.attribute-table .table-scroll th{position:sticky;top:0;background:#f5f8f3;z-index:1;padding:0}
+.attribute-table .table-scroll th>button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:10px 12px;text-align:left;white-space:nowrap;font-size:11px;color:#526e56}
+.attribute-table .table-scroll th[aria-sort=ascending],.attribute-table .table-scroll th[aria-sort=descending]{background:#eaf2e8}
+.attribute-table .table-scroll th>button>span{color:#2e7653}
+.attribute-table .table-scroll td{max-width:310px;padding:8px 12px;white-space:nowrap;text-align:left;font-variant-numeric:tabular-nums}
+.attribute-table .inventory-cell-value{display:block;max-width:285px;overflow:hidden;text-overflow:ellipsis}
+.attribute-table .table-scroll td.inventory-missing{color:#98a496}
+.attribute-table .table-scroll tr[aria-selected=true]{background:#e7f2e5;box-shadow:inset 3px 0 #377d58}
+.attribute-table .table-scroll tr:focus-visible{outline:2px solid #3c8b61;outline-offset:-2px}
+.attribute-table .table-scroll th:first-child,.attribute-table .table-scroll td:first-child{position:sticky;left:0;min-width:66px;background:#fff;border-right:1px solid #e5ece3}
+.attribute-table .table-scroll th:first-child{z-index:2;background:#f5f8f3}
+.attribute-table .table-scroll tr[aria-selected=true]>td:first-child{background:#e7f2e5}
+.attribute-table .table-scroll tr:hover>td:first-child{background:#f2f6ef}
+.attribute-table #table-sort:focus-visible,.attribute-table .inventory-sort-direction:focus-visible{outline:2px solid #34896e;outline-offset:2px}
+@media(max-width:700px){
+ .attribute-table .table-query{gap:7px;padding:7px 9px}
+ .attribute-table .table-query>input{flex:1;min-width:100px;width:115px}
+ .attribute-table .table-query>label{display:flex;font-size:0;gap:0}
+ .attribute-table #table-sort{font-size:11px;width:106px;max-width:106px;min-width:0;padding:7px 5px}
+ .attribute-table .inventory-columns>summary{padding:7px}
+ .attribute-table #table-columns-count{display:none}
+ .attribute-table .inventory-column-panel{left:auto;right:0}
+ .attribute-table #table-column-options label{display:flex}
+ .attribute-table .table-header{min-height:40px}
+ .attribute-table .table-header>div{min-width:0}
+ .attribute-table #table-count{display:none}
+ .attribute-table #table-layer-name{max-width:140px}
+ .attribute-table .selected-filter{font-size:10px;white-space:nowrap}
+ .attribute-table .table-scroll th>button,.attribute-table .table-scroll td{padding:9px;font-size:11px}
+}

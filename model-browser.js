@@ -1,5 +1,5 @@
 import * as THREE from './vendor/three.module.js';
-import './local-model-core.js?v=1.1';
+import './local-model-core.js?v=1.2';
 const $=s=>document.querySelector(s),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let api,map,manifest,current,method='initial',collection='us-experiment',enabled=false,token=0,renderer,renderCount=0,initialized=false;
 const cache=new Map(),scene=new THREE.Scene(),camera=new THREE.Camera(),root=new THREE.Group();scene.add(root);scene.add(new THREE.AmbientLight(0xffffff,1.4));const light=new THREE.DirectionalLight(0xffffff,1.5);light.position.set(-250,-200,800);scene.add(light);

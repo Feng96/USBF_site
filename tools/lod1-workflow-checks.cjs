@@ -1,0 +1,46 @@
+/* Reuses the parent's existing browser. Never launches Chrome or creates a page. */
+const fs=require('fs'),path=require('path');
+module.exports=async qa=>{
+ const p=qa.page,start=qa.checks.length,downloads=[];
+ const watch=download=>downloads.push(download.suggestedFilename());
+ const data={type:'FeatureCollection',features:[{type:'Feature',id:'real-outline-fixture',geometry:{type:'Polygon',coordinates:[[[-77.072,38.912],[-77.0716,38.912],[-77.0716,38.9124],[-77.072,38.9124],[-77.072,38.912]],[[-77.0719,38.9121],[-77.0718,38.9121],[-77.0718,38.9122],[-77.0719,38.9122],[-77.0719,38.9121]]]},properties:{usbf_id:'courtyard-fixture',height_m:18,height_missing:true,keepNull:null,footprint_license:'ODbL',height_license:'CC BY-NC 4.0'}},{type:'Feature',geometry:{type:'Polygon',coordinates:[[[-77.0715,38.912],[-77.0713,38.912],[-77.0713,38.9122],[-77.0715,38.9122],[-77.0715,38.912]]]},properties:{usbf_id:'missing-height-fixture',height_m:null,height_missing:false}},{type:'Feature',geometry:{type:'Polygon',coordinates:[[[-77.0712,38.912],[-77.071,38.912],[-77.071,38.9122],[-77.0712,38.9122],[-77.0712,38.912]]]},properties:{usbf_id:'second-height-fixture',height_m:12,footprint_license:'ODbL',height_license:'CC BY-NC 4.0'}}]};
+ const open=async()=>{await p.evaluate(()=>PortalLoD1.open());await p.locator('#lod1-dialog').waitFor({state:'visible'});};
+ const ready=async()=>{await p.locator('#lod1-scope').selectOption('layer');await p.locator('#lod1-create').click();await p.waitForFunction(()=>PortalLoD1.model&&!PortalLoD1.busy);};
+ const add=async()=>p.evaluate(async data=>{const l=await PortalLayers.addGeoJSON('LoD1 source buildings',data,{dataRole:'buildings',heightField:'height_m',license:'ODbL / CC BY-NC 4.0',attribution:'Synthetic browser acceptance fixtures'});return l.id;},data);
+ try{
+  await qa.open();await p.waitForFunction(()=>window.PortalLoD1&&window.PortalProject);
+  await p.evaluate(async()=>{PortalLoD1.cancel({clear:true});PortalLayers.clear();PortalLocalModels.clear();PortalModels.hide();const l=await PortalLayers.addGeoJSON('Different saved map',{type:'FeatureCollection',features:[{type:'Feature',properties:{name:'Other map'},geometry:{type:'Point',coordinates:[-90,40]}}]});window.__lod1Other=(await PortalProject.collect('Different saved map')).project;PortalLayers.remove(l.id);});
+  const source=await add();await open();
+  qa.ok(await p.locator('#lod1-confirm-row').isHidden()&&await p.locator('#lod1-height').inputValue()==='height_m','Known building datasets choose the supplied metre height without asking for a redundant building declaration');
+  await ready();
+  const built=await p.evaluate(()=>({counts:PortalLoD1.model.metadata.counts,scope:PortalLoD1.model.metadata.source.provenance.scope,role:PortalLoD1.model.metadata.modelType}));
+  qa.ok(built.role==='LoD1'&&built.counts.inputRecords===3&&built.counts.modeledRecords===2&&built.counts.skipped.missingHeight===1&&(await p.locator('#lod1-counts').innerText()).includes('without heights'),'The model form reports actual flat-roof building and missing-height counts');
+  await p.locator('#lod1-format').selectOption('glb');await qa.download(()=>p.locator('#lod1-download').click(),'lod1-ui-glb.zip');
+  await p.locator('#lod1-format').selectOption('obj');await qa.download(()=>p.locator('#lod1-download').click(),'lod1-ui-obj.zip');
+  await qa.screenshot('lod1-ready-desktop.png');await p.locator('#lod1-show').click();await p.waitForFunction(()=>!document.querySelector('#lod1-dialog').open);
+  const preview=await p.evaluate(source=>{const l=Array.from(PortalLayers.layers.values()).find(l=>l.id!==source&&l.data.modelPreview);return {id:l.id,feature:l.data.features[0],count:l.data.features.length,extrusion:portal.map.getLayer(l.id+'-fill-extrusion')?.type,history:l.data.provenance.modelSelection,heightField:l.heightField,mode:portal.view3d,cached:!!PortalLoD1.model};},source);
+  qa.ok(preview.count===2&&preview.feature.properties.height_missing===true&&JSON.stringify(preview.feature)===JSON.stringify(data.features[0])&&preview.history.skipped.missingHeight===1&&preview.heightField==='height_m'&&preview.extrusion==='fill-extrusion'&&preview.mode,'Show on map creates an ordinary 3D layer with exact original outlines, original attributes and the modeled subset history');
+  qa.ok(preview.cached,'Adding the preview layer does not invalidate its own generated model');
+  const savedPreview=await p.evaluate(async id=>{const project=(await PortalProject.collect('LoD1 preview map')).project,l=project.layers.find(l=>l.data?.modelPreview);return {data:l?.data,heightField:l?.style?.heightField,role:l?.meta?.dataRole};},preview.id);
+  qa.ok(savedPreview.data?.features.length===2&&savedPreview.data.provenance.modelSelection.skipped.missingHeight===1&&savedPreview.role==='buildings'&&savedPreview.heightField==='height_m','A complete-footprint LoD1 preview saves in the normal project with its height field, modeled subset and missing-height history');
+  await p.evaluate(async()=>PortalProject.restore(await PortalProject.prepare(__lod1Other)));
+  qa.ok(await p.evaluate(()=>!PortalLoD1.model&&!PortalLoD1.busy&&Array.from(PortalLayers.layers.values()).every(l=>l.cfg.name==='Different saved map')),'Restoring a different project clears every cached model before changing layers');
+  await open();qa.ok(await p.locator('#lod1-empty').isVisible()&&await p.locator('#lod1-result').isHidden(),'Reopening Create from buildings cannot show or download a previous project model');await p.locator('#lod1-close').click();
+  const replacement=await add();await open();await ready();
+  p.on('download',watch);await p.evaluate(()=>{document.querySelector('#lod1-download').click();PortalLoD1.cancel({clear:true});});await p.waitForTimeout(150);p.removeListener('download',watch);
+  qa.ok(downloads.length===0&&await p.evaluate(()=>!PortalLoD1.model&&!PortalLoD1.busy),'Cancellation during the download preparation tick prevents a stale model file from downloading');
+  await p.evaluate(async()=>{const real=PortalAnalysisData.capture,snapshot=await real(PortalLayers.active,{scope:'layer'});window.__lod1RealCapture=real;window.__lod1DelayedSnapshot=snapshot;PortalAnalysisData.capture=()=>new Promise(resolve=>window.__lod1Release=resolve);document.querySelector('#lod1-form').requestSubmit();});
+  await p.waitForFunction(()=>PortalLoD1.busy);await p.evaluate(()=>{PortalLoD1.cancel({clear:true});PortalAnalysisData.capture=__lod1RealCapture;document.querySelector('#lod1-form').requestSubmit();});await p.waitForFunction(()=>PortalLoD1.model&&!PortalLoD1.busy);await p.evaluate(()=>{window.__lod1Latest=PortalLoD1.model;__lod1Release(__lod1DelayedSnapshot);});await p.waitForTimeout(100);
+  qa.ok(await p.evaluate(()=>PortalLoD1.model===__lod1Latest&&!PortalLoD1.busy),'An earlier delayed source capture cannot overwrite a newer model or its busy state');
+  await p.evaluate(id=>{const l=PortalLayers.layers.get(id);l.setData(JSON.parse(JSON.stringify(l.data)));PortalLayers.refresh();},replacement);
+  qa.ok(await p.evaluate(()=>!PortalLoD1.model&&document.querySelector('#lod1-result').hidden),'Replacing a source dataset invalidates its previously generated model');
+  await p.evaluate(()=>{for(const d of document.querySelectorAll('dialog[open]'))d.close();});
+  const unknown=await p.evaluate(async()=>{const l=await PortalLayers.addGeoJSON('User building outlines',{type:'FeatureCollection',features:[{type:'Feature',geometry:{type:'Polygon',coordinates:[[[-77.072,38.912],[-77.0716,38.912],[-77.0716,38.9124],[-77.072,38.9124],[-77.072,38.912]]]},properties:{my_height:14}}]});return l.id;});await open();await p.locator('#lod1-layer').selectOption(unknown);await p.locator('#lod1-height').selectOption('my_height');await p.locator('#lod1-scope').selectOption('layer');await p.locator('#lod1-create').click();await p.waitForFunction(()=>!PortalLoD1.busy);
+  qa.ok(!await p.locator('#lod1-confirm-row').isHidden()&&!(await p.evaluate(()=>!!PortalLoD1.model))&&(await p.locator('#lod1-message').innerText()).includes('Confirm'),'Unclassified numeric polygons require an explicit declaration that the outlines are buildings');
+  await p.locator('#lod1-confirm').check();await p.locator('#lod1-create').click();await p.waitForFunction(()=>PortalLoD1.model&&!PortalLoD1.busy);
+  qa.ok(await p.evaluate(()=>PortalLoD1.model.metadata.height.field==='my_height'&&PortalLoD1.model.metadata.counts.modeledRecords===1),'User-provided building footprints can use an explicitly chosen height field');
+  await p.setViewportSize({width:390,height:844});qa.ok(await p.locator('#lod1-dialog').evaluate(d=>d.scrollWidth<=d.clientWidth),'The create-building-model workflow fits a phone screen');await qa.screenshot('lod1-ready-mobile.png');await p.setViewportSize({width:1440,height:960});
+  const report={passed:true,checks:qa.checks.slice(start),built,preview,errors:qa.errors};fs.writeFileSync(path.join(qa.out,'lod1-workflow.json'),JSON.stringify(report,null,2));return report;
+ }catch(error){await qa.screenshot('lod1-failure.png').catch(()=>{});throw error;}
+ finally{p.removeListener('download',watch);await p.evaluate(()=>{if(window.__lod1RealCapture)PortalAnalysisData.capture=__lod1RealCapture;PortalLoD1?.cancel({clear:true});document.querySelector('#lod1-dialog')?.close();}).catch(()=>{});}
+};

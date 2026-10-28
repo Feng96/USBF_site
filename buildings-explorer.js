@@ -14,6 +14,8 @@
   const seeds=[['dc','Washington','DC',-77.071,38.912,['Washington DC','D.C.','Georgetown']],['nyc','New York','NY',-73.985,40.748,['New York City','NYC','Manhattan']],['la','Los Angeles','CA',-118.244,34.052,['LA','L.A.']],['chicago','Chicago','IL',-87.63,41.88,[]],['knoxville','Knoxville','TN',-83.9207,35.9606,[]],['denver','Denver','CO',-104.99,39.74,[]],['boston','Boston','MA',-71.06,42.36,[]],['seattle','Seattle','WA',-122.335,47.608,[]],['sf','San Francisco','CA',-122.419,37.775,['SF']],['austin','Austin','TX',-97.743,30.267,[]],['miami','Miami','FL',-80.192,25.762,[]]];
   const fallback=seeds.map(p=>({id:'featured-'+p[0],kind:'city',name:p[1],label:p[1]+', '+p[2],stateCode:p[2],state:'',coords:p.slice(3,5),aliases:p[5],covered:true,population:0}));
   let places=fallback.slice(),byID=new Map(places.map(p=>[p.id,p])),placesPromise=null,placesReady=false,map,started=false,picker,refreshTimer,lastSummarySignature='',addressSequence=0,lastAddressRequest=0,pendingAddress=null,selection=null;
+  let gazetteer=null,gazetteerPromise=null,pickerState='',pickerVersion=0,pickerLimit=40;
+  const stateLists=new Map(),stateRequests=new Map(),stateFailures=new Map();
   const addressCache=new Map(),addressResults=new Map();
   function normalizePlace(p){
     if(!p||!/^[a-z0-9-]{1,80}$/.test(String(p.id))||!['city','state','coverage'].includes(p.kind)||!pointValid(p.coords)||typeof p.name!=='string'||typeof p.label!=='string'||p.bounds&&!boxValid(p.bounds))throw Error('Place index could not be read.');
@@ -24,6 +26,7 @@
     const seen=new Set(),next=data.places.map(p=>{const row=normalizePlace(p);if(seen.has(row.id))throw Error('Place index has duplicate entries.');seen.add(row.id);return row;});
     places=next;byID=new Map(next.map(p=>[p.id,p]));
     for(const seed of fallback){const match=next.find(p=>p.kind==='city'&&normal(p.name)===normal(seed.name)&&p.stateCode===seed.stateCode);if(match){match.aliases=Array.from(new Set([...match.aliases,...seed.aliases]));match.viewCenter=seed.coords;byID.set(seed.id,match);}else{places.push(seed);byID.set(seed.id,seed);}}
+    for(const rows of stateLists.values())for(const p of rows)byID.set(p.id,p);
     placesReady=true;return places;
   }
   function loadPlaces(){if(placesReady)return Promise.resolve(places);if(!placesPromise)placesPromise=(async()=>{const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);try{const r=await fetch(new URL('./data/places/us-places.json',document.baseURI),{credentials:'omit',signal:controller.signal});if(!r.ok)throw Error('Place list is unavailable. You can still search an address or use the map.');return configurePlaces(await r.json());}finally{clearTimeout(timer);}})().catch(error=>{placesPromise=null;throw error;});return placesPromise;}
@@ -32,6 +35,44 @@
     const tokens=q.split(' '),ranked=[];
     for(const p of places){const names=[p.name,p.label,...p.aliases].map(normal).filter(Boolean),text=normal([p.name,p.label,p.state,p.stateCode,...p.aliases].join(' '));let score=0;for(const value of names){if(value===q)score=Math.max(score,p.kind==='state'&&value===normal(p.stateCode)?1100:1200);else if(value.startsWith(q))score=Math.max(score,240);else if(value.includes(q))score=Math.max(score,90);}if(normal(p.stateCode)===q)score=Math.max(score,p.kind==='state'?1100:900);if(!score&&tokens.every(t=>text.includes(t)))score=30;if(score){if(p.kind==='city')score+=Math.min(12,Math.log10(Math.max(1,p.population)));ranked.push({p,score});}}
     return ranked.sort((a,b)=>b.score-a.score||a.p.label.localeCompare(b.p.label)).slice(0,8).map(({p})=>({label:p.label,note:p.kind==='state'?'U.S. state':p.kind==='coverage'?'Current USBF coverage':'City'+(p.covered===false?' · outside current USBF coverage':''),action:'explore-place:'+p.id}));
+  }
+  async function readPlaceFile(path){
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
+    try{const response=await fetch(new URL('./data/places/census-2026/'+path,document.baseURI),{credentials:'omit',signal:controller.signal});if(!response.ok)throw Error('Place list is unavailable. Try again or use a quick place.');return await response.json();}finally{clearTimeout(timer);}
+  }
+  function loadPlaceManifest(){
+    if(gazetteer)return Promise.resolve(gazetteer);
+    if(!gazetteerPromise)gazetteerPromise=readPlaceFile('manifest.json').then(data=>{
+      if(data?.schemaVersion!==1||data.year!==2026||!Array.isArray(data.states)||data.states.length!==52)throw Error('The place list could not be read. Use a quick place or try again.');
+      const codes=new Set();for(const s of data.states){if(!/^[A-Z]{2}$/.test(s.code)||!/^\d{2}$/.test(s.fips)||codes.has(s.code)||typeof s.name!=='string'||!s.name.trim()||!Number.isInteger(s.count)||s.count<1||s.count>5000)throw Error('The place list could not be read. Use a quick place or try again.');codes.add(s.code);}
+      gazetteer=data;return data;
+    }).catch(error=>{gazetteerPromise=null;throw error;});return gazetteerPromise;
+  }
+  const shortPlaceName=name=>name.replace(/ (?:city|town|village|borough|municipality|CDP|comunidad|zona urbana)$/i,'');
+  function loadStatePlaces(code){
+    code=String(code||'').toUpperCase();if(!/^[A-Z]{2}$/.test(code))return Promise.reject(Error('Choose a state or territory from the list.'));
+    if(stateLists.has(code))return Promise.resolve(stateLists.get(code));if(stateRequests.has(code))return stateRequests.get(code);
+    const request=(async()=>{
+      const manifest=await loadPlaceManifest(),state=manifest.states.find(s=>s.code===code);if(!state)throw Error('Choose a state or territory from the list.');
+      const data=await readPlaceFile(code.toLowerCase()+'.json');
+      if(data?.schemaVersion!==1||data.state!==code||!Array.isArray(data.places)||data.places.length!==state.count)throw Error('This place list could not be read. Try again or use a quick place.');
+      const seen=new Set(),names=new Map(),rows=data.places.map(row=>{
+        if(!Array.isArray(row)||row.length!==4||typeof row[0]!=='string'||!/^\d{7}$/.test(row[0])||!row[0].startsWith(state.fips)||seen.has(row[0])||typeof row[1]!=='string'||!row[1].trim()||row[1].length>180||!pointValid(row.slice(2)))throw Error('This place list could not be read. Try again or use a quick place.');
+        seen.add(row[0]);const name=row[1],short=shortPlaceName(name),key=normal(short);names.set(key,(names.get(key)||0)+1);
+        return {id:'census-'+row[0],kind:'place',name,shortName:short,label:short+', '+code,state:state.name,stateCode:code,coords:row.slice(2),aliases:[short],covered:!['AK','HI','PR'].includes(code),coordinateRole:'census-internal-point'};
+      });
+      for(const p of rows){p.sameName=names.get(normal(p.shortName))>1;byID.set(p.id,p);}stateLists.set(code,rows);stateFailures.delete(code);return rows;
+    })().catch(error=>{stateFailures.set(code,error.message);throw error;}).finally(()=>stateRequests.delete(code));stateRequests.set(code,request);return request;
+  }
+  function placeNote(p){
+    let note=/ CDP$/i.test(p.name)?'Census-designated place':'Place';
+    if(p.sameName)note+=' · '+Math.abs(p.coords[1]).toFixed(2)+'°'+(p.coords[1]<0?'S':'N')+', '+Math.abs(p.coords[0]).toFixed(2)+'°'+(p.coords[0]<0?'W':'E');
+    return note+(p.covered===false?' · outside current USBF coverage':'');
+  }
+  function searchState(code,query='',maximum=40){
+    const rows=stateLists.get(String(code||'').toUpperCase())||[],q=normal(query),tokens=q.split(' ').filter(Boolean),ranked=[];
+    for(const p of rows){const names=[p.name,p.shortName,p.label].map(normal),text=normal([p.name,p.shortName,p.state,p.stateCode].join(' '));let score=q?0:1;for(const value of names){if(value===q)score=Math.max(score,100);else if(q&&value.startsWith(q))score=Math.max(score,30);}if(q&&!score&&tokens.every(t=>text.includes(t)))score=10;if(score)ranked.push({p,score});}
+    return ranked.sort((a,b)=>b.score-a.score||a.p.label.localeCompare(b.p.label)||a.p.id.localeCompare(b.p.id)).slice(0,Math.max(1,Math.min(5000,Number.isFinite(maximum)?Math.floor(maximum):40))).map(({p})=>({label:p.label,note:placeNote(p),action:'explore-place:'+p.id,officialName:p.name,coordinateRole:p.coordinateRole}));
   }
   function parseAddress(payload,query){
     if(!payload?.result||!Array.isArray(payload.result.addressMatches))throw Error('The address service returned an unreadable response. Try again.');
@@ -70,16 +111,50 @@
     $('#search-results').hidden=true;picker?.close();if(innerWidth<=700){$('#sidebar')?.classList.remove('is-open');const b=$('[data-action=layers]');if(b)b.setAttribute('aria-expanded','false');}schedule();return true;
   }
   function navigate(action){const value=String(action||'');if(value.startsWith('explore-place:')){const p=byID.get(value.slice(14));if(p)return go(p);notify('Choose the place again.');return true;}if(value.startsWith('explore-address:')){const p=addressResults.get(value.slice(16));if(p)return go(p);notify('Search this address again to reopen its location.');return true;}return false;}
-  function pickerResults(query=''){
-    if(!picker)return;const q=normal(query),items=q?searchLocal(query):['featured-dc','featured-nyc','featured-la','featured-chicago','featured-knoxville','featured-sf'].map(id=>byID.get(id)).filter(Boolean).map(p=>({label:p.label,note:'City',action:'explore-place:'+p.id}));const list=$('#explorer-place-list');list.innerHTML=items.map(r=>'<button type="button" data-explorer-place="'+esc(r.action)+'"><strong>'+esc(r.label)+'</strong><span>'+esc(r.note)+'</span></button>').join('')||'<p>No matching city or state. For a street address, use the search bar on the map.</p>';
+  function populateStatePicker(){
+    if(!picker)return;const rows=gazetteer?.states||places.filter(p=>p.kind==='state').map(p=>({code:p.stateCode,name:p.name}));
+    const choices=rows.slice();if(!choices.some(s=>s.code==='PR'))choices.push({code:'PR',name:'Puerto Rico'});
+    $('#explorer-place-state').innerHTML='<option value="">Quick places</option>'+choices.sort((a,b)=>a.name.localeCompare(b.name)).map(s=>'<option value="'+esc(s.code)+'"'+(s.code===pickerState?' selected':'')+'>'+esc(s.name)+'</option>').join('');
   }
-  function openPlacePicker(){if(!map){notify('The map is loading. Please try again shortly.');return;}if(!picker){picker=document.createElement('dialog');picker.id='explorer-place-dialog';picker.className='explorer-place-dialog';picker.setAttribute('aria-labelledby','explorer-place-title');picker.innerHTML='<header><h2 id="explorer-place-title">Choose a place</h2><button type="button" data-close-place-picker aria-label="Close">×</button></header><div class="explorer-place-content"><label>City or state<input id="explorer-place-query" type="search" placeholder="New York, California, DC…" autocomplete="off"></label><div id="explorer-place-list"></div><p class="explorer-place-note">Searches this place list without sending a request. Street-address searches use the U.S. Census Bureau.</p></div>';document.body.append(picker);picker.querySelector('[data-close-place-picker]').onclick=()=>picker.close();$('#explorer-place-query').oninput=e=>pickerResults(e.target.value);picker.addEventListener('click',e=>{const button=e.target.closest('[data-explorer-place]');if(button)navigate(button.dataset.explorerPlace);});}
-    $('#explorer-place-query').value='';pickerResults();picker.showModal();loadPlaces().then(()=>pickerResults($('#explorer-place-query').value)).catch(()=>{});
+  function pickerResults(query=''){
+    if(!picker)return;const list=$('#explorer-place-list'),status=$('#explorer-place-status'),q=normal(query),state=gazetteer?.states.find(s=>s.code===pickerState),stateName=state?.name||places.find(p=>p.kind==='state'&&p.stateCode===pickerState)?.name||(pickerState==='PR'?'Puerto Rico':pickerState);
+    $('#explorer-place-query-label').textContent=pickerState?'Place name':'City or state';$('#explorer-place-query').placeholder=pickerState?'Search cities, towns and other places…':'New York, California, DC…';
+    const coverage=$('#explorer-place-coverage');coverage.hidden=!['AK','HI','PR'].includes(pickerState);coverage.textContent='USBF does not currently cover '+stateName+'. You can explore the map and add another dataset.';
+    $('#explorer-place-help').textContent=pickerState?'Census places open at a reference point, not an individual building. For a street address, use the map search.':'Choose a state to find smaller places. For a street address, use the map search.';
+    if(pickerState&&!stateLists.has(pickerState)){
+      const failed=stateFailures.get(pickerState);status.textContent=failed?'The place list is unavailable. Try again or choose Quick places.':'Loading places in '+stateName+'…';
+      list.innerHTML=failed?'<button type="button" class="explorer-place-retry" data-explorer-place-retry>Try again</button>':'';return;
+    }
+    const all=pickerState?searchState(pickerState,query,5000):q?searchLocal(query):['featured-dc','featured-nyc','featured-la','featured-chicago','featured-knoxville','featured-sf'].map(id=>byID.get(id)).filter(Boolean).map(p=>({label:p.label,note:'City',action:'explore-place:'+p.id})),items=all.slice(0,pickerLimit);
+    status.textContent=pickerState?(q?integer.format(all.length)+' matching '+(all.length===1?'place':'places'):integer.format(all.length)+' places')+' in '+stateName+'.':'';
+    list.innerHTML=items.map(r=>'<button type="button" data-explorer-place="'+esc(r.action)+'"'+(r.officialName?' title="'+esc(r.officialName)+'"':'')+'><strong>'+esc(r.label)+'</strong><span>'+esc(r.note)+'</span></button>').join('')||(pickerState?'<p>No matching place. Try part of the name, or choose another state.</p>':'<p>No matching quick place. Choose a state for smaller places.</p>');
+    if(all.length>items.length)list.insertAdjacentHTML('beforeend','<button type="button" class="explorer-place-more" data-explorer-place-more>Show more places</button>');
+  }
+  async function choosePickerState(code){
+    pickerState=String(code||'');pickerLimit=40;const version=++pickerVersion;if(pickerState)stateFailures.delete(pickerState);pickerResults($('#explorer-place-query').value);
+    if(!pickerState)return;try{await loadStatePlaces(pickerState);}catch(error){}if(version===pickerVersion&&picker)pickerResults($('#explorer-place-query').value);
+  }
+  function openPlacePicker(){
+    if(!map){notify('The map is loading. Please try again shortly.');return;}
+    if(!picker){
+      picker=document.createElement('dialog');picker.id='explorer-place-dialog';picker.className='explorer-place-dialog';picker.setAttribute('aria-labelledby','explorer-place-title');
+      picker.innerHTML='<header><h2 id="explorer-place-title">Choose a place</h2><button type="button" data-close-place-picker aria-label="Close">×</button></header><div class="explorer-place-content"><div class="explorer-place-fields"><label>State or territory<select id="explorer-place-state"><option value="">Quick places</option></select></label><label><span id="explorer-place-query-label">City or state</span><input id="explorer-place-query" type="search" placeholder="New York, California, DC…" autocomplete="off"></label></div><p id="explorer-place-coverage" class="explorer-place-coverage" hidden></p><p id="explorer-place-status" class="explorer-place-status" role="status" aria-live="polite"></p><div id="explorer-place-list"></div><p id="explorer-place-help" class="explorer-place-note"></p><details class="explorer-place-source"><summary>About this place list</summary><p>Quick places use Natural Earth. State lists use the U.S. Census Bureau’s 2026 Gazetteer, including cities, towns and census-designated places. Search stays in this website; typing does not send queries to a geocoder. Reference points help you find a place and do not show its boundary.</p><a href="https://www.census.gov/geographies/reference-files/2026/geo/gazetter-file.html" target="_blank" rel="noopener">Census Gazetteer 2026 ↗</a></details></div>';
+      document.body.append(picker);picker.querySelector('[data-close-place-picker]').onclick=()=>picker.close();$('#explorer-place-state').onchange=e=>choosePickerState(e.target.value);$('#explorer-place-query').oninput=e=>{pickerLimit=40;pickerResults(e.target.value);};
+      picker.addEventListener('click',e=>{const button=e.target.closest('[data-explorer-place]');if(button)navigate(button.dataset.explorerPlace);if(e.target.closest('[data-explorer-place-more]')){pickerLimit+=40;pickerResults($('#explorer-place-query').value);}if(e.target.closest('[data-explorer-place-retry]'))choosePickerState(pickerState);});
+    }
+    $('#explorer-place-query').value='';pickerLimit=40;populateStatePicker();pickerResults();if(!picker.open)picker.showModal();$('#explorer-place-query').focus();
+    Promise.allSettled([loadPlaces(),loadPlaceManifest()]).then(()=>{populateStatePicker();pickerResults($('#explorer-place-query').value);});if(pickerState)choosePickerState(pickerState);
   }
   function sourceName(value){const text=String(value??'').trim(),names={osm:'OpenStreetMap',openstreetmap:'OpenStreetMap',microsoft:'Microsoft',ms:'Microsoft',msft:'Microsoft',google:'Google Open Buildings',gba:'GlobalBuildingAtlas'};return names[text.toLowerCase()]||text||'Not recorded';}
   function numeric(value){return typeof value==='number'&&Number.isFinite(value)?value:null;}
   function heightOf(layer,feature){const p=feature?.properties||{},field=layer?.heightField||'height_m',value=numeric(p[field]);if(value!==null&&value>0)return value;if(layer?.cfg?.driver==='usbf'){const inherited=numeric(p.height);if(inherited!==null&&inherited>0)return inherited;}return null;}
-  function isBuilding(layer,feature){const role=layer?.data?.provenance?.featureRole||layer?.cfg?.provenance?.featureRole;if(role==='features'||role==='feature'||role==='derived')return false;if(layer?.data?.analysis?.operation&&role!=='building'&&role!=='buildings')return false;const id=feature?.properties?.usbf_id,identified=typeof id==='string'&&id.trim()!==''||typeof id==='number'&&Number.isFinite(id);return ['usbf','gba','nyc'].includes(layer?.cfg?.driver)||['dc-government','training-heights'].includes(layer?.cfg?.id)||identified&&['Polygon','MultiPolygon'].includes(feature?.geometry?.type);}
+  function isBuilding(layer,feature){
+    if(root.PortalAnalysisData?.isBuildingLayer)return root.PortalAnalysisData.isBuildingLayer(layer);
+    const provenance=layer?.data?.provenance||layer?.cfg?.provenance,role=provenance?.featureRole;
+    if(['features','feature','derived'].includes(role)||provenance?.role==='user-drawing'||layer?.cfg?.sourceKind==='drawing'||layer?.data?.analysis?.operation||provenance?.operation)return false;
+    const id=feature?.properties?.usbf_id,identified=typeof id==='string'&&id.trim()!==''||typeof id==='number'&&Number.isFinite(id);
+    return ['usbf','gba','nyc'].includes(layer?.cfg?.driver)||['dc-government','training-heights'].includes(layer?.cfg?.id)||['building','buildings'].includes(role)||layer?.cfg?.dataRole==='buildings'||identified&&['Polygon','MultiPolygon'].includes(feature?.geometry?.type);
+  }
   function changeLabel(value){return value===true?'Changed from source':value===false?'Unchanged from source':'Not recorded';}
   function stableID(value){return typeof value==='string'&&value.trim()!==''||typeof value==='number'&&Number.isFinite(value);}
   function originalFeature(layer,feature){
@@ -124,5 +199,5 @@
     map.on('moveend',schedule);map.on('idle',schedule);['portal-layers-changed','portal-style-changed'].forEach(e=>document.addEventListener(e,schedule));loadPlaces().catch(()=>{});refresh();
   }
   document.addEventListener('portal-ready',init);document.addEventListener('click',e=>{const button=e.target.closest('[data-explorer-place],[data-explorer-choose],[data-explorer-3d],[data-explorer-download-building],[data-explorer-retry]');if(!button)return;if(button.dataset.explorerPlace)navigate(button.dataset.explorerPlace);if(button.hasAttribute('data-explorer-choose'))openPlacePicker();if(button.hasAttribute('data-explorer-3d'))root.portal?.setViewMode(true,true);if(button.hasAttribute('data-explorer-download-building'))downloadSelected();if(button.hasAttribute('data-explorer-retry'))root.PortalLayers?.active?.checkUpdates?.();});
-  root.PortalExplorer={init,loadPlaces,configurePlaces,searchLocal,searchAddress,navigate,renderFeature,fieldLabel,summaryFor,heightOf,changeLabel,parseAddress,originalFeature,footprintArea,openPlacePicker,clearLocation:()=>{selection=null;map?.getSource('explorer-address-location')?.setData({type:'FeatureCollection',features:[]});},metadata:()=>{if(!selection)return null;let visible=true;const b=map?.getBounds();if(b)visible=selection.coordinates[0]>=b.getWest()&&selection.coordinates[0]<=b.getEast()&&selection.coordinates[1]>=b.getSouth()&&selection.coordinates[1]<=b.getNorth();return {...JSON.parse(JSON.stringify(selection)),visible};},get ready(){return placesReady;},get places(){return places.slice();}};init();
+  root.PortalExplorer={init,loadPlaces,configurePlaces,searchLocal,searchAddress,loadPlaceManifest,loadStatePlaces,searchState,navigate,renderFeature,fieldLabel,summaryFor,heightOf,changeLabel,parseAddress,originalFeature,footprintArea,openPlacePicker,clearLocation:()=>{selection=null;map?.getSource('explorer-address-location')?.setData({type:'FeatureCollection',features:[]});},metadata:()=>{if(!selection)return null;let visible=true;const b=map?.getBounds();if(b)visible=selection.coordinates[0]>=b.getWest()&&selection.coordinates[0]<=b.getEast()&&selection.coordinates[1]>=b.getSouth()&&selection.coordinates[1]<=b.getNorth();return {...JSON.parse(JSON.stringify(selection)),visible};},get ready(){return placesReady;},get places(){return places.slice();}};init();
 })(globalThis);

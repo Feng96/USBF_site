@@ -6,13 +6,16 @@ A map for the published USBF U.S. building inventory, comparison datasets and
 research roof models. Search a place, inspect buildings, summarize an area and
 save a map or data. Advanced controls stay in the tools and layer menus.
 
-## Workspace 1.1
+## Workspace 1.2
 
 - A compact header and toolbar. Statistics, spatial tools, charts, drawing,
   coordinate settings and map styling open from **Tools**. Layer opacity,
-  publication status and source details live in each layer’s settings.
-- A local list of 821 U.S. cities, states and coverage entries; street addresses
-  use an explicitly submitted U.S. Census Bureau query. Address points are
+  publication status and source details live in each layer’s settings. Rename,
+  recolor and reorder layers there without adding controls over the map.
+- A quick local list of 821 U.S. cities, states and coverage entries, plus
+  32,363 official Census Gazetteer places loaded by state. Same-name places
+  remain separate choices. Street addresses use an explicitly submitted U.S.
+  Census Bureau query. Address points are
   approximate locations along a street range, separate from identified buildings.
   Building cards show readable height, footprint source, area and edit status;
   original fields and component licenses remain under details.
@@ -25,6 +28,14 @@ save a map or data. Advanced controls stay in the tools and layer menus.
   models with explicit placement, up axis, units, elevation and scale. Download
   original files or a ZIP containing placed OBJ geometry and its location file.
   Model export actually applies units, orientation, scale and elevation.
+- **Models → Create from buildings** produces genuine flat-roof LoD1 OBJ/GLB
+  files from complete original footprints and positive supplied heights. Holes,
+  multipart buildings and exact geographic placement are retained. Missing
+  heights are skipped and counted. Downloads include source attributes,
+  component licenses, captured scope and a reversible local AEQD projection.
+  The map preview uses the original geographic footprints; it does not place a
+  large projected mesh using an approximate map transform. LoD2 research models
+  remain a separate experimental collection.
 - A frozen data snapshot drives numeric summaries, category frequencies,
   histograms, scatter plots and grouped averages. Statistics prepare their inputs
   automatically; explicit refresh marks a new calculation. PNG charts embed their
@@ -35,8 +46,11 @@ save a map or data. Advanced controls stay in the tools and layer menus.
   measurements. Results become independent, downloadable vector layers.
   Derived buffers and overlays keep source height attributes for reference but
   are not automatically extruded as physical buildings.
-- Draw points, lines, polygons and point labels. A drawn polygon can be used as
-  an analysis boundary. Escape cancels; Enter finishes; Backspace undoes a vertex.
+- Draw points, lines, polygons and point labels. After drawing a study area,
+  choose the building dataset and directly summarize or download its buildings.
+  Whole original buildings intersecting the area are included once; holes and
+  missing heights remain meaningful. The exact boundary and source details are
+  frozen with the result. Escape cancels; Enter finishes; Backspace undoes a vertex.
 - Real coordinate conversion for imports, readouts and exports: WGS84, Web
   Mercator, north/south UTM and custom PROJ definitions. The map itself renders
   in EPSG:3857. Horizontal conversion leaves source Z values and vertical datums
@@ -45,9 +59,15 @@ save a map or data. Advanced controls stay in the tools and layer menus.
   models, plus title, dataset legend, scale, north arrow, date, extent and source
   credits. Download PNG at standard or true 2× rendering resolution, download
   map metadata, or download a PDF directly. PDF supports Letter/A4/A3, portrait
-  or landscape and page margins, plus an attached source-details JSON.
+  or landscape and page margins. Paper text uses readable physical sizes; long
+  source credits continue on additional pages. A source-details JSON stays attached.
   Pending/failed data require explicit consent
   to make a clearly labelled partial map.
+- Save and open a portable `.usbf.json` map from **Tools → Save or open a map**.
+  It retains original vector records, drawings/labels, raster and model original
+  files, source rights, derived-result scope, styles, order, camera and CRS.
+  Catalog sources reconnect to the latest publication. Embedded files are checked
+  before replacement; a staging failure keeps the previous map intact.
 - Download complete loaded source geometry as WGS84 GeoJSON, declared projected
   JSON or CSV with WKT. Original local raster files remain available unchanged.
 
@@ -71,7 +91,8 @@ source and a suitable processing service; this site does not scan 150 million
 buildings in a browser or substitute loaded tile counts for national totals.
 
 The attribute table remains an explicitly labelled current-view preview. Its
-CSV/fragment exports describe what was rendered; use **Download** for source
+CSV/fragment exports describe their current-view scope; complete source records
+are recovered for full-geometry layers before selection or export; use **Download** for source
 geometry exports. Overlapping datasets are not automatically reconciled into a
 single building inventory.
 
@@ -97,13 +118,21 @@ rendered tile alone is never an analytical original.
    PNG and metadata are complementary: the metadata records source dates,
    styles, limits, camera and local model placements.
 
-Local files, drawings, analysis outputs and imported models remain in the
-browser session. Download them before closing. Shared URLs restore catalog
-connections, camera and styles; local files and models must be reopened on the
-receiving device. The site does not upload user files to a storage service.
+Save a map file to keep local files, finished drawings, added analysis outputs
+and imported models for another session or device. Shared URLs restore catalog
+connections, camera and styles; send the saved map file when local content is
+needed. The site does not upload user files to a storage service. Maps include up
+to 24 layers and three models, with at most 48 MiB of embedded originals
+(32 MiB per original file; map JSON up to 80 MiB). Image-only layers explicitly
+retain a display preview rather than claiming original raster pixels. Drawings
+restore up to 64 text labels per layer and 128 across a saved map.
 
 ## Browser limits and measurement meaning
 
+- Flat-roof mesh creation: at most 2,000 buildings, 75,000 source vertices,
+  150,000 triangles and a 10 km local radius. Topology checks have a bounded
+  comparison budget, stop at the first invalid intersection and can be cancelled.
+  Ground elevation and roof shape are not inferred.
 - Direct vector/image inputs: 32 MiB; vectors: 50,000 features / one million
   coordinate positions. Zipped Shapefile expansion is checked before parsing.
 - GeoTIFF/COG: range-based access, bounded native decode memory, overview/window
@@ -234,7 +263,7 @@ Application MIT licensing does not replace dataset licensing. Each provider and
 model retains its source attribution and component terms. US experimental LoD2
 results remain experiments and are not a national production roof inventory.
 
-The 1.1 beginner flows were informed by the official [GeoLibre guide](https://geolibre.app/)
+The beginner flows were informed by the official [GeoLibre guide](https://geolibre.app/)
 and [QGIS interface / print layout documentation](https://docs.qgis.org/3.40/en/docs/user_manual/print_composer/overview_composer.html).
 The application remains centered on the published U.S. building data rather than
 exposing every GIS operation on the starting map. Internal processing parameters

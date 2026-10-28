@@ -1,4 +1,4 @@
-/* All rules are scoped to the data-tools dialog. */
+/* Styles for on-demand analysis and study-area dialogs. */
 .analysis-workspace{width:min(920px,calc(100vw - 36px));max-width:920px;max-height:calc(100dvh - 36px);padding:0;border:1px solid #cdd8d1;border-radius:14px;color:#183c37;background:#fff;box-shadow:0 22px 80px #102c3338;overflow:auto;font-family:inherit}
 .analysis-workspace::backdrop{background:#142b2c70;backdrop-filter:blur(2px)}
 .analysis-workspace [hidden]{display:none!important}
@@ -91,3 +91,13 @@
  .analysis-workspace .analysis-metric>strong{font-size:22px}
  .analysis-workspace .analysis-source-facts>div{grid-template-columns:65px 1fr;gap:9px}
 }
+
+.analysis-study-dialog{width:520px}
+.analysis-study-dialog .analysis-study-name{font-size:15px;font-weight:600;color:#315b43;margin-bottom:8px;overflow-wrap:anywhere}
+.analysis-study-dialog label{display:grid;gap:7px;font-size:12px;color:#566f5d}
+.analysis-study-dialog select{width:100%;min-width:0;max-width:100%;border:1px solid #c8d7cd;padding:10px 11px;border-radius:5px;background:#fff;color:#2e4b36;font:inherit;font-size:12px}
+.analysis-study-dialog .workspace-actions{margin-top:6px}
+.analysis-study-dialog button:disabled{opacity:.45;cursor:default}
+.analysis-study-dialog .analysis-text-button{padding:8px 0;margin-top:12px;font-size:12px;color:#2c725a;text-decoration:underline;text-underline-offset:3px}
+.analysis-study-dialog select:focus-visible,.analysis-study-dialog button:focus-visible{outline:3px solid #79b69a;outline-offset:2px}
+.analysis-study-dialog [hidden],#drawing-dialog [hidden]{display:none!important}

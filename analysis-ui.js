@@ -13,12 +13,13 @@
   function remember(){try{preferences={...preferences,chartOptions:{...preferences.chartOptions,[$('chart-kind').value]:{field:$('chart-field').value,y:$('chart-y').value,group:$('chart-group').value}},scope:$('scope').value,numeric:$('numeric-field').value,category:$('group-field').value,chartKind:$('chart-kind').value,chartField:$('chart-field').value,chartY:$('chart-y').value,chartGroup:$('chart-group').value,operation:$('operation').value,distance:$('distance').value};localStorage.setItem(storage,JSON.stringify(preferences));}catch(e){}}
   function identity(object){if(!object||typeof object!=='object')return null;if(!objects.has(object))objects.set(object,++objectSequence);return objects.get(object);}
   function layer(){return root.PortalLayers?.layers.get($('layer')?.value);}
-  function available(){const l=layer(),c=A().capabilities(l);return !!(c.supported&&(!c.attributePreview||$('tile-optin').checked)&&!(l.cfg.type==='viewport'&&(l.viewLoading||!l.loaded||l.error)));}
+  function studyLayer(){return root.PortalLayers?.layers.get($('study-area')?.value);}
+  function available(){const l=layer(),c=A().capabilities(l);return !!(c.supported&&(!c.attributePreview||$('tile-optin').checked)&&!(l.cfg.type==='viewport'&&(l.viewLoading||!l.loaded||l.error))&&($('scope').value!=='study-area'||A().isBuildingLayer(l)&&studyLayer()));}
   function bounds(){const b=root.portal?.map.getBounds();return b?[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()]:null;}
   function inputBinding(){
     const l=layer();if(!l)return '';
-    const scope=$('scope').value,selected=root.PortalLayers.selection;
-    return JSON.stringify([l.id,identity(l.data),l.data?.features.length,l.sourceFilter||'',l.cfg.fixedSource||'',l.minArea||0,l.viewLoadedAt,l.release?[l.release.name,l.release.updated,l.release.tiles,l.release.buildings]:null,l.viewLoading,scope,scope==='view'||l.cfg.type==='viewport'?bounds():null,scope==='selection'?[selected?.layer,identity(selected?.feature)]:null,$('tile-optin').checked]);
+    const scope=$('scope').value,selected=root.PortalLayers.selection,area=scope==='study-area'?studyLayer():null;
+    return JSON.stringify([l.id,identity(l.data),l.data?.features.length,l.sourceFilter||'',l.cfg.fixedSource||'',l.minArea||0,l.viewLoadedAt,l.release?[l.release.name,l.release.updated,l.release.tiles,l.release.buildings]:null,l.viewLoading,scope,scope==='view'||l.cfg.type==='viewport'?bounds():null,scope==='selection'?[selected?.layer,identity(selected?.feature)]:null,area?[area.id,identity(area.data),area.data?.features.length]:null,$('tile-optin').checked]);
   }
   function fieldLabel(key){
     if(key==='$area_m2')return snapshot?.provenance.featureRole==='buildings'?'Footprint area · m²':'Area · m²';
@@ -39,6 +40,7 @@
   }
   function scopeLabel(p){
     if(p.fragmentCount!==undefined)return 'Display samples from the current map';
+    if(p.studyArea)return p.studyArea.name+(p.sourceType==='viewport'?' · loaded neighborhood':'');
     if(p.operation)return 'Study-area result';
     if(p.requestedScope==='selection'||p.scope==='selection')return 'Selected feature';
     if(p.scope==='whole-layer')return 'Whole dataset';
@@ -120,8 +122,10 @@
     const old=$('layer').value,selected=old&&layers.has(old)?old:root.PortalLayers.active?.id;
     fillSelect('layer',Array.from(layers.values()).map(l=>[l.id,l.cfg.name]),selected);
     const reference=$('reference').value;
-    fillSelect('reference',[['__map__','Current map area'],...Array.from(layers.values()).filter(l=>{const c=A().capabilities(l);return c.wholeLayer&&c.geometryAnalysis&&l.data?.features.length&&l.data.features.every(f=>['Polygon','MultiPolygon'].includes(f.geometry?.type));}).map(l=>[l.id,l.cfg.name])],reference||'__map__');
-    if(old&&old!==$('layer').value){clearSnapshot();autoPending=tab==='stats'&&dialog.open;}
+    const areas=Array.from(layers.values()).filter(l=>{const c=A().capabilities(l);return c.wholeLayer&&c.geometryAnalysis&&l.data?.features.length&&l.data.features.every(f=>['Polygon','MultiPolygon'].includes(f.geometry?.type));}),oldArea=$('study-area').value;
+    fillSelect('reference',[['__map__','Current map area'],...areas.map(l=>[l.id,l.cfg.name])],reference||'__map__');
+    fillSelect('study-area',areas.map(l=>[l.id,l.cfg.name]),oldArea||areas.find(l=>l.data?.provenance?.role==='user-drawing')?.id);
+    if((old&&old!==$('layer').value)||($('scope').value==='study-area'&&oldArea&&!layers.has(oldArea))){clearSnapshot();autoPending=tab==='stats'&&dialog.open;}
     updateScope();if(!snapshot)populateFields();updateFreshness();maybeAuto();
   }
   function updateScope(){
@@ -129,7 +133,9 @@
     const l=layer(),c=A().capabilities(l),tiles=c.kind==='tile-preview',previous=$('scope').value||preferences.scope||'view';
     $('source-note').textContent=sourceNote(l,c);$('tile-preview').hidden=!tiles;$('original-data').hidden=!(tiles||!l||!c.supported);$('return-map').hidden=!(lastError||l?.cfg.type==='viewport'&&!l.loaded);
     const choices=tiles?[['tile-preview','Map display samples']]:c.wholeLayer?[['view','Current map area'],['layer','Whole dataset'],['selection','Selected feature']]:[['view','Current map area'],['layer','Loaded neighborhood'],['selection','Selected feature']];
+    if(!tiles&&A().isBuildingLayer(l)&&$('study-area').options.length)choices.push(['study-area','Drawn or saved study area']);
     fillSelect('scope',choices,previous);
+    $('study-wrap').hidden=$('scope').value!=='study-area';$('study-note').hidden=$('scope').value!=='study-area';
     $('capture').disabled=!available();$('scope').disabled=!c.supported;
     $('original-data').textContent=tiles?'Open original building data':l?'Add building footprints':'Add data';
     updateButtons();
@@ -141,6 +147,7 @@
     $('run-geometry').disabled=!can||!c.geometryAnalysis;$('run-chart').disabled=!can||!$('chart-field').value;
     $('run-spatial').disabled=!can||!c.geometryAnalysis;$('snapshot-download').disabled=!snapshot;
     $('stats-download').disabled=!lastStats&&!summary;$('chart-svg').disabled=!lastChart;$('chart-csv').disabled=!lastChart;$('chart-png').disabled=!lastChart;
+    $('data-download').hidden=!snapshot?.provenance.studyArea;$('data-download').disabled=!snapshot?.provenance.studyArea||!snapshot.capabilities.geometryAnalysis;
     $('spatial-add').disabled=!lastResult?.features.length;$('spatial-download').disabled=!lastResult;
   }
   function switchTab(name){
@@ -159,13 +166,14 @@
     if(p.release?.updated)rows.push(['Published',new Date(p.release.updated).toLocaleString()]);
     if(p.sourceUrl)rows.push(['Source',p.sourceUrl]);
     if(p.heightBasis)rows.push(['Height source',p.sourceDriver==='usbf'||p.sourceDriver==='gba'?'GlobalBuildingAtlas estimates':p.heightBasis]);
+    if(p.studyArea){rows.push(['Study area',p.studyArea.name],['Included',p.studyArea.geometryRule]);if(p.studyArea.withinLoadedBounds===false)rows.push(['Area coverage','Part of this area is outside the loaded neighborhood']);}
     if(p.licenses?.length)rows.push(['Terms',p.licenses.join(' · ')]);
     if(p.lineage?.length)rows.push(['Based on',p.lineage.map(l=>l.name||l.scopeLabel||'Source data').join(' · ')]);
     return rows.map(([key,value])=>'<div><dt>'+esc(key)+'</dt><dd>'+esc(value)+'</dd></div>').join('');
   }
   async function prepare(signal){
     const l=layer();if(!l)throw Error('Add a dataset to the map first.');
-    const start=inputBinding(),captured=await A().capture(l,{scope:$('scope').value,map:root.portal.map,selection:root.PortalLayers.selection,allowTilePreview:$('tile-optin').checked,signal,onProgress:progress});
+    const start=inputBinding(),captured=await A().capture(l,{scope:$('scope').value,studyArea:studyLayer(),map:root.portal.map,selection:root.PortalLayers.selection,allowTilePreview:$('tile-optin').checked,signal,onProgress:progress});
     const own=currentJob(signal);if(binding!==start)clearProducts();own.snapshot=captured;own.binding=start;snapshot=captured;binding=start;renderSnapshot();return captured;
   }
   function metric(value,label,detail=''){return '<div class="analysis-metric"><strong>'+esc(value)+'</strong><span>'+esc(label)+'</span>'+(detail?'<small>'+esc(detail)+'</small>':'')+'</div>';}
@@ -177,7 +185,8 @@
     if(h){const fraction=summary.records?h.valid/summary.records:0;html+=metric((fraction*100).toFixed(0)+'%','Have a height',fmt(h.valid,0)+' of '+fmt(summary.records,0));html+=metric(h.mean===null?'—':fmt(h.mean)+' m','Average height',h.median===null?'No supplied heights':'Median '+fmt(h.median)+' m');}
     if(summary.area)html+=metric(fmt(summary.area.sum/1000000,3)+' km²',summary.kind==='buildings'?'Total footprint area':'Total polygon area',fmt(summary.polygonRecords,0)+' polygons');
     $('overview').innerHTML='<div class="analysis-metrics">'+html+'</div>';
-    $('overview-note').textContent=summary.provenance.sourceDriver==='usbf'||summary.provenance.sourceDriver==='gba'?'Heights are estimates from GlobalBuildingAtlas, not on-site measurements.':h?'Missing height values are left out of height averages.':'No height field was supplied for this dataset.';
+    const heightNote=summary.provenance.sourceDriver==='usbf'||summary.provenance.sourceDriver==='gba'?'Heights are estimates from GlobalBuildingAtlas.':h?'Missing height values are left out of height averages.':'No height field was supplied for this dataset.';
+    $('overview-note').textContent=(summary.provenance.studyArea?'Counts and footprint areas use whole buildings touching or overlapping the study area. ':'')+heightNote;
   }
   function validateField(field,data=snapshot){if(!data||!field||!data.fields.includes(field)&&!['$area_m2','$length_m'].includes(field))throw Error('That field is no longer available. Choose another field.');}
   function table(headers,rows){return '<div class="analysis-table-wrap"><table><thead><tr>'+headers.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map(v=>'<td>'+esc(v)+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';}
@@ -266,6 +275,11 @@
     else rows=s.kind==='numeric'?[['measure','value'],...Object.entries(s.summary)]:s.kind==='groups'?[['category','count'],...s.rows.map(r=>[r.label,r.count])]:[['measure','value'],...Object.entries(s.result.area_m2).map(([k,v])=>['area_m2_'+k,v]),...Object.entries(s.result.length_m).map(([k,v])=>['length_m_'+k,v])];
     rows=rows.map((r,i)=>r.concat(i===0?['source','area','data_time','licenses']:[p.name,p.scopeLabel,p.capturedAt,p.licenses]));save('building-statistics.csv',csv(rows),'text/csv;charset=utf-8');
   }
+  function dataDownload(){
+    if(!snapshot?.provenance.studyArea)return;
+    const name=snapshot.provenance.studyArea.name.replace(/[^\p{L}\p{N}_.-]+/gu,'-').replace(/^[.-]+/,'').slice(0,80)||'study-area';
+    save(name+'-buildings.geojson',JSON.stringify(A().sourceGeoJSON(snapshot)),'application/geo+json');
+  }
   function chartDownload(){
     if(!lastChart)return;const c=lastChart,p=c.provenance;let rows;
     if(c.kind==='scatter')rows=[['x','y'],...(c.pairs||c.points).map(point=>[point.x,point.y])];
@@ -293,11 +307,11 @@
     dialog.innerHTML=[
       '<header class="analysis-header"><h2 id="analysis-title">Statistics and analysis</h2><button type="button" class="analysis-close" data-analysis-close aria-label="Close">×</button></header>',
       '<div class="analysis-tabs" role="tablist" aria-label="Data tools"><button type="button" role="tab" id="analysis-tab-stats" data-analysis-tab="stats" aria-controls="analysis-panel-stats">Statistics</button><button type="button" role="tab" id="analysis-tab-spatial" data-analysis-tab="spatial" aria-controls="analysis-panel-spatial">Spatial tools</button><button type="button" role="tab" id="analysis-tab-chart" data-analysis-tab="chart" aria-controls="analysis-panel-chart">Charts</button></div>',
-      '<div class="analysis-body"><section class="analysis-inputs"><div class="analysis-grid"><label>Dataset<select id="analysis-layer"></select></label><label>Area<select id="analysis-scope"></select></label></div><p id="analysis-source-note" class="analysis-note"></p><div class="analysis-input-actions"><button type="button" id="analysis-capture" class="analysis-text-button">Refresh data</button><button type="button" id="analysis-original-data" hidden>Open original building data</button></div><details id="analysis-tile-preview" hidden><summary>Preview displayed fields</summary><label id="analysis-tile-optin-wrap" class="analysis-optin"><input id="analysis-tile-optin" type="checkbox"> Use map display samples. These can contain parts of the same building.</label></details></section>',
+      '<div class="analysis-body"><section class="analysis-inputs"><div class="analysis-grid"><label>Dataset<select id="analysis-layer"></select></label><label>Area<select id="analysis-scope"></select></label><label id="analysis-study-wrap" hidden>Study area<select id="analysis-study-area"></select></label></div><p id="analysis-study-note" class="analysis-note" hidden>Whole buildings touching or overlapping this area are included. Outlines are kept intact.</p><p id="analysis-source-note" class="analysis-note"></p><div class="analysis-input-actions"><button type="button" id="analysis-capture" class="analysis-text-button">Refresh data</button><button type="button" id="analysis-original-data" hidden>Open original building data</button></div><details id="analysis-tile-preview" hidden><summary>Preview displayed fields</summary><label id="analysis-tile-optin-wrap" class="analysis-optin"><input id="analysis-tile-optin" type="checkbox"> Use map display samples. These can contain parts of the same building.</label></details></section>',
       '<p id="analysis-message" class="analysis-message" role="status" aria-live="polite" hidden></p><button type="button" id="analysis-cancel" data-analysis-cancel hidden>Cancel</button><button type="button" id="analysis-return-map" class="analysis-text-button" hidden>Return to map</button>',
       '<p id="analysis-changed" class="analysis-warning" hidden></p>',
       '<section id="analysis-snapshot" class="analysis-snapshot" hidden><strong id="analysis-snapshot-name"></strong><p id="analysis-snapshot-scope"></p><span id="analysis-snapshot-time" class="analysis-note"></span><p id="analysis-snapshot-limit" class="analysis-warning" hidden>Some data was unavailable. Results cover the available features only.</p><details><summary>Data source and area</summary><dl id="analysis-snapshot-provenance" class="analysis-source-facts"></dl><button type="button" id="analysis-snapshot-download" class="analysis-text-button">Download source details</button></details></section>',
-      '<section id="analysis-panel-stats" role="tabpanel" aria-labelledby="analysis-tab-stats"><div id="analysis-overview"></div><p id="analysis-overview-note" class="analysis-note"></p><details class="analysis-more-statistics"><summary>Explore a field</summary><div class="analysis-grid"><div><label>Numeric value<select id="analysis-numeric-field"></select></label><button type="button" id="analysis-run-stats">Calculate</button></div><div><label>Group by<select id="analysis-group-field"></select></label><button type="button" id="analysis-run-groups">Count groups</button></div></div><div class="analysis-actions"><button type="button" id="analysis-run-geometry">Measure outlines</button></div><div id="analysis-stats-result" class="analysis-result"></div><div id="analysis-geometry-result" class="analysis-result"></div></details><div class="analysis-actions"><button type="button" id="analysis-stats-download">Download statistics</button></div></section>',
+      '<section id="analysis-panel-stats" role="tabpanel" aria-labelledby="analysis-tab-stats"><div id="analysis-overview"></div><p id="analysis-overview-note" class="analysis-note"></p><details class="analysis-more-statistics"><summary>Explore a field</summary><div class="analysis-grid"><div><label>Numeric value<select id="analysis-numeric-field"></select></label><button type="button" id="analysis-run-stats">Calculate</button></div><div><label>Group by<select id="analysis-group-field"></select></label><button type="button" id="analysis-run-groups">Count groups</button></div></div><div class="analysis-actions"><button type="button" id="analysis-run-geometry">Measure outlines</button></div><div id="analysis-stats-result" class="analysis-result"></div><div id="analysis-geometry-result" class="analysis-result"></div></details><div class="analysis-actions"><button type="button" id="analysis-stats-download">Download statistics</button><button type="button" id="analysis-data-download" hidden>Download buildings</button></div></section>',
       '<section id="analysis-panel-spatial" role="tabpanel" aria-labelledby="analysis-tab-spatial" hidden><label>What would you like to do?<select id="analysis-operation"><option value="buffer">Add an area around each feature (buffer)</option><option value="filter">Keep features in a study area</option><option value="clip">Trim outlines to a study area (clip)</option><option value="aggregate">Count and measure features by area</option><option value="intersect">Compare overlapping areas</option><option value="measure">Add area and boundary length</option><option value="centroid">Create center points</option></select></label><p id="analysis-operation-note" class="analysis-note"></p><div class="analysis-grid"><label id="analysis-distance-wrap">Distance · m<input id="analysis-distance" type="number" value="50" min=".01" max="100000" step="any"></label><label id="analysis-reference-wrap" hidden>Study area<select id="analysis-reference"></select></label><label id="analysis-predicate-wrap" hidden>Include features that<select id="analysis-predicate"><option value="intersects">Touch or overlap the area</option><option value="representative-point">Have a point inside the area</option></select></label></div><div class="analysis-actions"><button type="button" id="analysis-run-spatial" class="analysis-primary">Run</button><button type="button" id="analysis-spatial-add" hidden>Add result to map</button><button type="button" id="analysis-spatial-download" hidden>Download result</button></div><div id="analysis-spatial-result" class="analysis-result"></div></section>',
       '<section id="analysis-panel-chart" role="tabpanel" aria-labelledby="analysis-tab-chart" hidden><div class="analysis-grid"><label>Chart type<select id="analysis-chart-kind"><option value="histogram">Distribution</option><option value="category">Counts by category</option><option value="scatter">Compare two values</option><option value="grouped">Average by category</option></select></label><label><span id="analysis-chart-field-label">Field</span><select id="analysis-chart-field"></select></label><label id="analysis-chart-y-wrap" hidden>Vertical axis<select id="analysis-chart-y"></select></label><label id="analysis-chart-group-wrap" hidden>Group by<select id="analysis-chart-group"></select></label><label id="analysis-bins-wrap">Number of groups<input id="analysis-bins" type="number" value="10" min="2" max="30" step="1"></label></div><div class="analysis-actions"><button type="button" id="analysis-run-chart" class="analysis-primary">Make chart</button><button type="button" id="analysis-chart-png">PNG image</button><button type="button" id="analysis-chart-svg">SVG</button><button type="button" id="analysis-chart-csv">Chart data</button></div><div id="analysis-chart-result" class="analysis-chart-result"></div></section></div>'
     ].join('');
@@ -306,7 +320,8 @@
     dialog.addEventListener('cancel',()=>controller?.abort());$('cancel').onclick=()=>controller?.abort();$('return-map').onclick=()=>dialog.close();
     dialog.querySelectorAll('[data-analysis-tab]').forEach(b=>{b.onclick=()=>{switchTab(b.dataset.analysisTab);if(tab==='stats'&&!snapshot){autoPending=true;maybeAuto();}};b.onkeydown=e=>{if(['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();const tabs=['stats','spatial','chart'],next=tabs[(tabs.indexOf(tab)+(e.key==='ArrowRight'?1:2))%3];$('tab-'+next).click();$('tab-'+next).focus();}};});
     $('layer').onchange=()=>{clearSnapshot();updateScope();populateFields();autoPending=tab==='stats';maybeAuto();};
-    $('scope').onchange=()=>{clearSnapshot();populateFields();remember();autoPending=tab==='stats';maybeAuto();};
+    $('scope').onchange=()=>{clearSnapshot();updateScope();populateFields();remember();autoPending=tab==='stats';maybeAuto();};
+    $('study-area').onchange=()=>{clearSnapshot();populateFields();autoPending=tab==='stats';maybeAuto();};
     $('tile-optin').onchange=()=>{clearSnapshot();updateScope();populateFields();};
     $('capture').onclick=()=>job(tab==='stats'?refreshStatistics:prepare);
     $('original-data').onclick=()=>{const original=A().capabilities(layer()).attributePreview;dialog.close();if(original&&root.PortalImport)root.PortalImport.open('url');else root.PortalLayers.open('catalog');};
@@ -318,7 +333,7 @@
     $('operation').onchange=()=>{remember();updateOperation();};$('chart-kind').onchange=()=>{updateChartFields();remember();};
     ['numeric-field','group-field','chart-field','chart-y','chart-group'].forEach(id=>$(id).onchange=()=>{remember();updateButtons();});
     $('snapshot-download').onclick=()=>snapshot&&save('data-sources.json',JSON.stringify(snapshot.provenance,null,2),'application/json');
-    $('stats-download').onclick=statsDownload;$('chart-csv').onclick=chartDownload;$('chart-svg').onclick=()=>lastChart&&save('building-chart.svg',lastChart.svg,'image/svg+xml');
+    $('stats-download').onclick=statsDownload;$('data-download').onclick=dataDownload;$('chart-csv').onclick=chartDownload;$('chart-svg').onclick=()=>lastChart&&save('building-chart.svg',lastChart.svg,'image/svg+xml');
     $('chart-png').onclick=()=>job(async signal=>{const image=await chartImage();currentJob(signal);save('building-chart.png',image.blob);});
     $('spatial-download').onclick=()=>lastResult&&save('analysis-result.geojson',JSON.stringify(lastResult),'application/geo+json');$('spatial-add').onclick=()=>job(addResult);
     dialog.addEventListener('click',e=>{if(e.target.closest('[data-analysis-add-result]'))job(addResult);if(e.target.closest('[data-analysis-download-result]'))$('spatial-download').click();});
@@ -333,11 +348,22 @@
     ensure();refreshLayers();
     if(options.layerId&&root.PortalLayers.layers.has(options.layerId)){$('layer').value=options.layerId;clearSnapshot();}
     else if(root.PortalLayers.active?.id&&$('layer').value!==root.PortalLayers.active.id){$('layer').value=root.PortalLayers.active.id;clearSnapshot();}
-    updateScope();if(options.scope&&Array.from($('scope').options).some(o=>o.value===options.scope))$('scope').value=options.scope;
+    if(options.studyAreaId&&root.PortalLayers.layers.has(options.studyAreaId))$('study-area').value=options.studyAreaId;
+    updateScope();if(options.scope&&Array.from($('scope').options).some(o=>o.value===options.scope))$('scope').value=options.scope;updateScope();
     populateFields();switchTab(name);if(!dialog.open)dialog.showModal();updateFreshness();
     if(tab==='stats'&&options.auto!==false){autoPending=true;maybeAuto();}
     return activeJob;
   }
-  root.PortalAnalysis={open,cancel,fieldLabel,whenReady:()=>activeJob,chartImage,pngWithMetadata,get busy(){return busy;},get error(){return lastError;},get overview(){return summary;},get snapshot(){return snapshot;},get result(){return lastResult;},get chart(){return lastChart;},get statistics(){return lastStats;}};
+  async function openStudyArea(buildingLayerId,studyAreaId,options={}){
+    ensure();const building=root.PortalLayers.layers.get(buildingLayerId),area=root.PortalLayers.layers.get(studyAreaId);
+    if(!building||!A().isBuildingLayer(building))throw Error('Choose an original building footprint layer.');
+    if(!area)throw Error('Choose a study area first.');
+    if(dialog.open)dialog.close();const stopping=cancel({clear:true}),launchGeneration=generation;await stopping;
+    if(generation!==launchGeneration||root.PortalLayers.layers.get(buildingLayerId)!==building||root.PortalLayers.layers.get(studyAreaId)!==area)throw aborted();
+    open('stats',{layerId:buildingLayerId,scope:'study-area',studyAreaId,auto:false});
+    if($('scope').value!=='study-area')throw Error('Choose a complete polygon layer as your study area.');
+    return job(async signal=>{await refreshStatistics(signal);currentJob(signal);if(options.action==='download')dataDownload();});
+  }
+  root.PortalAnalysis={open,openStudyArea,cancel,fieldLabel,whenReady:()=>activeJob,chartImage,pngWithMetadata,get busy(){return busy;},get error(){return lastError;},get overview(){return summary;},get snapshot(){return snapshot;},get result(){return lastResult;},get chart(){return lastChart;},get statistics(){return lastStats;}};
   document.addEventListener('portal-ready',ensure);if(root.portal?.ready)ensure();
 })(globalThis);

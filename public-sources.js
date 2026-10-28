@@ -33,7 +33,7 @@
     const cfg=l.cfg;
     function cancel(){revision++;clearTimeout(timer);clearTimeout(requestTimer);controller?.abort();workerReject?.(new DOMException('View changed','AbortError'));workerReject=null;worker?.terminate();worker=null;}
     function status(note,loading=false){l.viewNote=note;l.viewLoading=loading;update();}
-    function clear(note){l.loaded=false;l.viewBytes=0;l.viewLimited=false;l.viewBounds=null;l.viewLoadedAt=null;l.data=empty();map.getSource(l.id)?.setData(l.data);l.error=false;status(note);}
+    function clear(note){l.loaded=false;l.viewBytes=0;l.viewLimited=false;l.viewBounds=null;l.viewLoadedAt=null;l.data=empty();if(l.setData)l.setData(l.data);else map.getSource(l.id)?.setData(l.data);l.error=false;status(note);}
     async function load(){
       cancel();const rev=revision;if(stopped||!map.getSource(l.id))return;
       if(!l.visible){clear('Layer hidden');return;}
@@ -57,7 +57,7 @@
         if(!result.data||!Array.isArray(result.data.features))throw Error('The provider did not return building features.');
         l.data=result.data;l.loaded=true;l.error=false;l.viewBytes=result.bytes||0;l.viewLimited=!!result.limited;l.viewBounds=b.slice();l.viewLoadedAt=new Date().toISOString();
         l.fields=Array.from(new Set([...l.fields,...result.data.features.flatMap(f=>Object.keys(f.properties||{}))]));
-        map.getSource(l.id).setData(l.data);
+        if(l.setData)l.setData(l.data);else map.getSource(l.id).setData(l.data);
         status(result.data.features.length.toLocaleString()+' buildings loaded'+(result.limited?' · zoom in to see more':''));
       }catch(e){if(!stopped&&rev===revision){l.error=true;status(e.name==='AbortError'?'Request timed out. Retry this view.':e.message);}}
       finally{clearTimeout(timeout);if(rev===revision){workerReject=null;worker?.terminate();worker=null;l.viewLoading=false;update();}}

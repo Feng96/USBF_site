@@ -1,0 +1,21 @@
+/* Count bounded label resources with tiny map/canvas stubs; no browser or GPU. */
+const fs=require('fs'),path=require('path'),vm=require('vm'),assert=require('assert');
+const events=new Map(),nodes=new Map(),sources=new Map(),layers=new Map(),images=new Map();let canvases=0,addedImages=0;
+const node=()=>({hidden:false,textContent:'',style:{},append(){},onclick:null});
+const document={querySelector(key){if(!nodes.has(key))nodes.set(key,node());return nodes.get(key);},querySelectorAll:()=>[],addEventListener(name,fn){if(!events.has(name))events.set(name,[]);events.get(name).push(fn);},createElement(tag){if(tag==='canvas'){canvases++;return {width:1,height:1,getContext:()=>({measureText:()=>({width:20}),fillRect(){},strokeRect(){},fillText(){},getImageData:()=>({data:new Uint8ClampedArray(4)})})};}return node();}};
+const map={addSource:(id,spec)=>sources.set(id,spec),addLayer:spec=>layers.set(spec.id,spec),addImage:(id,data)=>{images.set(id,data);addedImages++;},getLayer:id=>layers.get(id),getSource:id=>sources.get(id),hasImage:id=>images.has(id),removeLayer:id=>layers.delete(id),removeSource:id=>sources.delete(id),removeImage:id=>images.delete(id),setLayoutProperty(){},setPaintProperty(){}};
+const portal={ready:false,map},PortalLayers={layers:new Map()},context=vm.createContext({document,portal,PortalLayers,Uint8ClampedArray});context.window=context;vm.runInContext(fs.readFileSync(path.join(__dirname,'../workspace-tools.js'),'utf8'),context);
+portal.ready=true;for(const fn of events.get('portal-ready'))fn();
+const D=context.PortalDraw,checks=[],ok=(v,m)=>{assert(v,m);checks.push(m);console.log('PASS',m);};
+const feature=i=>({type:'Feature',properties:{label:'Label '+i},geometry:{type:'Point',coordinates:[-77+i*.00001,39]}}),layer={id:'labels',cfg:{},data:{type:'FeatureCollection',features:Array.from({length:65},(_,i)=>feature(i)),provenance:{role:'user-drawing'}},visible:true,opacity:.75};PortalLayers.layers.set(layer.id,layer);
+ok(D.labelLimit===64,'Drawing label limit is publicly available for project preflight');
+const baseline={sources:sources.size,layers:layers.size};assert.throws(()=>D.restoreLayerLabels(layer),/up to 64 labels|smaller layers/);
+ok(canvases===0&&addedImages===0&&sources.size===baseline.sources&&layers.size===baseline.layers,'An oversized label layer is rejected before allocating its first canvas, image, source or layer');
+layer.data.features=layer.data.features.slice(0,64);const ids=D.restoreLayerLabels(layer);
+ok(ids.length===64&&canvases===64&&images.size===64&&sources.size===baseline.sources+64&&layers.size===baseline.layers+64,'Exactly 64 labels remain supported within the declared resource budget');
+D.restoreLayerLabels(layer);ok(canvases===64&&addedImages===64,'Repeated project restoration is idempotent within the label budget');
+layer.data.features.push(feature(64));assert.throws(()=>D.restoreLayerLabels(layer),/up to 64 labels|smaller layers/);
+ok(canvases===64&&images.size===64&&D.labelLayerIds(layer).length===64,'Rejecting an oversized replacement preserves the existing valid label resources');
+PortalLayers.layers.delete(layer.id);for(const fn of events.get('portal-layers-changed'))fn();
+ok(images.size===0&&sources.size===baseline.sources&&layers.size===baseline.layers,'Removing a layer releases every bounded annotation resource');
+console.log(JSON.stringify({passed:true,checks:checks.length}));

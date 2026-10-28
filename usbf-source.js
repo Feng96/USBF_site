@@ -33,7 +33,7 @@
     const coverageVisibility=()=>{if(map.getLayer(coverageLayer))map.setLayoutProperty(coverageLayer,'visibility',l.visible?'visible':'none');};
     function note(s,loading=false){l.viewNote=s;l.viewLoading=loading;update();}
     function cancel(){revision++;clearTimeout(queryTimer);clearTimeout(queryTimeout);worker?.terminate();worker=null;}
-    function clear(s){l.loaded=false;l.viewBytes=0;l.viewLimited=false;l.viewBounds=null;l.viewLoadedAt=null;l.data=empty();l.featureById=new Map();map.getSource(l.id)?.setData(l.data);note(s);}
+    function clear(s){l.loaded=false;l.viewBytes=0;l.viewLimited=false;l.viewBounds=null;l.viewLoadedAt=null;l.data=empty();l.featureById=new Map();if(l.setData)l.setData(l.data);else map.getSource(l.id)?.setData(l.data);note(s);}
     function bounds(){const b=map.getBounds();return [b.getWest(),b.getSouth(),b.getEast(),b.getNorth()];}
     function loadView(){
       cancel();if(stopped||!map.getSource(l.id))return;coverageVisibility();
@@ -51,7 +51,7 @@
         if(stopped||rev!==revision)return;clearTimeout(queryTimeout);worker?.terminate();worker=null;
         if(e.data.error){l.error=true;l.errorDetail=e.data.error;note(/32 MB|limit|fewer|budget/i.test(e.data.error)?'There are too many buildings to open at once. Zoom in and try again.':e.data.code==='RELEASE_CHANGED'?'The data is being updated. Try again in a moment.':e.data.error);if(e.data.code==='RELEASE_CHANGED')checkUpdates();return;}
         const d=e.data;l.data=d.data;l.featureById=new Map(d.data.features.map(f=>[String(f.properties.usbf_id),f]));l.loaded=true;l.error=false;l.viewBytes=d.bytes;l.viewLimited=!!d.limited;l.viewBounds=box.slice();l.viewLoadedAt=new Date().toISOString();l.viewSelection='Published cx/cy ownership coordinates within the loaded bounds plus a 0.002-degree buffer';
-        l.fields=Array.from(new Set([...entry.fields,...d.data.features.flatMap(f=>Object.keys(f.properties))]));map.getSource(l.id).setData(l.data);l.onDataChanged?.();
+        l.fields=Array.from(new Set([...entry.fields,...d.data.features.flatMap(f=>Object.keys(f.properties))]));if(l.setData)l.setData(l.data);else map.getSource(l.id).setData(l.data);l.onDataChanged?.();
         note(d.data.features.length.toLocaleString()+' buildings loaded'+(d.limited?' · zoom in to see more':''));
       };
       worker.onerror=e=>{if(rev!==revision||stopped)return;clearTimeout(queryTimeout);worker?.terminate();worker=null;l.error=true;note(e.message||'USBF reader could not start.');};
