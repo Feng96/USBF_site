@@ -1,0 +1,49 @@
+/* All rules are scoped to the data-tools dialog. */
+.analysis-workspace{width:min(920px,calc(100vw - 36px));max-width:920px;max-height:calc(100dvh - 36px);padding:0;border:1px solid #cdd8d1;border-radius:14px;color:#183c37;background:#fff;box-shadow:0 22px 80px #102c3338;overflow:auto;font-family:inherit}
+.analysis-workspace::backdrop{background:#142b2c70;backdrop-filter:blur(2px)}
+.analysis-workspace [hidden]{display:none!important}
+.analysis-workspace .analysis-header{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding:23px 28px 18px;border-bottom:1px solid #e1e7e3}
+.analysis-workspace h2{font-size:23px;margin:0 0 5px;line-height:1.25;letter-spacing:-.02em}
+.analysis-workspace h3{font-size:16px;margin:18px 0 10px;line-height:1.4}
+.analysis-workspace p{line-height:1.5;margin:8px 0;overflow-wrap:anywhere}
+.analysis-workspace .analysis-header p{font-size:13px;margin:0;color:#687b72}
+.analysis-workspace button{font:inherit;font-size:13px;line-height:1.3;padding:10px 14px;border:1px solid #cbd7d0;border-radius:7px;background:#fff;color:#234e43;cursor:pointer;min-height:39px}
+.analysis-workspace button:hover:enabled{background:#eef4f0;border-color:#699780}
+.analysis-workspace button:focus-visible,.analysis-workspace input:focus-visible,.analysis-workspace select:focus-visible,.analysis-workspace summary:focus-visible{outline:3px solid #79b69a;outline-offset:2px}
+.analysis-workspace button:disabled{cursor:default;opacity:.45}
+.analysis-workspace .analysis-close{font-size:27px;padding:0;width:36px;height:36px;min-height:36px;border:0;color:#6b7c73;flex-shrink:0}
+.analysis-workspace .analysis-tabs{display:flex;padding:0 28px;border-bottom:1px solid #e1e7e3;gap:22px}
+.analysis-workspace .analysis-tabs button{border:0;border-bottom:3px solid transparent;border-radius:0;padding:14px 0 11px;background:transparent;font-size:14px}
+.analysis-workspace .analysis-tabs button[aria-selected=true]{border-color:#287f76;color:#1f655d;font-weight:600}
+.analysis-workspace .analysis-body{padding:22px 28px 30px}
+.analysis-workspace .analysis-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.analysis-workspace .analysis-grid>div{min-width:0}
+.analysis-workspace label{display:flex;flex-direction:column;gap:7px;font-weight:550;font-size:12px;line-height:1.4;color:#4e675b}
+.analysis-workspace select,.analysis-workspace input[type=number]{font:inherit;font-size:13px;padding:10px 11px;min-height:40px;width:100%;min-width:0;max-width:100%;border:1px solid #cbd7d0;border-radius:7px;background:#fff;color:#244b3d;box-sizing:border-box}
+.analysis-workspace .analysis-inputs{padding-bottom:18px;border-bottom:1px solid #e1e7e3;margin-bottom:18px}
+.analysis-workspace .analysis-note{font-size:12px;color:#697b71;line-height:1.5}
+.analysis-workspace .analysis-primary{background:#215e50;color:white;border-color:#215e50}
+.analysis-workspace .analysis-primary:hover:enabled{background:#17493d;color:#fff;border-color:#17493d}
+.analysis-workspace .analysis-optin{flex-direction:row;align-items:flex-start;gap:9px;font-size:12px;background:#fff6e7;border:1px solid #e7d4b2;border-radius:7px;padding:11px;margin:10px 0;color:#7d552d}
+.analysis-workspace .analysis-optin input{margin-top:2px;width:15px;height:15px;flex-shrink:0;accent-color:#287f76}
+.analysis-workspace .analysis-snapshot{border:1px solid #cbdcd2;border-radius:8px;background:#f4f8f5;padding:13px 15px;margin-bottom:20px}
+.analysis-workspace .analysis-snapshot strong{font-size:13px;font-weight:600}
+.analysis-workspace .analysis-snapshot>p{font-size:12px;margin:5px 0}
+.analysis-workspace .analysis-snapshot .analysis-text-button{margin-top:8px;font-size:12px;padding:6px 0;min-height:30px;border:0;background:none;color:#286b5c;text-decoration:underline;text-underline-offset:3px}
+.analysis-workspace details{margin:10px 0;font-size:12px}
+.analysis-workspace summary{cursor:pointer;color:#426957}
+.analysis-workspace pre{white-space:pre-wrap;overflow-wrap:anywhere;overflow:auto;max-height:210px;padding:12px;background:#f0f4f1;border:1px solid #dee7e0;border-radius:6px;font:11px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;color:#496352}
+.analysis-workspace .analysis-warning{background:#fff2de;border-left:3px solid #c08b3e;padding:9px 11px;color:#80562b;font-size:12px}
+.analysis-workspace .analysis-message{font-size:13px;background:#edf4f0;border-radius:7px;padding:11px 13px;color:#436a57}
+.analysis-workspace .analysis-message.analysis-error{color:#8f4539;background:#fff0eb}
+.analysis-workspace .analysis-actions{display:flex;gap:9px;flex-wrap:wrap;margin:16px 0}
+.analysis-workspace .analysis-grid>div>button{margin-top:9px}
+.analysis-workspace .analysis-table-wrap{overflow-x:auto;border:1px solid #e0e7e2;border-radius:7px}
+.analysis-workspace table{border-collapse:collapse;width:100%;font-size:12px}
+.analysis-workspace th{text-align:left;background:#f0f5f1;font-size:11px;color:#5c7566;font-weight:600;padding:10px 12px}
+.analysis-workspace td{padding:9px 12px;border-top:1px solid #e5ece7;overflow-wrap:anywhere;max-width:340px}
+.analysis-workspace tr td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.analysis-workspace .analysis-result:empty{display:none}
+.analysis-workspace .analysis-chart-result{margin-top:20px;max-width:100%;overflow:hidden}
+.analysis-workspace .analysis-chart-result svg{display:block;width:100%;height:auto;border:1px solid #e0e8e2;border-radius:8px}
+@media(max-width:620px){.analysis-workspace{width:calc(100vw - 18px);max-height:calc(100dvh - 18px);border-radius:10px}.analysis-workspace .analysis-header{padding:19px 17px 15px}.analysis-workspace .analysis-tabs{padding:0 17px;gap:18px}.analysis-workspace .analysis-tabs button{font-size:12px}.analysis-workspace .analysis-body{padding:18px 17px 24px}.analysis-workspace .analysis-grid{grid-template-columns:minmax(0,1fr);gap:14px}.analysis-workspace .analysis-actions{gap:8px}.analysis-workspace button{font-size:12px;padding:10px 12px}.analysis-workspace h2{font-size:21px}.analysis-workspace td,.analysis-workspace th{padding:9px}.analysis-workspace .analysis-chart-result{overflow-x:auto}.analysis-workspace .analysis-chart-result svg{min-width:540px}.analysis-workspace .analysis-snapshot{padding:12px}}

@@ -33,7 +33,7 @@
     const cfg=l.cfg;
     function cancel(){revision++;clearTimeout(timer);clearTimeout(requestTimer);controller?.abort();workerReject?.(new DOMException('View changed','AbortError'));workerReject=null;worker?.terminate();worker=null;}
     function status(note,loading=false){l.viewNote=note;l.viewLoading=loading;update();}
-    function clear(note){l.loaded=false;l.viewBytes=0;l.data=empty();map.getSource(l.id)?.setData(l.data);l.error=false;status(note);}
+    function clear(note){l.loaded=false;l.viewBytes=0;l.viewLimited=false;l.viewBounds=null;l.viewLoadedAt=null;l.data=empty();map.getSource(l.id)?.setData(l.data);l.error=false;status(note);}
     async function load(){
       cancel();const rev=revision;if(stopped||!map.getSource(l.id))return;
       if(!l.visible){clear('Hidden · map queries paused');return;}
@@ -47,7 +47,7 @@
         let result;
         if(cfg.driver==='gba'){
           result=await new Promise((resolve,reject)=>{
-            workerReject=reject;worker=new Worker(new URL('./gba-worker.js',document.baseURI),{type:'module'});
+            workerReject=reject;worker=new Worker(new URL('./gba-worker.js?v=1.0',document.baseURI),{type:'module'});
             worker.onmessage=e=>e.data.error?reject(Error(e.data.error)):resolve(e.data);
             worker.onerror=e=>reject(Error(e.message||'GBA reader could not start.'));
             worker.postMessage({bounds:b});
@@ -55,7 +55,7 @@
         }else result=await query(cfg,b,controller.signal);
         if(stopped||rev!==revision||!map.getSource(l.id))return;
         if(!result.data||!Array.isArray(result.data.features))throw Error('The provider did not return building features.');
-        l.data=result.data;l.loaded=true;l.error=false;l.viewBytes=result.bytes||0;
+        l.data=result.data;l.loaded=true;l.error=false;l.viewBytes=result.bytes||0;l.viewLimited=!!result.limited;l.viewBounds=b.slice();l.viewLoadedAt=new Date().toISOString();
         l.fields=Array.from(new Set([...l.fields,...result.data.features.flatMap(f=>Object.keys(f.properties||{}))]));
         map.getSource(l.id).setData(l.data);
         status(result.data.features.length.toLocaleString()+' features in requested view'+(result.limited?' · view limit reached; zoom in':'')+(result.bytes?' · '+(result.bytes/1048576).toFixed(1)+' MB read':''));

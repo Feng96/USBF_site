@@ -1,5 +1,5 @@
 /* Read current public USBF tiles, never a bundled national snapshot. */
-import './usbf-source.js?v=0.6';
+import './usbf-source.js?v=1.0';
 import {parquetMetadataAsync,parquetReadObjects} from './vendor/hyparquet-1.31.5/index.js';
 import {wkbToGeojson} from './vendor/hyparquet-1.31.5/wkb.js';
 import {decompress} from './vendor/fzstd-0.1.1.js';

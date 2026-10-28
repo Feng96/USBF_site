@@ -16,6 +16,7 @@
   catalog[0].recommended=false;catalog.unshift(PortalUSBF.entry);
   let catalogQuery='';
   const isTiled=l=>['pmtiles','vector'].includes(l.cfg.type);
+  const isRaster=l=>['raster','image','raster-pmtiles'].includes(l.cfg.type)||l.cfg.sourceKind==='raster';
   let api, map, protocol, seq=0, selected=null, active=null, tab='catalog';
   const layers=new Map(), pending=new Set();
   const text = v => {const n=document.createElement('span');n.textContent=String(v);return n.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;');};
@@ -39,9 +40,9 @@
   }
   function refresh(){
     if(!map)return;
-    if(!layers.has(active))active=Array.from(layers.values()).find(l=>l.cfg.type!=='raster')?.id||null;
+    if(!layers.has(active)||isRaster(layers.get(active)))active=Array.from(layers.values()).find(l=>!isRaster(l))?.id||null;
     const entries=Array.from(layers.values()).reverse();
-    $('#added-layers').innerHTML=entries.length?'<div class="added-heading">ADDED DATA <span>'+entries.length+'</span></div>'+entries.map(l=>'<article class="added-row layer-row" data-added-row="'+l.id+'"><div class="added-main"><input type="checkbox" data-added-toggle="'+l.id+'" aria-label="Show '+text(l.cfg.name)+'" '+(l.visible?'checked':'')+'><span class="catalog-swatch" style="background:'+l.color+'"></span><button class="layer-activate '+(active===l.id?'active':'')+'" data-layer-activate="'+l.id+'">'+text(l.cfg.name)+'</button><button data-added-remove="'+l.id+'" title="Remove layer" aria-label="Remove '+text(l.cfg.name)+'">×</button></div><p class="added-state '+(l.error?'error':'')+'">'+text(l.viewNote||(l.error?'Tile request failed. Check the source or retry.':l.loaded?'Connected · '+l.cfg.type.toUpperCase():'Loading map tiles…'))+'</p><div class="added-actions"><button data-added-zoom="'+l.id+'">Zoom to layer</button>'+(l.error?'<button data-added-retry="'+l.id+'">Retry</button>':'')+'<button data-added-info="'+l.id+'">Details</button>'+(l.checkUpdates?'<button data-added-update="'+l.id+'" '+(l.checkingRelease?'disabled':'')+'>'+(l.checkingRelease?'Checking…':'Check updates')+'</button>':'')+'</div>'+(l.release?'<p class="added-release">'+text(l.release.name+' · '+new Date(l.release.updated).toISOString().replace('T',' ').slice(0,16)+' UTC · checks every 5 min')+'</p>':'')+(l.releaseWarning?'<p class="added-state error">'+text(l.releaseWarning)+'</p>':'')+'<label class="added-opacity">Opacity<input type="range" min="0" max="100" value="'+Math.round(l.opacity*100)+'" data-added-opacity="'+l.id+'" aria-label="'+text(l.cfg.name)+' opacity"><output>'+Math.round(l.opacity*100)+'%</output></label></article>').join(''):'<div class="empty-layers"><strong>Your map starts here</strong><p>Add a catalog layer, connect a URL or open a GeoJSON file.</p><button class="text-button" data-add-data>+ Add your first layer</button></div>';
+    $('#added-layers').innerHTML=entries.length?'<div class="added-heading">ADDED DATA <span>'+entries.length+'</span></div>'+entries.map(l=>'<article class="added-row layer-row" data-added-row="'+l.id+'"><div class="added-main"><input type="checkbox" data-added-toggle="'+l.id+'" aria-label="Show '+text(l.cfg.name)+'" '+(l.visible?'checked':'')+'><span class="catalog-swatch" style="background:'+l.color+'"></span><button class="layer-activate '+(active===l.id?'active':'')+'" data-layer-activate="'+l.id+'">'+text(l.cfg.name)+'</button><button data-added-remove="'+l.id+'" title="Remove layer" aria-label="Remove '+text(l.cfg.name)+'">×</button></div><details class="layer-details"><summary>Layer settings</summary><p class="added-state '+(l.error?'error':'')+'">'+text(l.viewNote||(l.error?'Tile request failed. Check the source or retry.':l.loaded?'Connected · '+l.cfg.type.toUpperCase():'Loading map tiles…'))+'</p><div class="added-actions"><button data-added-zoom="'+l.id+'">Zoom to layer</button>'+(l.error?'<button data-added-retry="'+l.id+'">Retry</button>':'')+'<button data-added-info="'+l.id+'">Details</button>'+(l.rasterResource?'<button data-raster-style="'+l.id+'">Raster style</button>':'')+''+(l.checkUpdates?'<button data-added-update="'+l.id+'" '+(l.checkingRelease?'disabled':'')+'>'+(l.checkingRelease?'Checking…':'Check updates')+'</button>':'')+'</div>'+(l.release?'<p class="added-release">'+text(l.release.name+' · '+new Date(l.release.updated).toISOString().replace('T',' ').slice(0,16)+' UTC · checks every 5 min')+'</p>':'')+(l.releaseWarning?'<p class="added-state error">'+text(l.releaseWarning)+'</p>':'')+'<label class="added-opacity">Opacity<input type="range" min="0" max="100" value="'+Math.round(l.opacity*100)+'" data-added-opacity="'+l.id+'" aria-label="'+text(l.cfg.name)+' opacity"><output>'+Math.round(l.opacity*100)+'%</output></label></details></article>').join(''):'<div class="empty-layers"><strong>Your map starts here</strong><p>Add a catalog layer, connect a URL or open a GeoJSON file.</p><button class="text-button" data-add-data>+ Add your first layer</button></div>';
     const demo=['footprints','original','height','lod2'].filter(k=>$('#layer-'+k).checked).length;
     $('#layer-count').textContent=layers.size+demo;
     $('#data-workspace-label').textContent=layers.size?layers.size+' added '+(layers.size===1?'layer':'layers'):(demo?'Synthetic demo layers':'No data layers added');
@@ -78,41 +79,44 @@
     if(Array.from(layers.values()).some(l=>cfg.id?l.cfg.id===cfg.id:l.cfg.url===cfg.url&&l.cfg.sourceLayer===cfg.sourceLayer)){message('This layer is already in the map.');return;}
     pending.add(key);renderCatalog();message('Connecting to '+cfg.name+'…');let l;
     try{
-      const id=uid();l={id,cfg:{...cfg},color:cfg.color||'#4b78a1',opacity:options.opacity??.75,visible:options.visible!==false,renderIds:[],bounds:cfg.bounds,loaded:false,error:false,filters:{},colorMode:options.colorMode||'uniform',sourceFilter:options.sourceFilter||'',minArea:options.minArea||0,heightField:options.heightField||cfg.heightField||null};let source;
+      const id=uid();l={id,cfg:{...cfg},color:cfg.color||'#4b78a1',opacity:options.opacity??.75,visible:options.visible!==false,renderIds:[],fields:[],bounds:cfg.bounds,loaded:false,error:false,filters:{},colorMode:options.colorMode||'uniform',sourceFilter:options.sourceFilter||'',minArea:options.minArea||0,heightField:cfg.allowHeight===false?null:options.heightField||cfg.heightField||null};let source;
       if(cfg.type==='pmtiles'){
         if(!window.pmtiles)throw Error('PMTiles support could not load. Reload the page.');
-        const url=https(cfg.url),archive=new pmtiles.PMTiles(url);const [header,meta]=await timeout(Promise.all([archive.getHeader(),archive.getMetadata()]));
-        if(header.tileType!==1)throw Error('Use a vector PMTiles archive for this data type.');
+        const archive=cfg.localArchive||new pmtiles.PMTiles(https(cfg.url)),url=archive.source.getKey();const [header,meta]=await timeout(Promise.all([archive.getHeader(),archive.getMetadata()]));
+        if(![1,2,3,4,5].includes(header.tileType))throw Error('This archive has an unsupported PMTiles tile type.');
         const names=(meta.vector_layers||[]).map(v=>v.id);let sourceLayer=cfg.sourceLayer||names[0];
-        if(!cfg.sourceLayer&&names.length>1)throw Error('This archive has multiple source layers. Enter one of: '+names.slice(0,12).join(', ')+(names.length>12?'…':''));
-        if(!sourceLayer||!names.includes(sourceLayer))throw Error('Source layer not found. Available: '+names.slice(0,12).join(', '));
+        if(header.tileType===1&&!cfg.sourceLayer&&names.length>1)throw Error('This archive has multiple source layers. Enter one of: '+names.slice(0,12).join(', ')+(names.length>12?'…':''));
+        if(header.tileType===1&&(!sourceLayer||!names.includes(sourceLayer)))throw Error('Source layer not found. Available: '+names.slice(0,12).join(', '));
         if(Array.from(layers.values()).some(x=>x.cfg.url===url&&x.cfg.sourceLayer===sourceLayer&&x.cfg.fixedSource===cfg.fixedSource)){message('This source layer is already in the map.');return;}
-        l.fields=Object.keys((meta.vector_layers||[]).find(x=>x.id===sourceLayer)?.fields||{});l.cfg.sourceLayer=sourceLayer;l.bounds=[[header.minLon,header.minLat],[header.maxLon,header.maxLat]];protocol.add(archive);
-        source={type:'vector',url:'pmtiles://'+url,attribution:text(cfg.attribution||'User-added PMTiles')};
+        l.fields=Object.keys((meta.vector_layers||[]).find(x=>x.id===sourceLayer)?.fields||{});l.cfg.sourceLayer=sourceLayer;l.bounds=[[header.minLon,header.minLat],[header.maxLon,header.maxLat]];protocol.add(archive);l.cfg.analysisQuality='render-tiles';l.cfg.sourceKind=header.tileType===1?'vector':'raster';if(header.tileType!==1){l.cfg.type='raster-pmtiles';l.cfg.sourceLayer=undefined;}if(cfg.localArchive)l.stop=()=>protocol.tiles.delete(url);
+        source={type:header.tileType===1?'vector':'raster',url:'pmtiles://'+url,attribution:text(cfg.attribution||'User-added PMTiles'),...(header.tileType===1?{}:{tileSize:Number(meta.tileSize)||256})};
       }else if(cfg.type==='vector'){
-        https(cfg.url);l.fields=cfg.fields||[];source={type:'vector',tiles:[cfg.url],minzoom:0,maxzoom:cfg.maxzoom??19,attribution:text(cfg.attribution)};
+        if(!cfg.sourceLayer)throw Error('Enter the vector tile source-layer name.');https(cfg.url);if(!['{z}','{x}','{y}'].every(k=>cfg.url.includes(k)))throw Error('Vector XYZ URL must contain {z}, {x} and {y}.');l.fields=cfg.fields||[];source={type:'vector',tiles:[cfg.url],minzoom:0,maxzoom:cfg.maxzoom??19,attribution:text(cfg.attribution||'User-supplied vector tiles')};
       }else if(cfg.type==='viewport'){
-        l.data=PortalPublicSources.empty();l.fields=cfg.fields||[];source={type:'geojson',data:l.data,attribution:text(cfg.attribution)};
+        l.data=PortalPublicSources.empty();l.fields=cfg.fields||[];source={type:'geojson',data:l.data,attribution:text(cfg.attribution||'User-supplied vector tiles')};
       }else if(cfg.type==='geojson'){
-        const valid=geojson(cfg.data||(cfg.load?await cfg.load():await readJSON(https(cfg.url))));l.data=valid.data;l.fields=Array.from(new Set(l.data.features.flatMap(f=>Object.keys(f.properties||{}))));l.bounds=valid.bounds;source={type:'geojson',data:l.data,attribution:text(cfg.attribution||'User-added GeoJSON')};
+        const valid=geojson(cfg.data||(cfg.load?await cfg.load():await readJSON(https(cfg.url))));l.data=valid.data;l.fields=Array.from(new Set(l.data.features.flatMap(f=>Object.keys(f.properties||{}))));l.bounds=valid.bounds;if(l.data.analysis?.operation||l.data.provenance?.geometryQuality==='derived-source-geometry'){l.cfg.allowHeight=false;l.heightField=null;}source={type:'geojson',data:l.data,attribution:text(cfg.attribution||'User-added GeoJSON')};
+      }else if(cfg.type==='image'){
+        if(!Array.isArray(cfg.coordinates)||cfg.coordinates.length!==4||!cfg.coordinates.every(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite)&&Math.abs(p[0])<=180&&Math.abs(p[1])<=85.05113))throw Error('Raster corners must use valid Web Mercator display bounds.');
+        source={type:'image',url:cfg.imageURL,coordinates:cfg.coordinates};l.cfg.sourceKind='raster';l.cfg.analysisQuality='display-raster';l.viewNote=cfg.sourceNote||'Georeferenced raster preview';l.stop=()=>cfg.cleanup?.();
       }else if(cfg.type==='raster'){
-        https(cfg.url);if(!['{z}','{x}','{y}'].every(k=>cfg.url.includes(k)))throw Error('XYZ URL must contain {z}, {x} and {y}.');
+        https(cfg.url);if(cfg.service==='wms'?!cfg.url.includes('{bbox-epsg-3857}'):!['{z}','{x}','{y}'].every(k=>cfg.url.includes(k)))throw Error('XYZ needs {z}, {x}, {y}; WMS needs {bbox-epsg-3857}.');
         source={type:'raster',tiles:[cfg.url],tileSize:256,maxzoom:cfg.maxzoom??19,attribution:text(cfg.attribution||'User-added raster tiles')};
       }else throw Error('Unsupported data type.');
-      map.addSource(id,source);layers.set(id,l);if(cfg.type!=='raster')active=id;
-      const before=cfg.type==='raster'?(map.getStyle().layers.find(x=>!x.id.startsWith('base-')&&x.id!=='background')||{}).id:'measure-line';
+      map.addSource(id,source);layers.set(id,l);if(!isRaster(l))active=id;
+      const before=isRaster(l)?(map.getStyle().layers.find(x=>!x.id.startsWith('base-')&&x.id!=='background')||{}).id:'measure-line';
       function insert(spec){map.addLayer({...spec,id:id+'-'+spec.type,source:id,layout:{visibility:l.visible?'visible':'none'},...(isTiled(l)?{'source-layer':l.cfg.sourceLayer}:{})},before);l.renderIds.push(id+'-'+spec.type);if(spec.filter)l.filters[id+'-'+spec.type]=spec.filter;}
-      if(cfg.type==='raster')insert({type:'raster',paint:{'raster-opacity':l.opacity}});
+      if(isRaster(l))insert({type:'raster',paint:{'raster-opacity':l.opacity}});
       else{
         insert({type:'fill',filter:['==',['geometry-type'],'Polygon'],paint:{'fill-color':l.color,'fill-opacity':l.opacity}});
         insert({type:'line',filter:['in',['geometry-type'],['literal',['Polygon','LineString']]],paint:{'line-color':l.color,'line-width':1.2,'line-opacity':l.opacity}});
         insert({type:'circle',filter:['==',['geometry-type'],'Point'],paint:{'circle-color':l.color,'circle-radius':5,'circle-opacity':l.opacity,'circle-stroke-width':1,'circle-stroke-color':'#ffffff'}});
       }
-      if(cfg.type!=='raster'){l.heightField=l.heightField||['height_m','height','render_height'].find(f=>l.fields.includes(f))||null;if(l.heightField){insert({type:'fill-extrusion',filter:['all',['==',['geometry-type'],'Polygon'],['>', ['coalesce',['to-number',['get',l.heightField]],0],0]],paint:{'fill-extrusion-color':l.color,'fill-extrusion-height':['coalesce',['to-number',['get',l.heightField]],0],'fill-extrusion-opacity':l.opacity}});}applyStyle(l);}
-      if(!options.restore){api.clearSelection();selected=null;['footprints','original','height','lod2'].forEach(k=>{const c=$('#layer-'+k);if(c.checked){c.checked=false;c.dispatchEvent(new Event('change'));}});$('#welcome-card').hidden=true;$('#tab-layers').click();if(cfg.type==='geojson')zoom(l);}
+      if(!isRaster(l)){l.heightField=l.cfg.allowHeight===false?null:l.heightField||['height_m','height','render_height'].find(f=>l.fields.includes(f))||null;if(l.heightField){insert({type:'fill-extrusion',filter:['all',['==',['geometry-type'],'Polygon'],['>', ['coalesce',['to-number',['get',l.heightField]],0],0]],paint:{'fill-extrusion-color':l.color,'fill-extrusion-height':['coalesce',['to-number',['get',l.heightField]],0],'fill-extrusion-opacity':l.opacity}});}applyStyle(l);}
+      if(!options.restore){api.clearSelection();selected=null;['footprints','original','height','lod2'].forEach(k=>{const c=$('#layer-'+k);if(c.checked){c.checked=false;c.dispatchEvent(new Event('change'));}});$('#welcome-card').hidden=true;$('#tab-layers').click();if(['geojson','image'].includes(cfg.type)||cfg.localArchive)zoom(l);}
       if(cfg.type==='viewport'){l.onDataChanged=()=>{if(selected?.layer!==l.id)return;const fresh=l.featureById?.get(String(selected.feature.properties?.usbf_id));if(fresh)inspect(l,fresh);else{clearExternalSelection();api.clearSelection();}};PortalPublicSources.attach(l,map,refresh);if(!options.restore&&cfg.start)map.jumpTo({center:cfg.start.slice(0,2),zoom:cfg.start[2],pitch:0});}
-      refresh();api.saveView();$('#status-message').textContent='Added '+cfg.name;message('Added '+cfg.name+'.');if(!options.restore)$('#data-dialog').close();
-    }catch(e){if(l){l.stop?.();l.renderIds.forEach(id=>{if(map.getLayer(id))map.removeLayer(id);});if(map.getSource(l.id))map.removeSource(l.id);layers.delete(l.id);}message(e.message||'Unable to add this source. Check its URL and browser access.',true);}
+      refresh();api.saveView();$('#status-message').textContent='Added '+cfg.name;message('Added '+cfg.name+'.');if(!options.restore)$('#data-dialog').close();return l;
+    }catch(e){if(l){l.stop?.();l.renderIds.forEach(id=>{if(map.getLayer(id))map.removeLayer(id);});if(map.getSource(l.id))map.removeSource(l.id);layers.delete(l.id);}message(e.message||'Unable to add this source. Check its URL and browser access.',true);if(options.throwOnError)throw e;}
     finally{pending.delete(key);renderCatalog();}
   }
   function zoom(l){if(l.bounds)map.fitBounds(l.bounds,{padding:55,maxZoom:17,duration:0});else message('This source does not provide an extent.');}
@@ -125,13 +129,13 @@
     const props=f.properties||{};$('#properties-content').innerHTML='<span class="eyebrow">'+text(isTiled(l)?'TILED FEATURE':'ADDED DATA')+'</span><h2 class="feature-id">'+text(l.cfg.name)+'</h2><div class="feature-values real-values"><div><span>HEIGHT</span><strong>'+((l.heightField&&Number.isFinite(Number(props[l.heightField]))&&props[l.heightField]!==null)?text(props[l.heightField])+' <small>m</small>':'—')+'</strong></div><div><span>PROVIDER</span><strong>'+text(props.bf_source||props.source||l.cfg.provider||'Source data')+'</strong></div></div><dl class="feature-properties">'+Object.entries(props).slice(0,80).map(([k,v])=>'<div><dt>'+text(k)+'</dt><dd>'+text(v===null?'Not provided':typeof v==='object'?JSON.stringify(v):v)+'</dd></div>').join('')+'</dl><button class="feature-action" data-feature-zoom>Zoom to feature</button>'+(props.model_id?'<button class="feature-action" data-model-id="'+text(props.model_id)+'">Open this 3D sample</button>':'')+'<p class="feature-notice">'+(isTiled(l)?'Tile geometry may be simplified or clipped. Use the source dataset for complete building geometries.':text(l.cfg.sourceNote||'Attributes are shown as supplied by this data source.'))+'</p>'+(l.cfg.type==='geojson'?'<button class="feature-action" data-added-export="'+l.id+'">Export this GeoJSON layer</button>':'')+(l.cfg.page?'<a class="source-detail-link" target="_blank" rel="noopener" href="'+text(l.cfg.page)+'">Source data &amp; license ↗</a>':'');
     $('#status-message').textContent='Feature selected · '+l.cfg.name;setTimeout(()=>map.resize(),10);document.dispatchEvent(new CustomEvent('portal-selection-changed'));
   }
-  function identify(e){const ids=Array.from(layers.values()).filter(l=>l.visible&&l.cfg.type!=='raster').flatMap(l=>l.renderIds);if(!ids.length)return false;const hits=map.queryRenderedFeatures(e.point,{layers:ids});if(!hits.length)return false;const l=layers.get(hits[0].source);if(!l)return false;inspect(l,hits[0]);return true;}
+  function identify(e){const ids=Array.from(layers.values()).filter(l=>l.visible&&!isRaster(l)).flatMap(l=>l.renderIds);if(!ids.length)return false;const hits=map.queryRenderedFeatures(e.point,{layers:ids});if(!hits.length)return false;const l=layers.get(hits[0].source);if(!l)return false;inspect(l,hits[0]);return true;}
   function exportLayer(l){if(!l||!l.data)return;const url=URL.createObjectURL(new Blob([JSON.stringify(l.data)],{type:'application/geo+json'})),a=document.createElement('a');a.href=url;a.download=l.cfg.name.replace(/[^a-z0-9_-]/gi,'_')+'.geojson';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
   function handleExport(){if(window.PortalInventory&&layers.size){PortalInventory.exportDialog();return true;}if(selected){const l=layers.get(selected.layer);if(l?.data)exportLayer(l);else{open();message('Tiled features are clipped for display. Download full geometries from the dataset source.');}return true;}if(layers.size){open();message('Select a GeoJSON feature to export its layer. For tiled layers, use Source & license to find full downloads.');return true;}return false;}
   function fullExtent(){const rows=Array.from(layers.values()).filter(l=>l.visible&&l.bounds);if(!rows.length)return false;const b=[[Math.min(...rows.map(l=>l.bounds[0][0])),Math.min(...rows.map(l=>l.bounds[0][1]))],[Math.max(...rows.map(l=>l.bounds[1][0])),Math.max(...rows.map(l=>l.bounds[1][1]))]];map.fitBounds(b,{padding:55,maxZoom:17,duration:0});return true;}
   function writeShare(q){const styles=Array.from(layers.values()).filter(l=>catalog.some(c=>c.id===l.cfg.id)).map(l=>[l.cfg.id,l.colorMode,l.sourceFilter,l.minArea]);if(styles.some(x=>x[1]!=='uniform'||x[2]||x[3]))q.set('styles',JSON.stringify(styles));const entries=Array.from(layers.values()).filter(l=>catalog.some(c=>c.id===l.cfg.id)).map(l=>[l.cfg.id,l.opacity.toFixed(2),l.visible?1:0].join(':'));if(entries.length)q.set('data',entries.join(','));}
   function applyStyle(l){
-    if(!map||l.cfg.type==='raster')return;
+    if(!map)return;if(isRaster(l)){for(const id of l.renderIds)if(map.getLayer(id))map.setLayoutProperty(id,'visibility',l.visible?'visible':'none');return;}
     l.syncCoverageStyle?.();
     const sourceField=['bf_source','source','geom_source','SOURCE'].find(f=>l.fields?.includes(f));
     let color=l.color;
@@ -145,23 +149,30 @@
   }
   function setStyle(id,options){const l=layers.get(id);if(!l)return;Object.assign(l,options);applyStyle(l);api.saveView();document.dispatchEvent(new CustomEvent('portal-style-changed'));}
   function set3D(){layers.forEach(applyStyle);}
-  function details(l){if(['viewport','vector'].includes(l.cfg.type)){open();message(l.cfg.name+' · '+l.cfg.license+'. '+(l.cfg.sourceNote||l.cfg.description));return;}open('url');$('#data-type').value=l.cfg.type;$('#data-name').value=l.cfg.name;$('#data-url').value=l.cfg.url||'';$('#data-source-layer').value=l.cfg.sourceLayer||'';$('#data-type').dispatchEvent(new Event('change'));message(l.cfg.attribution||'Local file — reopen after refresh.');}
+  function details(l){if(window.PortalImport){PortalImport.details(l);return;}if(['viewport','vector','image','raster-pmtiles'].includes(l.cfg.type)){open();message(l.cfg.name+' · '+l.cfg.license+'. '+(l.cfg.sourceNote||l.cfg.description));return;}open('url');$('#data-type').value=l.cfg.type;$('#data-name').value=l.cfg.name;$('#data-url').value=l.cfg.url||'';$('#data-source-layer').value=l.cfg.sourceLayer||'';$('#data-type').dispatchEvent(new Event('change'));message(l.cfg.attribution||'Local file — reopen after refresh.');}
   document.addEventListener('click',e=>{
-    const b=e.target.closest('[data-add-data],[data-source-tab],[data-catalog-add],[data-added-remove],[data-added-zoom],[data-added-retry],[data-added-info],[data-added-update],[data-added-export],[data-layer-activate],[data-feature-zoom]');if(!b)return;
+    const b=e.target.closest('[data-add-data],[data-source-tab],[data-catalog-add],[data-added-remove],[data-added-zoom],[data-added-retry],[data-added-info],[data-raster-style],[data-added-update],[data-added-export],[data-layer-activate],[data-feature-zoom]');if(!b)return;
     if(b.hasAttribute('data-add-data'))open();
     if(b.dataset.sourceTab)sourceTab(b.dataset.sourceTab);
     if(b.dataset.catalogAdd){const c=catalog.find(c=>c.id===b.dataset.catalogAdd);open();if(c)add(c);}
     if(b.hasAttribute('data-feature-zoom')&&selected){const pts=[];const walk=c=>{if(Array.isArray(c)&&typeof c[0]==='number')pts.push(c);else if(Array.isArray(c))c.forEach(walk);};walk(selected.feature.geometry?.coordinates);if(pts.length)map.fitBounds([[Math.min(...pts.map(p=>p[0])),Math.min(...pts.map(p=>p[1]))],[Math.max(...pts.map(p=>p[0])),Math.max(...pts.map(p=>p[1]))]],{padding:70,maxZoom:19,duration:0});return;}
     if(b.dataset.layerActivate){active=b.dataset.layerActivate;refresh();return;}
     if(b.dataset.addedRemove)remove(b.dataset.addedRemove);
-    const l=layers.get(b.dataset.addedZoom||b.dataset.addedRetry||b.dataset.addedInfo||b.dataset.addedUpdate||b.dataset.addedExport);if(!l)return;
-    if(b.dataset.addedUpdate)l.checkUpdates?.();if(b.dataset.addedZoom)zoom(l);if(b.dataset.addedInfo)details(l);if(b.dataset.addedExport)exportLayer(l);
+    const l=layers.get(b.dataset.addedZoom||b.dataset.addedRetry||b.dataset.addedInfo||b.dataset.rasterStyle||b.dataset.addedUpdate||b.dataset.addedExport);if(!l)return;
+    if(b.dataset.rasterStyle)PortalImport.styleRaster(l);if(b.dataset.addedUpdate)l.checkUpdates?.();if(b.dataset.addedZoom)zoom(l);if(b.dataset.addedInfo)details(l);if(b.dataset.addedExport)exportLayer(l);
     if(b.dataset.addedRetry){const cfg=l.cfg;remove(l.id);open();add(cfg);}
   });
   document.addEventListener('change',e=>{const id=e.target.dataset.addedToggle,l=layers.get(id);if(l){l.visible=e.target.checked;applyStyle(l);l.reload?.();refresh();api.saveView();}});
   document.addEventListener('input',e=>{const l=layers.get(e.target.dataset.addedOpacity);if(l){opacity(l,Number(e.target.value)/100);e.target.nextElementSibling.textContent=e.target.value+'%';}});
   document.addEventListener('keydown',e=>{if(e.target.matches('[data-source-tab]')&&['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();const tabs=['catalog','url','file'],n=(tabs.indexOf(tab)+(e.key==='ArrowRight'?1:2))%3;sourceTab(tabs[n]);$('#source-tab-'+tabs[n]).focus();}});
-  async function init(portal,hash){api=portal;map=api.map;if(window.pmtiles){protocol=new pmtiles.Protocol();maplibregl.addProtocol('pmtiles',protocol.tile);}
+  async function pmtilesRequest(request,controller){
+    const response=await protocol.tile(request,controller);
+    // MapLibre 5.6 image requests remain pending on null protocol data. A missing
+    // raster tile is a 404, allowing sparse archives and rounded bounds to settle.
+    if(request.type==='image'&&response?.data==null){const missing=Error('No raster tile at this archive coordinate.');missing.status=404;throw missing;}
+    return response;
+  }
+  async function init(portal,hash){api=portal;map=api.map;if(window.pmtiles){protocol=new pmtiles.Protocol();maplibregl.addProtocol('pmtiles',pmtilesRequest);}
     $('#catalog-search').oninput=e=>{catalogQuery=e.target.value.trim().toLowerCase();renderCatalog();};
     $('#close-data-dialog').onclick=()=>$('#data-dialog').close();
     $('#data-type').onchange=()=>{const t=$('#data-type').value;$('#source-layer-field').hidden=t!=='pmtiles';$('#url-hint').textContent=t==='raster'?'Use an XYZ tile URL with {z}, {x} and {y}. The service must allow browser access.':t==='geojson'?'Public GeoJSON in WGS84 longitude / latitude, up to 20 MB. The server must allow browser access.':'Use a direct file URL. The server must allow browser access and byte-range requests.';};
@@ -175,5 +186,5 @@
     let savedStyles=[];try{savedStyles=JSON.parse(q.get('styles')||'[]');if(!Array.isArray(savedStyles))savedStyles=[];}catch(e){}
     for(const saved of (q.get('data')||'').split(',').slice(0,20)){const [id,op,on]=saved.split(':'),c=catalog.find(c=>c.id===id);if(c){const n=Number(op);const st=savedStyles.find(x=>x[0]===id)||[];await add(c,{restore:true,colorMode:['uniform','source','height','change'].includes(st[1])?st[1]:'uniform',sourceFilter:typeof st[2]==='string'?st[2]:'',minArea:Number.isFinite(st[3])?Math.max(0,st[3]):0,opacity:Number.isFinite(n)?Math.max(0,Math.min(1,n)):.75,visible:on!=='0'});$('#welcome-card').hidden=true;}}
   }
-  window.PortalLayers={init,open,refresh,fullExtent,identify,setStyle,set3D,inspect,get active(){return layers.get(active);},get selection(){return selected;},selectLayer(id){active=id;refresh();},writeShare,handleExport,clearExternalSelection,catalog,get layers(){return layers;},add};
+  window.PortalLayers={init,open,refresh,fullExtent,identify,setStyle,set3D,inspect,get active(){return layers.get(active);},get selection(){return selected;},selectLayer(id){active=id;refresh();},writeShare,handleExport,clearExternalSelection,catalog,get layers(){return layers;},add,addGeoJSON:(name,data,meta={})=>add({...meta,id:meta.id||'import-'+(++seq),name,type:'geojson',data,sourceKind:'vector',analysisQuality:meta.analysisQuality||'complete-geometry'}, {throwOnError:true}),isRaster};
 })();

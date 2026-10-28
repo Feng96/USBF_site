@@ -1,10 +1,117 @@
-# US Buildings — inventory and roof-model workspace
+# US Buildings
 
-[Open the website](https://feng96.github.io/USBF_site/).
+[Open the workspace](https://feng96.github.io/USBF_site/).
 
-USBF is the default inventory, read directly from the live Source Cooperative
-publication. VIDA and the other public datasets remain available for comparison.
-US LoD2 results remain experimental. The site does not reconstruct new roofs.
+A browser GIS for the published USBF building inventory, comparison datasets,
+research roof models and your own data. Add data is the primary action; the map
+and layer list stay visible while detailed tools open on demand.
+
+## Workspace 1.0
+
+- A compact header and toolbar. Statistics, spatial tools, charts, drawing,
+  coordinate settings and map styling open from **Tools**. Layer opacity,
+  publication status and source details live in each layer’s settings.
+- Local and HTTPS imports: GeoJSON, CSV/TSV points, KML, zipped Shapefiles,
+  GeoTIFF/COG, georeferenced PNG/JPG/WebP and vector/raster PMTiles. Network
+  connections also accept XYZ vector/raster tiles and WMS 1.1.1 in EPSG:3857.
+- Building heights render as LoD1 only when a real positive source height exists.
+  The existing eight US experimental LoD2 buildings and twenty Dutch training
+  roofs remain separate collections. Import static OBJ or self-contained GLB
+  models with explicit placement, up axis, units, elevation and scale.
+- A frozen data snapshot drives numeric summaries, category frequencies,
+  histograms and SVG charts. Nulls and booleans never become numeric zero.
+- Metre-based buffers, polygon clipping, intersection overlay, spatial selection,
+  counts and intersection-area summaries within polygons, centroids and geometry
+  measurements. Results become independent, downloadable vector layers.
+  Derived buffers and overlays keep source height attributes for reference but
+  are not automatically extruded as physical buildings.
+- Draw points, lines, polygons and point labels. A drawn polygon can be used as
+  an analysis boundary. Escape cancels; Enter finishes; Backspace undoes a vertex.
+- Real coordinate conversion for imports, readouts and exports: WGS84, Web
+  Mercator, north/south UTM and custom PROJ definitions. The map itself renders
+  in EPSG:3857. Horizontal conversion leaves source Z values and vertical datums
+  unchanged.
+- Map layouts include the current rendered vectors, raster previews and 3D
+  models, plus title, dataset legend, scale, north arrow, date, extent and source
+  credits. Download PNG at standard or true 2× rendering resolution, download
+  map metadata, or print/save PDF. Pending/failed data require explicit consent
+  to make a clearly labelled partial map.
+- Download complete loaded source geometry as WGS84 GeoJSON, declared projected
+  JSON or CSV with WKT. Original local raster files remain available unchanged.
+
+## Fast rendering and analytical data
+
+The display and analysis paths have different contracts:
+
+| Input | Map display | Statistics and spatial analysis |
+|---|---|---|
+| Full imported vector | Browser GeoJSON tiles | Frozen complete source geometry, or whole features intersecting a chosen extent |
+| Live USBF / GBA / government batch | Current neighborhood | Frozen actual loaded records, with bounds, timestamp, release, filters and any limit preserved |
+| PMTiles / MVT | Fast, clipped/simplified tiles | Explicit field preview only; fragment observations are not unique building totals; geometry analysis and original-data exports are blocked |
+| Raster tiles / raster image preview | Georeferenced display | Excluded from vector analysis; GeoTIFF details expose clearly labelled preview sample summaries rather than claiming full-resolution pixel statistics |
+
+`PortalAnalysisData.capture()` makes a deep-frozen independent source snapshot.
+Panning, live publication updates and later layer edits do not change an existing
+result. Every chart, derived layer and data export retains its scope, component
+licenses and lineage. Reimporting an exported tile preview does not erase its
+restrictions. A regional or nationwide analysis needs an original analytical
+source and a suitable processing service; this site does not scan 150 million
+buildings in a browser or substitute loaded tile counts for national totals.
+
+The attribute table remains an explicitly labelled current-view preview. Its
+CSV/fragment exports describe what was rendered; use **Download** for source
+geometry exports. Overlapping datasets are not automatically reconciled into a
+single building inventory.
+
+A future USBF PMTiles publication can use this display path while the existing
+GeoParquet reader supplies bounded analytical batches. Source version, stable
+record identifiers, query scope and data licenses must remain associated; a
+rendered tile alone is never an analytical original.
+
+## Working with data
+
+1. Choose **Add data** → Catalog, From URL or Local File. Declare the source CRS
+   when the file does not embed it. CSV requires valid x/y columns; images need
+   bounds or a world file. ZIPs need matching `.prj` files or a declared CRS.
+2. Select a layer and open **Tools → Statistics**. Choose the full loaded layer,
+   current extent or selection, then **Capture snapshot**. Verify the scope
+   before calculating or making a chart.
+3. For a clip or zone summary, add/draw a complete polygon layer, select the
+   source snapshot and choose that polygon layer as the reference. Overlapping
+   clip masks are unioned; intersection overlays and zone summaries explicitly
+   describe how overlapping zones contribute.
+4. Use **Create map** for images and **Download** for vector data/original files.
+   PNG and metadata are complementary: the metadata records source dates,
+   styles, limits, camera and local model placements.
+
+Local files, drawings, analysis outputs and imported models remain in the
+browser session. Download them before closing. Shared URLs restore catalog
+connections, camera and styles; local files and models must be reopened on the
+receiving device. The site does not upload user files to a storage service.
+
+## Browser limits and measurement meaning
+
+- Direct vector/image inputs: 32 MiB; vectors: 50,000 features / one million
+  coordinate positions. Zipped Shapefile expansion is checked before parsing.
+- GeoTIFF/COG: range-based access, bounded native decode memory, overview/window
+  selection, maximum 1536 × 1536 preview. NoData is retained. GeoTIFF extra-sample
+  alpha is currently not applied and is recorded in metadata; PNG/JPG/WebP alpha
+  is retained. Use original raster pixels in dedicated software for raster
+  algebra, full-resolution zonal statistics or scientific raster measurements.
+- Statistical snapshots: 20,000 records / 500,000 vertices. Spatial tools:
+  1,500 records per input, 200,000 vertices and 50,000 feature pairs, with
+  cancellation and result limits. Clip masks have additional union limits.
+- Geometry area and length use Turf’s spherical Earth algorithms in m²/metres,
+  including polygon holes. Summed areas can overlap when input polygons overlap;
+  they are not a survey-grade ellipsoidal or projected engineering calculation.
+- Imported models: three at a time, 32 MiB and 150,000 triangles per model. OBJ
+  geometry uses a neutral material; external MTL/assets and compressed GLB
+  extensions requiring unavailable decoders are not loaded. Placement is manual,
+  relative to the map sea-level plane; there is no terrain/vertical-datum fit or
+  automatic roof reconstruction.
+- Image export requires CORS-compatible sources and a ready map, with a
+  16-million-pixel layout limit. Model/viewport availability and network limits
+  remain visible rather than being replaced with synthetic data.
 
 ## Live USBF and automatic updates (0.6)
 
@@ -58,169 +165,54 @@ retaining original nulls. `modified = null` remains unknown, separately from
 `height_m` accepts positive source `height` values only. Those heights are
 inherited GBA heights; nDSM input coverage flags never overwrite their meaning.
 
-## What changed in 0.5
+## Development and validation
 
-- Searchable catalog with independent Microsoft tiles, US GBA footprints/heights,
-  official DC and NYC APIs, pinned Overture tiles, and VIDA provenance subsets.
-- Bounded, cancellable neighborhood queries; source versions, height units and
-  download-only resources are stated explicitly.
+This is a buildless static site; GitHub Pages serves the repository root.
+A local HTTP server is required for ES modules and browser file APIs.
+`?empty=1` starts without a default catalog layer.
 
-## Inventory and models (0.4)
+- `data-manager.js`: map layers, source state, visibility, opacity and styles.
+- `data-import.js` / `import-worker.js`: vector/raster parsing and reprojection.
+- `analysis-data.js` / `analysis-ui.js`: scoped snapshots, analysis and charts.
+- `workspace-crs.js`: actual coordinate conversion and settings.
+- `map-composer.js`: rendered map layouts and analytical source downloads.
+- `workspace-tools.js`: compact toolbar and geographic drawing/annotations.
+- `local-models.js`: user-supplied OBJ/GLB placement and shared-WebGL rendering.
+- `model-browser.js`: verified experimental and training model collections.
+- `usbf-source.js` / `usbf-worker.js`: live publication and bounded source reads.
 
-- A national entry map with Add Data first. The original VIDA default is now
-  replaced by the live USBF connection; VIDA remains a comparison source.
-- The attribute table follows the active real dataset, with pagination, search,
-  sorting, map selection/highlighting, source filters and CSV/GeoJSON exports.
-- Counts describe visible loaded records, not nationwide building totals.
-- Provenance coloring, minimum-area filtering and shareable catalog styles.
-- LoD1 extrusions use supplied metre heights only. Missing heights retain their
-  2D footprint. VIDA has no building-height field in these archives.
-- Integrated model controls on the main map: eight existing US experiment cases
-  with three methods each, and twenty actual 3DBAG training-roof references.
-- Method, edge/roof display, model selection and camera restore from shared URLs.
-  Models can be downloaded as local-coordinate OBJ or provenance-bearing JSON.
-- An additional catalog layer links the twenty training-reference footprints
-  and model-derived heights to their corresponding roof models.
-- Indexed city, longitude/latitude and sample-ID navigation. This is not an
-  address geocoder. Custom GeoJSON and PMTiles/XYZ URL connections remain.
+Run the source-contract checks:
 
-## Data catalog (0.6)
+```sh
+node tools/usbf-update-qa.cjs
+node tools/import-qa.cjs
+node tools/analysis-qa.cjs
+node tools/crs-export-qa.cjs
+node tools/local-models-qa.cjs
+node tools/pmtiles-qa.cjs
+```
 
-| Provider | Coverage / role | Source |
-|---|---|---|
-| USBF live | Our published CONUS48 + DC inventory | Live Source Cooperative manifest and 0.5-degree GeoParquet files; automatic update checks |
-| VIDA US | Combined footprints, with separate Microsoft / OSM subset entries | Source Cooperative PMTiles; provenance filters do not recreate the complete original sources |
-| Microsoft US | Independent Microsoft / Esri legacy tiles | 125M snapshot; geometry-focused tiles with limited attributes, separate HDX mirror linked for newer files |
-| GlobalBuildingAtlas US | US footprints, source codes, estimated heights and variance | Taylor Geospatial / Source Cooperative GeoParquet mirror, September 2025; current neighborhood queried directly in a worker |
-| Overture Buildings | Global merged inventory including US | Official `2026-10-21.0` PMTiles, pinned release |
-| DC government | Official OCTO footprints and capture metadata | DC GIS ArcGIS API, current view, maximum 2,000 returned features |
-| NYC government | Official OTI footprints and roof heights above ground | NYC Open Data API, current view, maximum 5,000 returned features |
-| VIDA global | Optional global footprint comparison | Source Cooperative PMTiles |
-| USGS Orthoimagery | Reference imagery | The National Map XYZ tiles |
-| 3DBAG samples | Twenty Dutch training-reference footprints and heights | Bundled frozen sample manifest, separate from US coverage |
+`tools/workspace-qa.cjs` uses Playwright, real WebGL and real parsers with explicit
+network fixtures to exercise import, CRS, statistics/charts, spatial results,
+model loading, drawing, downloads, map generation and mobile layout. Supply
+`PLAYWRIGHT_PATH`, `PORTAL_CHROMIUM_PATH` and `PORTAL_QA_OUTPUT`. Its fixture
+records are test data, never published as observed buildings. Public USBF range
+reads and publication-update contracts are checked separately.
 
-VIDA combines Google, Microsoft and OSM footprints; the US/global archives are
-alternative organizations of that merged product, not independent originals.
-PMTiles uses HTTP range requests instead of downloading the full archive.
-Provider coverage, source composition, resolution and observation dates vary.
+## Dependencies and licenses
 
-Tiled features may be simplified or clipped. View exports are labelled
-`visible-tile-fragments`, not complete source-building exports. The original
-source download remains available. GeoJSON imports preserve source geometry,
-properties and nulls; no height is assigned to a missing value.
+Runtime dependencies are pinned and self-hosted: MapLibre GL JS 5.6.2, PMTiles
+4.3.0, Three.js r169 (with matching official OBJ/GLTF loaders), Turf 7.2.0,
+Proj4js 2.12.1, GeoTIFF.js 2.1.3, shpjs 6.2.0, hyparquet 1.31.5 and fzstd 0.1.1.
+Their license files are retained under `vendor/`. MapLibre’s previously verified
+subresource integrity is retained. No package installation or CDN script is
+required by the published site.
 
-### Source identity and bounded requests
-
-The catalog contains twelve working map entries and two download resources. Its
-search finds names, coverage, descriptions and source groups. Microsoft / OSM
-subsets always retain their fixed VIDA provenance filter, including after share
-restoration. They remain merged-release subsets. The independent Microsoft tile
-layer is the older Esri snapshot linked by Microsoft's US repository; it does
-not claim to show the latest GlobalMLBuildingFootprints release. The newer HDX
-GeoParquet mirror is a download resource, not an implemented streaming source.
-
-GBA and official APIs query at zoom 14+ and require a neighborhood-sized view.
-On pan, hide, removal or a new request, previous work is cancelled. Previous
-view data is cleared so exports do not include an obsolete request. Counts and
-exports describe the loaded view, not the national inventory. Requests which hit
-a feature cap are marked and users can zoom in. No backend or API key is needed.
-
-GBA uses the 189-file geographic index in `data/sources/gba-usa-index.json`.
-The worker reads only HTTP byte ranges, prunes row groups/pages using the
-supplied bbox statistics, and filters `region = USA`. Each request is limited
-to four files, 32 MiB of ranges and 12,000 displayed features. The 5-degree file
-names may include neighboring countries; the per-record region filter is
-required. The source geometry is decoded as WGS84 from the actual GeoParquet
-metadata. Original `height`, `var`, `source`, `id` and `region` are preserved;
-`height_m` accepts only positive supplied heights. No WFS service or whole-file
-download is used.
-
-NYC `height_roof` is the roof height **above ground**, in feet; `height_m` is
-its positive value multiplied by 0.3048. Zero/null heights remain missing.
-`shape_area` is retained as an original field, and is not converted to a claimed
-ground area: current OTI documentation explicitly says not to use that generated
-area field. DC footprints have no height attribute.
-
-FEMA/ORNL USA Structures remains a clearly marked download resource. The official
-catalog is available, but the public feature service returned an ArcGIS query
-error during verification. It is not presented as a working map connection.
-
-Source documentation:
-
-- [Independent Microsoft US / Esri tiles](https://github.com/microsoft/USBuildingFootprints)
-- [HDX Microsoft mirror](https://source.coop/hdx/microsoft-open-buildings)
-- [Taylor Geospatial GBA mirror](https://source.coop/tge-labs/globalbuildingatlas-lod1)
-- [Current GBA release and component licenses](https://github.com/zhu-xlab/GlobalBuildingAtlas)
-- [NYC OTI field definitions](https://github.com/CityOfNewYork/nyc-geo-metadata/blob/main/Metadata/Metadata_BuildingFootprints.md)
-- [FEMA official catalog](https://gis-fema.hub.arcgis.com/pages/usa-structures)
-
-GBA is a September 2025 merged mirror, preceding the current component split.
-The original release terms include CC BY-NC 4.0 for LoD1/heights and ODbL source
-components. The website does not relabel these data as CC BY or as USBF.
-
-## Model collections
-
-The eight US cases are the existing guarded-input paired experiment in
-Georgetown, DC. Initial reconstruction, image-line adaptation and DL-assisted
-local candidates retain their original geometry, methods and diagnostic
-outcomes, including failed checks. An edge check does not certify roof accuracy.
-No one-to-one match to a VIDA tile building is asserted.
-
-The twenty Dutch examples are selected from the actual frozen training roster:
-two examples per each of ten source cities. They preserve training mesh hashes,
-source response hashes and roster membership. The training assets contain
-**roof surfaces only**, not closed buildings. They are automatic 3DBAG teacher
-geometry, not independent measured ground truth or US production models.
-Their optional LoD1 layer uses maximum source roof Z minus recorded ground;
-this derived height basis is retained in attributes.
-
-Read [sample metadata and attribution](data/models/README.md). Each sample is
-loaded on demand and SHA-256 checked. The whole display collection is under
-1 MB of JSON. No raw experiment trees, weights or production outputs are copied.
-
-[Original US experiment](https://feng96.github.io/research-daily/lod2/paper/) ·
-[3DBAG terms](https://docs.3dbag.nl/en/copyright/) ·
-[VIDA source / ODbL](https://source.coop/vida/google-microsoft-osm-open-buildings)
-
-## Import and sharing
-
-- Vector PMTiles: a direct public HTTPS file with range and CORS support.
-  Multi-layer archives need a source-layer name.
-- GeoJSON: WGS84 longitude/latitude, up to 20 MB, 50,000 features and one million
-  coordinate positions. Files stay in the browser and are not uploaded.
-- Raster XYZ: public HTTPS templates containing `{z}`, `{x}`, `{y}`.
-
-Share links retain catalog layers, visibility, opacity, source/area/color
-settings, camera and model selection. Custom URLs and local imports are
-session-only and must be reopened; signed/private URLs are not embedded.
-Optional synthetic UI examples remain explicitly labelled and initially off.
-
-## Implementation and acceptance
-
-No build is required: `python3 -m http.server 8080`. GitHub Pages serves `main`
-at the repository root. `?empty=1` starts an empty workspace for import testing.
-
-- `data-manager.js`: sources, real layer state, filtering and height rendering.
-- `public-sources.js`: provider catalog, bounded API queries and cancellation.
-- `usbf-source.js`: live USBF manifest, publication grid and automatic updates.
-- `usbf-worker.js`: bounded source reads and full-geometry decoding.
-- `tools/usbf-update-qa.cjs`: update, cache, geometry, null and cleanup contracts.
-- `gba-worker.js`: spatially filtered GeoParquet range reads off the UI thread.
-- `inventory.js`: active-layer records, table, exports and indexed navigation.
-- `model-browser.js`: Three.js custom map layer and on-demand model selection.
-- `tools/export-model-samples.py`: read-only exporter for frozen research assets.
-- `tools/catalog-qa.cjs`, `tools/inventory-models-qa.cjs` / `tools/browser-qa.cjs`: full acceptance.
-- `tools/data-qa.cjs`: connection, validation and import/export regression.
-
-Browser QA uses an existing Playwright runtime via `PLAYWRIGHT_PATH` and writes
-screenshots/reports to `PORTAL_QA_OUTPUT` on bulk storage. Set `PORTAL_LIVE_URL`
-for published-site acceptance. Rendering, dataset identity, source filters,
-all 44 model/method views, sample association, OBJ/CSV export, sharing and mobile
-layout are checked with real browser execution.
-
-MapLibre GL JS 5.6.2 and its CSS are self-hosted under `vendor/`, with the
-previously pinned subresource integrity hashes verified and retained. Dataset
-initialization waits for `style.load`, so basemap raster delivery cannot block
-the live inventory connection. Vendored PMTiles 4.3.0, Three.js, hyparquet 1.31.5 (MIT) and fzstd 0.1.1 (MIT) retain their licenses. Application MIT licensing does not replace
-external dataset licensing. Source imagery/model terms and attribution remain
-with their providers.
+Library references: [Turf](https://turfjs.org/),
+[Proj4js](https://proj4js.org/),
+[GeoTIFF.js](https://github.com/geotiffjs/geotiff.js),
+[shpjs](https://github.com/calvinmetcalf/shapefile-js),
+[Three.js r169](https://github.com/mrdoob/three.js/tree/r169/examples/jsm/loaders).
+Application MIT licensing does not replace dataset licensing. Each provider and
+model retains its source attribution and component terms. US experimental LoD2
+results remain experiments and are not a national production roof inventory.

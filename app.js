@@ -19,6 +19,7 @@
     database:'<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0"/>',
     cube:'<path d="m12 2 10 6v9l-10 6L2 17V8Zm0 12v9M2 8l10 6 10-6M7 5l10 6"/>',
     height:'<path d="M5 21V9h6v12m0-16h6v16M3 21h17m0-18v12m-2-9 2-3 2 3m-4 6 2 3 2-3"/>',
+    settings:'<circle cx="12" cy="12" r="3"/><path d="M10 2h4l1 3 3 1 3 2-2 4 2 4-3 2-3 1-1 3h-4l-1-3-3-1-3-2 2-4-2-4 3-2 3-1Z"/>',sliders:'<path d="M3 6h18M3 12h18M3 18h18"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/>',chart:'<path d="M3 3v18h18M7 17v-5m5 5V7m5 10v-8"/>',draw:'<path d="m4 16-1 5 5-1L20 8l-4-4Zm10-10 4 4"/>',analysis:'<circle cx="8" cy="12" r="6"/><circle cx="16" cy="12" r="6"/>',
     home:'<path d="m3 11 9-8 9 8M5 10v11h14V10M9 21v-7h6v7"/>',mouse:'<rect x="6" y="2" width="12" height="20" rx="6"/><path d="M12 3v6"/>'
   };
   function icon(name) { return '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">'+(paths[name] || paths.info)+'</svg>'; }
@@ -58,7 +59,7 @@
       content='<p>A common map for your building data products. Live data will be connected after this interface review.</p><button class="dialog-option" data-layer-info="footprints">'+icon('layers')+'<span><strong>USBF footprints</strong><small>Geometry, lineage and revisions</small></span><span class="pill">Planned</span></button><button class="dialog-option" data-layer-info="height">'+icon('height')+'<span><strong>Building height</strong><small>Height attributes and source coverage</small></span><span class="pill">Planned</span></button><button class="dialog-option" data-modal="lod2">'+icon('cube')+'<span><strong>LoD2 roof models</strong><small>Research models and comparisons</small></span>'+icon('external')+'</button>';
     } else if(kind==='help') {
       title='A familiar way to explore';
-      content='<p>GIS-style controls, with a simple browser workspace.</p><dl class="help-grid"><dt>Add Data</dt><dd>USBF is the default inventory. Add comparison datasets from the catalog. USBF, GBA and official APIs load at neighborhood zoom. You can also connect a PMTiles/GeoJSON/XYZ URL or open a local GeoJSON file.</dd><dt>Explore</dt><dd>Drag to pan. Scroll or use + / − to zoom.</dd><dt>Identify</dt><dd>Click a footprint or an attribute-table row to inspect its source properties.</dd><dt>Measure</dt><dd>Click two or more positions to measure distance. Escape exits the tool.</dd><dt>USBF updates</dt><dd>The live publication is checked on opening and every five minutes while visible. Use Check updates for an immediate refresh.</dd><dt>Contents</dt><dd>Toggle layers, change opacity, and filter or color the active dataset by source.</dd><dt>3D Models</dt><dd>Browse US experimental reconstructions and Dutch training roof references; switch methods and view source/check status.</dd><dt>Attributes</dt><dd>Browse, search and sort loaded map records. Tiled geometry may be simplified or clipped.</dd><dt>Search</dt><dd>Find an indexed city, enter longitude/latitude, or search a sample model ID.</dd><dt>Export</dt><dd>Export visible records as CSV or GeoJSON. Models has separate OBJ and metadata downloads.</dd><dt>Share</dt><dd>Copy a URL preserving catalog layers, styling, camera and the current model.</dd></dl><p style="margin-top:18px">快捷键：<kbd>/</kbd> 图层搜索；<kbd>Esc</kbd> 退出工具。地图默认指北。</p>';
+      content='<p>Add data from the catalog, a public URL or a local file.</p><dl class="help-grid"><dt>Layers</dt><dd>Choose a dataset; open its settings for opacity, source details and updates. Style &amp; filters stays collapsed until needed.</dd><dt>Tools</dt><dd>Open the attribute table, measure, draw an analysis boundary, calculate statistics, make charts or run spatial analysis.</dd><dt>Analysis data</dt><dd>Capture a frozen source snapshot first. USBF analysis covers the loaded neighborhood. PMTiles are display fragments: connect original vector data for geometry analysis and complete downloads.</dd><dt>3D models</dt><dd>Browse experimental US roofs and training references, or place your own OBJ / GLB using explicit units and a geographic anchor.</dd><dt>CRS</dt><dd>Settings changes coordinate readouts and actual import / export conversions. The map renders in Web Mercator.</dd><dt>Create map</dt><dd>Generate a PNG with title, legend, scale, north arrow and sources. Download the image and metadata or print to PDF.</dd><dt>Download</dt><dd>Export full loaded vector geometry, a scoped source batch or the original raster. Local files and models stay in your browser; download them before closing.</dd></dl>';
     } else {
       title='US Buildings · Open workspace';
       content='<p>An open GIS workspace for <strong>building footprints, heights and roof models</strong>.</p><p>USBF reads our current Source Cooperative publication and checks for updates automatically. Inspect published footprints, inherited GBA heights and recorded edit attributes, or compare other datasets. Models contains experimental US roofs and actual 3DBAG training references.</p><p>Created for Yinan Feng.</p><a class="primary-button" href="https://feng96.github.io/research-daily/" target="_blank" rel="noopener">Research updates '+icon('external')+'</a>';
@@ -120,8 +121,8 @@
     $$('[data-tool]').forEach(function(b){b.classList.toggle('active',b.dataset.tool===next);b.setAttribute('aria-pressed',String(b.dataset.tool===next));});
     if(map){map.getCanvas().style.cursor=next==='measure'?'crosshair':next==='identify'?'crosshair':'';if(next==='measure')map.doubleClickZoom.disable();else map.doubleClickZoom.enable();}
     $('#measure-card').hidden=next!=='measure';
-    $('#tool-hint').textContent=next==='measure'?'Click to add measurement points · Escape to finish':next==='identify'?'Click any colored demo building to inspect its attributes':'Drag to explore · Scroll to zoom · Click a building to inspect';
-    status(next==='measure'?'Measure distance · click the map':next==='identify'?'Identify · click a demo building':'Map ready');
+    $('#tool-hint').textContent=next==='measure'?'Click to add measurement points · Escape to finish':next==='identify'?'Click a feature to inspect its attributes':'Drag to explore · Scroll to zoom · Click a building to inspect';
+    status(next==='measure'?'Measure distance · click the map':next==='identify'?'Identify · click a feature':'Map ready');
   }
   function selectFeature(id,pan) {
     var feature=featuresById.get(id);if(!feature)return;
@@ -194,14 +195,14 @@
   }
   async function action(name) {
     if(name==='close-dialog'){$('#workspace-dialog').close();return;}
-    if(name==='layers'){var open=$('#sidebar').classList.toggle('is-open');$('[data-action=layers]').setAttribute('aria-expanded',String(open));return;}
+    if(name==='layers'){var open;if(innerWidth>700){open=!document.body.classList.toggle('sidebar-collapsed');}else{open=$('#sidebar').classList.toggle('is-open');}$('[data-action=layers]').setAttribute('aria-expanded',String(open));if(map)setTimeout(function(){map.resize();},0);return;}
     if(name==='table'){if(window.PortalLayers?.layers.size&&window.PortalInventory)PortalInventory.toggleTable();else toggleTable();return;}
     if(name==='close-welcome'){$('#welcome-card').hidden=true;return;}
-    if(name==='export'){exportData();return;}
-    if(name==='legend'){var body=$('.legend-body');body.hidden=!body.hidden;$('.legend-title').setAttribute('aria-expanded',String(!body.hidden));return;}
+    if(name==='export'){if(window.PortalComposer)PortalComposer.open('download');else exportData();return;}
+    if(name==='legend'){var show=!document.body.classList.contains('legend-visible');document.body.classList.toggle('legend-visible',show);$('#legend-card').hidden=!show;$('.legend-body').hidden=false;$('.legend-title').setAttribute('aria-expanded',String(show));return;}
     if(name==='collapse-groups'){var groups=$$('.layer-group'),open=groups.some(function(g){return !g.open;});groups.forEach(function(g){g.open=open;});return;}
     if(!map){toast('The map is not available yet.');return;}
-    if(name==='home'&&!(window.PortalLayers&&PortalLayers.fullExtent()))bookmark('demo');
+    if(name==='home'&&!(window.PortalLayers&&PortalLayers.fullExtent()))bookmark('conus');
     if(name==='sample'){window.PortalModels?.hide();PortalLayers.layers.forEach(l=>{l.visible=false;});PortalLayers.set3D();$('#layer-footprints').checked=true;syncLayers();$('.demo-group').open=true;selectFeature('DEMO-129',true);}
     if(name==='zoom-in')map.zoomIn();
     if(name==='zoom-out')map.zoomOut();
@@ -213,8 +214,8 @@
     if(name==='retry-basemap'){tileFailures=0;$('#tile-warning').hidden=true;map.getSource('base-'+activeBasemap).setTiles([basemaps[activeBasemap].url]);}
     if(name==='share') {
       saveView();
-      try{await navigator.clipboard.writeText(location.href);toast('Map view link copied.');}
-      catch(e){$('#dialog-title').textContent='Share this view';$('#dialog-eyebrow').textContent='MAP LINK';$('#dialog-content').innerHTML='<p>Copy this link to reopen the same view and selection.</p><input id="share-url" readonly aria-label="Map sharing URL" style="width:100%;padding:10px;border:1px solid #dfe5d5;border-radius:5px">';$('#share-url').value=location.href;$('#workspace-dialog').showModal();$('#share-url').select();}
+      try{await navigator.clipboard.writeText(location.href);toast('Map view link copied. Reopen local files and models on the receiving device.');}
+      catch(e){$('#dialog-title').textContent='Share this view';$('#dialog-eyebrow').textContent='MAP LINK';$('#dialog-content').innerHTML='<p>Copy this link to reopen the map view and catalog layers. Local files, drawings, analysis results and imported models must be reopened on the receiving device.</p><input id="share-url" readonly aria-label="Map sharing URL" style="width:100%;padding:10px;border:1px solid #dfe5d5;border-radius:5px">';$('#share-url').value=location.href;$('#workspace-dialog').showModal();$('#share-url').select();}
     }
   }
   document.addEventListener('click',function(e) {
@@ -234,7 +235,7 @@
     if(e.key==='Escape') {if($('#workspace-dialog').open)$('#workspace-dialog').close();else{setTool('explore');$('#search-results').hidden=true;$('#sidebar').classList.remove('is-open');$('[data-action=layers]').setAttribute('aria-expanded','false');}}
     if(e.key==='/'&&!/input|textarea/i.test(document.activeElement.tagName)&&!$('#workspace-dialog').open){e.preventDefault();$('[data-tab=layers]').click();$('#sidebar').classList.add('is-open');$('[data-action=layers]').setAttribute('aria-expanded','true');$('#layer-filter').focus();}
     if((e.key==='Enter'||e.key===' ')&&e.target.matches('[data-feature]')){e.preventDefault();selectFeature(e.target.dataset.feature,true);}
-    if((e.key==='ArrowLeft'||e.key==='ArrowRight')&&e.target.matches('[data-tab]')){e.preventDefault();var tabs=['layers','catalog','models'],next=tabs[(tabs.indexOf(e.target.dataset.tab)+(e.key==='ArrowRight'?1:2))%3];$('[data-tab='+next+']').click();$('[data-tab='+next+']').focus();}
+    if((e.key==='ArrowLeft'||e.key==='ArrowRight')&&e.target.matches('[data-tab]')){e.preventDefault();var tabs=['layers','models'],next=tabs[(tabs.indexOf(e.target.dataset.tab)+1)%2];$('[data-tab='+next+']').click();$('[data-tab='+next+']').focus();}
   });
   $('#workspace-dialog').addEventListener('click',function(e){if(e.target===$('#workspace-dialog')){var r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.target.close();}});
   $('#layer-filter').addEventListener('input',function(){var q=this.value.toLowerCase(),visible=0;$$('.layer-row').forEach(function(row){row.hidden=!row.textContent.toLowerCase().includes(q);if(!row.hidden){visible++;if(row.closest('details'))row.closest('details').open=true;}});$('.layer-empty').hidden=visible>0;});
@@ -285,7 +286,7 @@
     var sources={},baseLayers=[{id:'background',type:'background',paint:{'background-color':'#e9ede4'}}];
     Object.keys(basemaps).forEach(function(k){var b=basemaps[k];sources['base-'+k]={type:'raster',tiles:[b.url],tileSize:256,maxzoom:b.maxZoom,attribution:b.attribution};baseLayers.push({id:'base-'+k,type:'raster',source:'base-'+k,layout:{visibility:k==='light'?'visible':'none'},paint:{'raster-fade-duration':0}});});
     maplibregl.setWorkerCount(2);
-    map=new maplibregl.Map({container:'map',style:{version:8,sources:sources,layers:baseLayers},center:[-98.5,39.5],zoom:4,minZoom:2,maxZoom:20,maxPitch:60,attributionControl:false,renderWorldCopies:false,canvasContextAttributes:{antialias:true}});
+    map=new maplibregl.Map({container:'map',style:{version:8,sources:sources,layers:baseLayers},center:[-98.5,39.5],zoom:4,minZoom:2,maxZoom:20,maxPitch:60,attributionControl:false,renderWorldCopies:false,canvasContextAttributes:{antialias:true,preserveDrawingBuffer:true}});
     var styleReady=new Promise(function(resolve){map.once('style.load',resolve);});
     map.addControl(new maplibregl.AttributionControl({compact:true}),'bottom-right');
     map.addControl(new maplibregl.ScaleControl({maxWidth:80,unit:'metric'}),'bottom-left');
@@ -309,11 +310,11 @@
       else{map.getCanvas().style.cursor=tool==='identify'?'crosshair':'';hoverPopup.remove();}
     });
     map.on('mouseout',function(){hoverPopup.remove();});
-    map.on('click',function(e){if(tool==='measure'){hoverPopup.remove();addMeasure(e.lngLat);return;}var hits=map.queryRenderedFeatures(e.point,{layers:[view3d?'demo-extrusion':'demo-fill']});if(window.PortalModels?.identify(e))return;if(window.PortalLayers&&PortalLayers.identify(e))return;if(hits.length)selectFeature(hits[0].properties.building_id,false);});
+    map.on('click',function(e){if(window.PortalDraw?.active){PortalDraw.click(e);return;}if(tool==='measure'){hoverPopup.remove();addMeasure(e.lngLat);return;}var hits=map.queryRenderedFeatures(e.point,{layers:[view3d?'demo-extrusion':'demo-fill']});if(window.PortalModels?.identify(e))return;if(window.PortalLayers&&PortalLayers.identify(e))return;if(hits.length)selectFeature(hits[0].properties.building_id,false);});
     $('#feature-count').textContent=collection.features.length;renderTable();saveView();
     $('#zoom-label').textContent='Zoom '+map.getZoom().toFixed(1);
     window.portal={engine:'MapLibre GL JS',get map(){return map;},get data(){return collection;},get selected(){return selected;},get view3d(){return view3d;},selectFeature:selectFeature};
-    window.portal.clearSelection=clearSelection;window.portal.saveView=saveView;window.portal.setViewMode=setViewMode;window.portal.setBasemap=setBasemap;window.portal.initialHash=initialHash;
+    window.portal.setTool=setTool;window.portal.getTool=function(){return tool;};window.portal.toast=toast;window.portal.clearSelection=clearSelection;window.portal.saveView=saveView;window.portal.setViewMode=setViewMode;window.portal.setBasemap=setBasemap;window.portal.initialHash=initialHash;
     if(window.PortalLayers)await PortalLayers.init(window.portal,initialHash);
     window.PortalInventory?.init(window.portal);window.portal.ready=true;document.dispatchEvent(new CustomEvent('portal-ready'));
     if(!initialHash&&!new URLSearchParams(location.search).has('empty')){PortalLayers.add(PortalLayers.catalog[0],{restore:true});}

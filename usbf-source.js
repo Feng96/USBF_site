@@ -33,7 +33,7 @@
     const coverageVisibility=()=>{if(map.getLayer(coverageLayer))map.setLayoutProperty(coverageLayer,'visibility',l.visible?'visible':'none');};
     function note(s,loading=false){l.viewNote=s;l.viewLoading=loading;update();}
     function cancel(){revision++;clearTimeout(queryTimer);clearTimeout(queryTimeout);worker?.terminate();worker=null;}
-    function clear(s){l.loaded=false;l.viewBytes=0;l.data=empty();l.featureById=new Map();map.getSource(l.id)?.setData(l.data);note(s);}
+    function clear(s){l.loaded=false;l.viewBytes=0;l.viewLimited=false;l.viewBounds=null;l.viewLoadedAt=null;l.data=empty();l.featureById=new Map();map.getSource(l.id)?.setData(l.data);note(s);}
     function bounds(){const b=map.getBounds();return [b.getWest(),b.getSouth(),b.getEast(),b.getNorth()];}
     function loadView(){
       cancel();if(stopped||!map.getSource(l.id))return;coverageVisibility();
@@ -45,12 +45,12 @@
       const tiles=selectTiles(manifest,box);if(!tiles.length){clear('No published USBF tile in this view');return;}
       if(tiles.length>9){clear('Zoom in to request fewer USBF tiles');return;}
       clear('Loading the current USBF view…');l.viewLoading=true;update();const rev=revision;
-      worker=new Worker(new URL('./usbf-worker.js?v=0.6',document.baseURI),{type:'module'});
+      worker=new Worker(new URL('./usbf-worker.js?v=1.0',document.baseURI),{type:'module'});
       queryTimeout=setTimeout(()=>{if(rev!==revision)return;worker?.terminate();worker=null;l.error=true;note('USBF read timed out. Use Check updates to retry.');},60000);
       worker.onmessage=e=>{
         if(stopped||rev!==revision)return;clearTimeout(queryTimeout);worker?.terminate();worker=null;
         if(e.data.error){l.error=true;note(e.data.error);if(e.data.code==='RELEASE_CHANGED')checkUpdates();return;}
-        const d=e.data;l.data=d.data;l.featureById=new Map(d.data.features.map(f=>[String(f.properties.usbf_id),f]));l.loaded=true;l.error=false;l.viewBytes=d.bytes;
+        const d=e.data;l.data=d.data;l.featureById=new Map(d.data.features.map(f=>[String(f.properties.usbf_id),f]));l.loaded=true;l.error=false;l.viewBytes=d.bytes;l.viewLimited=!!d.limited;l.viewBounds=box.slice();l.viewLoadedAt=new Date().toISOString();l.viewSelection='Published cx/cy ownership coordinates within the loaded bounds plus a 0.002-degree buffer';
         l.fields=Array.from(new Set([...entry.fields,...d.data.features.flatMap(f=>Object.keys(f.properties))]));map.getSource(l.id).setData(l.data);l.onDataChanged?.();
         note(d.data.features.length.toLocaleString()+' buildings in buffered ownership view'+(d.limited?' · view limit reached; zoom in':'')+' · '+(d.bytes/1048576).toFixed(1)+' MB read');
       };
