@@ -83,7 +83,7 @@
       l.data=result.data;l.featureById=new Map(result.data.features.map(feature=>[String(feature.properties.usbf_id),feature]));
       l.fields=Array.from(new Set([...entry.fields,...result.fields]));l.analysisRelease=clone(result.release);
       l.analysisState={loading:jobs.size>0,cached:true,error:null,bounds:result.viewBounds.slice(),release:clone(result.release),loadedAt:result.viewLoadedAt};
-      if(!l.renderTiled){l.displayMode='original';l.loaded=true;l.viewBounds=result.viewBounds.slice();l.viewLoadedAt=result.viewLoadedAt;l.viewBytes=result.viewBytes;l.viewLimited=result.viewLimited;l.viewSelection=result.viewSelection;l.setData?.(result.data);}
+      if(!l.renderTiled){l.displayMode='original';l.release=clone(result.release);l.loaded=true;l.viewBounds=result.viewBounds.slice();l.viewLoadedAt=result.viewLoadedAt;l.viewBytes=result.viewBytes;l.viewLimited=result.viewLimited;l.viewSelection=result.viewSelection;l.setData?.(result.data);}
       l.onDataChanged?.();status();
     }
     function startWorker(){
@@ -107,7 +107,7 @@
     async function publication(signal,ownGeneration){
       if(!manifest||Date.now()-manifestAt>pollMs){
         // A shared metadata read does not belong to any one analytical operation.
-        if(!manifestRequest)manifestRequest=getPublication().then(next=>{manifest=next;manifestAt=Date.now();l.release=releaseOf(next);l.displayStale=!!l.displayRelease&&l.displayRelease.updated!==next.updated;return next;}).finally(()=>{manifestRequest=null;});
+        if(!manifestRequest)manifestRequest=getPublication().then(next=>{manifest=next;manifestAt=Date.now();if(l.displayMode!=='original')l.release=releaseOf(next);l.displayStale=!!l.displayRelease&&l.displayRelease.updated!==next.updated;return next;}).finally(()=>{manifestRequest=null;});
         await new Promise((resolve,reject)=>{
           const cancel=()=>{cleanup();reject(aborted());};
           const cleanup=()=>{metadataWaits.delete(cancel);signal?.removeEventListener('abort',cancel);};
