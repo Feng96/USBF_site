@@ -28,6 +28,7 @@
     return {data:d,limited:d.features?.length>=5000};
   }
   function attach(l,map,update){
+    if(l.cfg.driver==='usbf'){PortalUSBF.attach(l,map,update);return;}
     let stopped=false,timer,requestTimer,controller,worker,workerReject,revision=0;
     const cfg=l.cfg;
     function cancel(){revision++;clearTimeout(timer);clearTimeout(requestTimer);controller?.abort();workerReject?.(new DOMException('View changed','AbortError'));workerReject=null;worker?.terminate();worker=null;}

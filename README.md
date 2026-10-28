@@ -2,10 +2,61 @@
 
 [Open the website](https://feng96.github.io/USBF_site/).
 
-VIDA is the current working footprint provider while the USBF integration is
-prepared. Names, provenance and licenses remain VIDA's. The same layer,
-attribute and height interfaces are designed to accept the future USBF release.
+USBF is the default inventory, read directly from the live Source Cooperative
+publication. VIDA and the other public datasets remain available for comparison.
 US LoD2 results remain experimental. The site does not reconstruct new roofs.
+
+## Live USBF and automatic updates (0.6)
+
+The dataset entry is [opengeos/us-buildings](https://source.coop/opengeos/us-buildings).
+The reader follows the stable `USBF_v1/manifest.json` URL at Source Cooperative;
+no publication manifest or tile list is copied into this repository.
+
+- Opening USBF fetches the current manifest with browser caching disabled and a
+  fresh check URL. The manifest's tile bounds, filenames, sizes, checksums,
+  publication date and counts drive the viewer.
+- A visible layer in a visible browser tab checks every five minutes. Returning
+  to a foreground tab checks again if the last check was over 30 seconds ago.
+  Hidden layers and background tabs pause automatic checks.
+- **Check updates** checks immediately and reloads the current neighborhood.
+  A changed manifest automatically refreshes the view and coverage grid while
+  retaining the camera, layer styles and opacity.
+- Data URLs include each tile's current SHA256 as a cache version. File-length
+  and exposed ETag changes during a range read reject mixed publication bytes.
+  SHA256 is a cache version, not a whole-file integrity verification: the viewer
+  reads only selected byte ranges.
+- A failed update check retains the last successfully loaded view, displays its
+  original publication date and shows an explicit warning. It does not label
+  old data as the new release.
+
+Shared USBF links follow the current publication; they do not freeze a data
+snapshot. Record the publication date and selected tile checksums for citations.
+
+Future data updates need **no website push** when publication keeps the same
+manifest URL and layout. Publish accepted tile files first, update each file's
+size/checksum and the inventory counts, and publish the manifest last. New tile
+names are discovered automatically. A different endpoint or incompatible schema
+needs a viewer adapter change. The viewer does not alter the publication
+pipeline, running production, source objects or scientific outputs.
+
+At national zoom the map shows a labelled **publication grid**, not building
+polygons or proof of completed refinement. At zoom 14+ it loads buildings whose
+published `cx`/`cy` ownership coordinates lie in the map extent plus a 0.002-degree
+buffer. Full polygons are retained; this is an ownership-view selection, not an
+exhaustive intersection query for very large buildings centered outside that
+buffer. Actual per-file bounds select candidate files, including grid-edge
+footprints. Requests are capped at nine files, 32 MiB of ranges and 12,000
+features; zoom in if a view exceeds those limits.
+
+The worker reads the core identity, source, state, inherited height, edit,
+coverage, snapshot and component-license fields. It does not download the large
+`original_geometry` column or all production diagnostic columns on every pan;
+the full published schema and source downloads remain linked. Table records,
+identification and exports recover full loaded source features by `usbf_id`,
+retaining original nulls. `modified = null` remains unknown, separately from
+`false`; the recorded-change color style uses a distinct unknown color.
+`height_m` accepts positive source `height` values only. Those heights are
+inherited GBA heights; nDSM input coverage flags never overwrite their meaning.
 
 ## What changed in 0.5
 
@@ -16,7 +67,8 @@ US LoD2 results remain experimental. The site does not reconstruct new roofs.
 
 ## Inventory and models (0.4)
 
-- A national entry map with VIDA loaded by default and Add Data first.
+- A national entry map with Add Data first. The original VIDA default is now
+  replaced by the live USBF connection; VIDA remains a comparison source.
 - The attribute table follows the active real dataset, with pagination, search,
   sorting, map selection/highlighting, source filters and CSV/GeoJSON exports.
 - Counts describe visible loaded records, not nationwide building totals.
@@ -32,10 +84,11 @@ US LoD2 results remain experimental. The site does not reconstruct new roofs.
 - Indexed city, longitude/latitude and sample-ID navigation. This is not an
   address geocoder. Custom GeoJSON and PMTiles/XYZ URL connections remain.
 
-## Data catalog (0.5)
+## Data catalog (0.6)
 
 | Provider | Coverage / role | Source |
 |---|---|---|
+| USBF live | Our published CONUS48 + DC inventory | Live Source Cooperative manifest and 0.5-degree GeoParquet files; automatic update checks |
 | VIDA US | Combined footprints, with separate Microsoft / OSM subset entries | Source Cooperative PMTiles; provenance filters do not recreate the complete original sources |
 | Microsoft US | Independent Microsoft / Esri legacy tiles | 125M snapshot; geometry-focused tiles with limited attributes, separate HDX mirror linked for newer files |
 | GlobalBuildingAtlas US | US footprints, source codes, estimated heights and variance | Taylor Geospatial / Source Cooperative GeoParquet mirror, September 2025; current neighborhood queried directly in a worker |
@@ -58,7 +111,7 @@ properties and nulls; no height is assigned to a missing value.
 
 ### Source identity and bounded requests
 
-The catalog contains eleven working map entries and two download resources. Its
+The catalog contains twelve working map entries and two download resources. Its
 search finds names, coverage, descriptions and source groups. Microsoft / OSM
 subsets always retain their fixed VIDA provenance filter, including after share
 restoration. They remain merged-release subsets. The independent Microsoft tile
@@ -149,6 +202,9 @@ at the repository root. `?empty=1` starts an empty workspace for import testing.
 
 - `data-manager.js`: sources, real layer state, filtering and height rendering.
 - `public-sources.js`: provider catalog, bounded API queries and cancellation.
+- `usbf-source.js`: live USBF manifest, publication grid and automatic updates.
+- `usbf-worker.js`: bounded source reads and full-geometry decoding.
+- `tools/usbf-update-qa.cjs`: update, cache, geometry, null and cleanup contracts.
 - `gba-worker.js`: spatially filtered GeoParquet range reads off the UI thread.
 - `inventory.js`: active-layer records, table, exports and indexed navigation.
 - `model-browser.js`: Three.js custom map layer and on-demand model selection.
@@ -162,6 +218,9 @@ for published-site acceptance. Rendering, dataset identity, source filters,
 all 44 model/method views, sample association, OBJ/CSV export, sharing and mobile
 layout are checked with real browser execution.
 
-MapLibre GL JS 5.6.2 is pinned with subresource integrity. Vendored PMTiles 4.3.0, Three.js, hyparquet 1.31.5 (MIT) and fzstd 0.1.1 (MIT) retain their licenses. Application MIT licensing does not replace
+MapLibre GL JS 5.6.2 and its CSS are self-hosted under `vendor/`, with the
+previously pinned subresource integrity hashes verified and retained. Dataset
+initialization waits for `style.load`, so basemap raster delivery cannot block
+the live inventory connection. Vendored PMTiles 4.3.0, Three.js, hyparquet 1.31.5 (MIT) and fzstd 0.1.1 (MIT) retain their licenses. Application MIT licensing does not replace
 external dataset licensing. Source imagery/model terms and attribution remain
 with their providers.

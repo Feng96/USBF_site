@@ -9,7 +9,7 @@ function key(f){const p=f.properties||{};return p.usbf_id?String(p.usbf_id):p.ge
 function source(f){return f.properties?.bf_source??f.properties?.source??f.properties?.geom_source??f.properties?.SOURCE??'Not provided';}
 function height(f,l){const h=l?.heightField?number(f.properties?.[l.heightField]):null;return h!==null&&h>0?h:null;}
 function area(f){return number(f.properties?.area_in_meters??f.properties?.area_m2);}
-function records(l){if(!map||!l||!l.visible||l.cfg.type==='raster')return [];const layer=l.id+(api.view3d&&l.heightField?'-fill-extrusion':'-fill');const ids=[layer,l.id+'-circle',l.id+'-line'].filter(x=>map.getLayer(x));const found=map.queryRenderedFeatures({layers:ids}),seen=new Set(),out=[];for(const f of found){const k=key(f);if(seen.has(k))continue;seen.add(k);out.push(f);if(out.length>=20000)break;}return out;}
+function records(l){if(!map||!l||!l.visible||l.cfg.type==='raster')return [];const layer=l.id+(api.view3d&&l.heightField?'-fill-extrusion':'-fill');const ids=[layer,l.id+'-circle',l.id+'-line'].filter(x=>map.getLayer(x));const found=map.queryRenderedFeatures({layers:ids}),seen=new Set(),out=[];for(const f of found){const k=key(f);if(seen.has(k))continue;seen.add(k);out.push(l.featureById?.get(String(f.properties?.usbf_id))||f);if(out.length>=20000)break;}return out;}
 function refresh(){
  if(!map)return;const l=PortalLayers.active;$('#inventory-controls').hidden=!l;
  const choices=Array.from(PortalLayers.layers.values()).filter(x=>x.cfg.type!=='raster');$('#inventory-layer').innerHTML=choices.map(x=>'<option value="'+x.id+'" '+(x.id===l?.id?'selected':'')+'>'+esc(x.cfg.name)+'</option>').join('');
@@ -17,11 +17,11 @@ function refresh(){
  if(lastLayer!==l.id){lastLayer=l.id;page=0;$('#table-search').value='';}
  rows=records(l);$('#visible-records').textContent=rows.length.toLocaleString()+(rows.length===20000?'+':'');$('#height-records').textContent=rows.filter(f=>(height(f,l)??0)>0).length.toLocaleString();
  $('#inventory-scope').textContent=tiled(l)?'Loaded tile records · geometries may be simplified':l.cfg.type==='viewport'?(l.viewNote||'Current API view · not a national count'):'Features visible in this map view';
- $('#inventory-color').value=l.colorMode;$('#inventory-color').querySelector('[value=height]').disabled=!l.heightField;$('#inventory-color').querySelector('[value=source]').disabled=!l.fields?.some(f=>['bf_source','source','geom_source','SOURCE'].includes(f));
+ $('#inventory-color').value=l.colorMode;$('#inventory-change-note').hidden=l.colorMode!=='change';$('#inventory-color').querySelector('[value=change]').disabled=!l.fields?.includes('modified');$('#inventory-color').querySelector('[value=height]').disabled=!l.heightField;$('#inventory-color').querySelector('[value=source]').disabled=!l.fields?.some(f=>['bf_source','source','geom_source','SOURCE'].includes(f));
  const pool=map.getSource(l.id)?map.querySourceFeatures(l.id,tiled(l)?{sourceLayer:l.cfg.sourceLayer}:{}):[];l.sourceValues=Array.from(new Set([...(l.sourceValues||[]),...pool.slice(0,20000).map(source).filter(x=>x!=='Not provided')])).sort();
  $('#inventory-source').innerHTML='<option value="">All sources</option>'+l.sourceValues.map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join('');$('#inventory-source').value=l.sourceFilter;$('#inventory-source').disabled=!l.sourceValues.length;
  $('#inventory-area').value=l.minArea;$('#inventory-area').disabled=!l.fields?.some(f=>['area_in_meters','area_m2'].includes(f));
- $('#inventory-height-note').textContent=l.heightField?'3D uses '+l.heightField+' in metres. '+(l.cfg.driver==='nyc'?'Converted from the source’s roof height in feet. ':'')+'Missing heights stay missing.':'This source does not supply building height. 3D tilts the map; no height is invented.';
+ $('#inventory-height-note').textContent=l.heightField?'3D uses '+l.heightField+' in metres. '+(l.cfg.driver==='nyc'?'Converted from the source’s roof height in feet. ':l.cfg.driver==='usbf'?'Inherited GBA height; nDSM input coverage is separate. ':'')+'Missing heights stay missing.':'This source does not supply building height. 3D tilts the map; no height is invented.';
  if(!$('#attribute-table').hidden)render();
 }
 function schedule(){clearTimeout(timer);timer=setTimeout(refresh,150);}

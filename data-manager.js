@@ -13,6 +13,7 @@
   catalog[0].category='VIDA combined & subsets';catalog[1].category='VIDA combined & subsets';
   catalog.push(...['microsoft','osm'].map((source,i)=>({...catalog[0],id:'vida-'+source+'-usa',name:'VIDA US · '+(i?'OpenStreetMap':'Microsoft')+' subset',recommended:false,color:i?'#448a72':'#4e83b5',fixedSource:source,description:'Only '+(i?'OpenStreetMap':'Microsoft')+'-labelled features retained in VIDA’s US merged release. This is a filtered subset, not the complete independent original dataset.'})));
   catalog.push(...PortalPublicSources.catalog);
+  catalog[0].recommended=false;catalog.unshift(PortalUSBF.entry);
   let catalogQuery='';
   const isTiled=l=>['pmtiles','vector'].includes(l.cfg.type);
   let api, map, protocol, seq=0, selected=null, active=null, tab='catalog';
@@ -25,7 +26,7 @@
   function renderCatalog(){
     const matches=c=>((c.id||'')+' '+c.name+' '+c.description+' '+c.scope+' '+(c.category||'')).toLowerCase().includes(catalogQuery);
     const group=c=>c.category||(c.id==='training-heights'?'Research samples':'Reference imagery');
-    const categories=['Independent footprints','VIDA combined & subsets','Government data','Reference imagery','Research samples'],cards=[];
+    const categories=['Our USBF data','Independent footprints','VIDA combined & subsets','Government data','Reference imagery','Research samples'],cards=[];
     for(const category of categories){const entries=catalog.filter(c=>group(c)===category&&matches(c));if(!entries.length)continue;
       cards.push('<h3 class="catalog-category">'+text(category)+'</h3>');
       for(const c of entries){const added=Array.from(layers.values()).some(l=>l.cfg.id===c.id),loading=pending.has(c.id);
@@ -40,7 +41,7 @@
     if(!map)return;
     if(!layers.has(active))active=Array.from(layers.values()).find(l=>l.cfg.type!=='raster')?.id||null;
     const entries=Array.from(layers.values()).reverse();
-    $('#added-layers').innerHTML=entries.length?'<div class="added-heading">ADDED DATA <span>'+entries.length+'</span></div>'+entries.map(l=>'<article class="added-row layer-row" data-added-row="'+l.id+'"><div class="added-main"><input type="checkbox" data-added-toggle="'+l.id+'" aria-label="Show '+text(l.cfg.name)+'" '+(l.visible?'checked':'')+'><span class="catalog-swatch" style="background:'+l.color+'"></span><button class="layer-activate '+(active===l.id?'active':'')+'" data-layer-activate="'+l.id+'">'+text(l.cfg.name)+'</button><button data-added-remove="'+l.id+'" title="Remove layer" aria-label="Remove '+text(l.cfg.name)+'">×</button></div><p class="added-state '+(l.error?'error':'')+'">'+text(l.viewNote||(l.error?'Tile request failed. Check the source or retry.':l.loaded?'Connected · '+l.cfg.type.toUpperCase():'Loading map tiles…'))+'</p><div class="added-actions"><button data-added-zoom="'+l.id+'">Zoom to layer</button>'+(l.error?'<button data-added-retry="'+l.id+'">Retry</button>':'')+'<button data-added-info="'+l.id+'">Details</button></div><label class="added-opacity">Opacity<input type="range" min="0" max="100" value="'+Math.round(l.opacity*100)+'" data-added-opacity="'+l.id+'" aria-label="'+text(l.cfg.name)+' opacity"><output>'+Math.round(l.opacity*100)+'%</output></label></article>').join(''):'<div class="empty-layers"><strong>Your map starts here</strong><p>Add a catalog layer, connect a URL or open a GeoJSON file.</p><button class="text-button" data-add-data>+ Add your first layer</button></div>';
+    $('#added-layers').innerHTML=entries.length?'<div class="added-heading">ADDED DATA <span>'+entries.length+'</span></div>'+entries.map(l=>'<article class="added-row layer-row" data-added-row="'+l.id+'"><div class="added-main"><input type="checkbox" data-added-toggle="'+l.id+'" aria-label="Show '+text(l.cfg.name)+'" '+(l.visible?'checked':'')+'><span class="catalog-swatch" style="background:'+l.color+'"></span><button class="layer-activate '+(active===l.id?'active':'')+'" data-layer-activate="'+l.id+'">'+text(l.cfg.name)+'</button><button data-added-remove="'+l.id+'" title="Remove layer" aria-label="Remove '+text(l.cfg.name)+'">×</button></div><p class="added-state '+(l.error?'error':'')+'">'+text(l.viewNote||(l.error?'Tile request failed. Check the source or retry.':l.loaded?'Connected · '+l.cfg.type.toUpperCase():'Loading map tiles…'))+'</p><div class="added-actions"><button data-added-zoom="'+l.id+'">Zoom to layer</button>'+(l.error?'<button data-added-retry="'+l.id+'">Retry</button>':'')+'<button data-added-info="'+l.id+'">Details</button>'+(l.checkUpdates?'<button data-added-update="'+l.id+'" '+(l.checkingRelease?'disabled':'')+'>'+(l.checkingRelease?'Checking…':'Check updates')+'</button>':'')+'</div>'+(l.release?'<p class="added-release">'+text(l.release.name+' · '+new Date(l.release.updated).toISOString().replace('T',' ').slice(0,16)+' UTC · checks every 5 min')+'</p>':'')+(l.releaseWarning?'<p class="added-state error">'+text(l.releaseWarning)+'</p>':'')+'<label class="added-opacity">Opacity<input type="range" min="0" max="100" value="'+Math.round(l.opacity*100)+'" data-added-opacity="'+l.id+'" aria-label="'+text(l.cfg.name)+' opacity"><output>'+Math.round(l.opacity*100)+'%</output></label></article>').join(''):'<div class="empty-layers"><strong>Your map starts here</strong><p>Add a catalog layer, connect a URL or open a GeoJSON file.</p><button class="text-button" data-add-data>+ Add your first layer</button></div>';
     const demo=['footprints','original','height','lod2'].filter(k=>$('#layer-'+k).checked).length;
     $('#layer-count').textContent=layers.size+demo;
     $('#data-workspace-label').textContent=layers.size?layers.size+' added '+(layers.size===1?'layer':'layers'):(demo?'Synthetic demo layers':'No data layers added');
@@ -109,16 +110,17 @@
       }
       if(cfg.type!=='raster'){l.heightField=l.heightField||['height_m','height','render_height'].find(f=>l.fields.includes(f))||null;if(l.heightField){insert({type:'fill-extrusion',filter:['all',['==',['geometry-type'],'Polygon'],['>', ['coalesce',['to-number',['get',l.heightField]],0],0]],paint:{'fill-extrusion-color':l.color,'fill-extrusion-height':['coalesce',['to-number',['get',l.heightField]],0],'fill-extrusion-opacity':l.opacity}});}applyStyle(l);}
       if(!options.restore){api.clearSelection();selected=null;['footprints','original','height','lod2'].forEach(k=>{const c=$('#layer-'+k);if(c.checked){c.checked=false;c.dispatchEvent(new Event('change'));}});$('#welcome-card').hidden=true;$('#tab-layers').click();if(cfg.type==='geojson')zoom(l);}
-      if(cfg.type==='viewport'){PortalPublicSources.attach(l,map,refresh);if(!options.restore&&cfg.start)map.jumpTo({center:cfg.start.slice(0,2),zoom:cfg.start[2],pitch:0});}
+      if(cfg.type==='viewport'){l.onDataChanged=()=>{if(selected?.layer!==l.id)return;const fresh=l.featureById?.get(String(selected.feature.properties?.usbf_id));if(fresh)inspect(l,fresh);else{clearExternalSelection();api.clearSelection();}};PortalPublicSources.attach(l,map,refresh);if(!options.restore&&cfg.start)map.jumpTo({center:cfg.start.slice(0,2),zoom:cfg.start[2],pitch:0});}
       refresh();api.saveView();$('#status-message').textContent='Added '+cfg.name;message('Added '+cfg.name+'.');if(!options.restore)$('#data-dialog').close();
     }catch(e){if(l){l.stop?.();l.renderIds.forEach(id=>{if(map.getLayer(id))map.removeLayer(id);});if(map.getSource(l.id))map.removeSource(l.id);layers.delete(l.id);}message(e.message||'Unable to add this source. Check its URL and browser access.',true);}
     finally{pending.delete(key);renderCatalog();}
   }
   function zoom(l){if(l.bounds)map.fitBounds(l.bounds,{padding:55,maxZoom:17,duration:0});else message('This source does not provide an extent.');}
   function remove(id){const l=layers.get(id);if(!l)return;l.stop?.();if(selected&&selected.layer===id){selected=null;api.clearSelection();}l.renderIds.forEach(k=>map.removeLayer(k));map.removeSource(id);layers.delete(id);refresh();api.saveView();}
-  function opacity(l,v){l.opacity=v;l.renderIds.forEach(id=>{const type=map.getLayer(id).type;map.setPaintProperty(id,type+'-opacity',v);});api.saveView();}
+  function opacity(l,v){l.opacity=v;l.renderIds.forEach(id=>{const type=map.getLayer(id).type;map.setPaintProperty(id,type+'-opacity',v);});l.syncCoverageStyle?.();api.saveView();}
   function clearExternalSelection(){selected=null;if(map?.getSource('inventory-selection'))map.getSource('inventory-selection').setData({type:'FeatureCollection',features:[]});document.dispatchEvent(new CustomEvent('portal-selection-changed'));}
   function inspect(l,f){
+    f=l.featureById?.get(String(f.properties?.usbf_id))||f;
     api.clearSelection();active=l.id;selected={layer:l.id,feature:f};if(map.getSource('inventory-selection'))map.getSource('inventory-selection').setData({type:'FeatureCollection',features:[{type:'Feature',properties:{},geometry:f.geometry}]});$('#properties').hidden=false;$('#welcome-card').hidden=true;
     const props=f.properties||{};$('#properties-content').innerHTML='<span class="eyebrow">'+text(isTiled(l)?'TILED FEATURE':'ADDED DATA')+'</span><h2 class="feature-id">'+text(l.cfg.name)+'</h2><div class="feature-values real-values"><div><span>HEIGHT</span><strong>'+((l.heightField&&Number.isFinite(Number(props[l.heightField]))&&props[l.heightField]!==null)?text(props[l.heightField])+' <small>m</small>':'—')+'</strong></div><div><span>PROVIDER</span><strong>'+text(props.bf_source||props.source||l.cfg.provider||'Source data')+'</strong></div></div><dl class="feature-properties">'+Object.entries(props).slice(0,80).map(([k,v])=>'<div><dt>'+text(k)+'</dt><dd>'+text(v===null?'Not provided':typeof v==='object'?JSON.stringify(v):v)+'</dd></div>').join('')+'</dl><button class="feature-action" data-feature-zoom>Zoom to feature</button>'+(props.model_id?'<button class="feature-action" data-model-id="'+text(props.model_id)+'">Open this 3D sample</button>':'')+'<p class="feature-notice">'+(isTiled(l)?'Tile geometry may be simplified or clipped. Use the source dataset for complete building geometries.':text(l.cfg.sourceNote||'Attributes are shown as supplied by this data source.'))+'</p>'+(l.cfg.type==='geojson'?'<button class="feature-action" data-added-export="'+l.id+'">Export this GeoJSON layer</button>':'')+(l.cfg.page?'<a class="source-detail-link" target="_blank" rel="noopener" href="'+text(l.cfg.page)+'">Source data &amp; license ↗</a>':'');
     $('#status-message').textContent='Feature selected · '+l.cfg.name;setTimeout(()=>map.resize(),10);document.dispatchEvent(new CustomEvent('portal-selection-changed'));
@@ -130,9 +132,11 @@
   function writeShare(q){const styles=Array.from(layers.values()).filter(l=>catalog.some(c=>c.id===l.cfg.id)).map(l=>[l.cfg.id,l.colorMode,l.sourceFilter,l.minArea]);if(styles.some(x=>x[1]!=='uniform'||x[2]||x[3]))q.set('styles',JSON.stringify(styles));const entries=Array.from(layers.values()).filter(l=>catalog.some(c=>c.id===l.cfg.id)).map(l=>[l.cfg.id,l.opacity.toFixed(2),l.visible?1:0].join(':'));if(entries.length)q.set('data',entries.join(','));}
   function applyStyle(l){
     if(!map||l.cfg.type==='raster')return;
+    l.syncCoverageStyle?.();
     const sourceField=['bf_source','source','geom_source','SOURCE'].find(f=>l.fields?.includes(f));
     let color=l.color;
     if(l.colorMode==='source'&&sourceField)color=['match',['downcase',['to-string',['get',sourceField]]],['google'],'#ca9950',['microsoft','ms','msft'],'#4e83b5',['osm','openstreetmap'],'#448a72',['photogrammetric'],'#8175ad',['other (manual)'],'#bb9465',['ours2'],'#aa7548','#929a98'];
+    if(l.colorMode==='change'&&l.fields?.includes('modified'))color=['case',['==',['get','modified'],true],'#c38c42',['==',['get','modified'],false],'#287f76','#a9b0aa'];
     if(l.colorMode==='height'&&l.heightField)color=['case',['>', ['coalesce',['to-number',['get',l.heightField]],0],0],['interpolate',['linear'],['to-number',['get',l.heightField]],0,'#d5e5ca',15,'#6ba98d',40,'#287c80',100,'#56519b'],'#abb2b0'];
     for(const id of l.renderIds){const type=map.getLayer(id).type;const extrusion=type==='fill-extrusion';map.setLayoutProperty(id,'visibility',l.visible&&(!extrusion||api.view3d)?'visible':'none');
       if(type!=='raster')map.setPaintProperty(id,type+'-color',color);
@@ -143,15 +147,15 @@
   function set3D(){layers.forEach(applyStyle);}
   function details(l){if(['viewport','vector'].includes(l.cfg.type)){open();message(l.cfg.name+' · '+l.cfg.license+'. '+(l.cfg.sourceNote||l.cfg.description));return;}open('url');$('#data-type').value=l.cfg.type;$('#data-name').value=l.cfg.name;$('#data-url').value=l.cfg.url||'';$('#data-source-layer').value=l.cfg.sourceLayer||'';$('#data-type').dispatchEvent(new Event('change'));message(l.cfg.attribution||'Local file — reopen after refresh.');}
   document.addEventListener('click',e=>{
-    const b=e.target.closest('[data-add-data],[data-source-tab],[data-catalog-add],[data-added-remove],[data-added-zoom],[data-added-retry],[data-added-info],[data-added-export],[data-layer-activate],[data-feature-zoom]');if(!b)return;
+    const b=e.target.closest('[data-add-data],[data-source-tab],[data-catalog-add],[data-added-remove],[data-added-zoom],[data-added-retry],[data-added-info],[data-added-update],[data-added-export],[data-layer-activate],[data-feature-zoom]');if(!b)return;
     if(b.hasAttribute('data-add-data'))open();
     if(b.dataset.sourceTab)sourceTab(b.dataset.sourceTab);
     if(b.dataset.catalogAdd){const c=catalog.find(c=>c.id===b.dataset.catalogAdd);open();if(c)add(c);}
     if(b.hasAttribute('data-feature-zoom')&&selected){const pts=[];const walk=c=>{if(Array.isArray(c)&&typeof c[0]==='number')pts.push(c);else if(Array.isArray(c))c.forEach(walk);};walk(selected.feature.geometry?.coordinates);if(pts.length)map.fitBounds([[Math.min(...pts.map(p=>p[0])),Math.min(...pts.map(p=>p[1]))],[Math.max(...pts.map(p=>p[0])),Math.max(...pts.map(p=>p[1]))]],{padding:70,maxZoom:19,duration:0});return;}
     if(b.dataset.layerActivate){active=b.dataset.layerActivate;refresh();return;}
     if(b.dataset.addedRemove)remove(b.dataset.addedRemove);
-    const l=layers.get(b.dataset.addedZoom||b.dataset.addedRetry||b.dataset.addedInfo||b.dataset.addedExport);if(!l)return;
-    if(b.dataset.addedZoom)zoom(l);if(b.dataset.addedInfo)details(l);if(b.dataset.addedExport)exportLayer(l);
+    const l=layers.get(b.dataset.addedZoom||b.dataset.addedRetry||b.dataset.addedInfo||b.dataset.addedUpdate||b.dataset.addedExport);if(!l)return;
+    if(b.dataset.addedUpdate)l.checkUpdates?.();if(b.dataset.addedZoom)zoom(l);if(b.dataset.addedInfo)details(l);if(b.dataset.addedExport)exportLayer(l);
     if(b.dataset.addedRetry){const cfg=l.cfg;remove(l.id);open();add(cfg);}
   });
   document.addEventListener('change',e=>{const id=e.target.dataset.addedToggle,l=layers.get(id);if(l){l.visible=e.target.checked;applyStyle(l);l.reload?.();refresh();api.saveView();}});
@@ -169,7 +173,7 @@
     map.addSource('inventory-selection',{type:'geojson',data:{type:'FeatureCollection',features:[]}});map.addLayer({id:'inventory-selection-outline',type:'line',source:'inventory-selection',paint:{'line-color':'#14b8a6','line-width':3}});
     renderCatalog();refresh();const q=new URLSearchParams((hash||'').slice(1));
     let savedStyles=[];try{savedStyles=JSON.parse(q.get('styles')||'[]');if(!Array.isArray(savedStyles))savedStyles=[];}catch(e){}
-    for(const saved of (q.get('data')||'').split(',').slice(0,20)){const [id,op,on]=saved.split(':'),c=catalog.find(c=>c.id===id);if(c){const n=Number(op);const st=savedStyles.find(x=>x[0]===id)||[];await add(c,{restore:true,colorMode:['uniform','source','height'].includes(st[1])?st[1]:'uniform',sourceFilter:typeof st[2]==='string'?st[2]:'',minArea:Number.isFinite(st[3])?Math.max(0,st[3]):0,opacity:Number.isFinite(n)?Math.max(0,Math.min(1,n)):.75,visible:on!=='0'});$('#welcome-card').hidden=true;}}
+    for(const saved of (q.get('data')||'').split(',').slice(0,20)){const [id,op,on]=saved.split(':'),c=catalog.find(c=>c.id===id);if(c){const n=Number(op);const st=savedStyles.find(x=>x[0]===id)||[];await add(c,{restore:true,colorMode:['uniform','source','height','change'].includes(st[1])?st[1]:'uniform',sourceFilter:typeof st[2]==='string'?st[2]:'',minArea:Number.isFinite(st[3])?Math.max(0,st[3]):0,opacity:Number.isFinite(n)?Math.max(0,Math.min(1,n)):.75,visible:on!=='0'});$('#welcome-card').hidden=true;}}
   }
   window.PortalLayers={init,open,refresh,fullExtent,identify,setStyle,set3D,inspect,get active(){return layers.get(active);},get selection(){return selected;},selectLayer(id){active=id;refresh();},writeShare,handleExport,clearExternalSelection,catalog,get layers(){return layers;},add};
 })();
