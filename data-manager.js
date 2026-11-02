@@ -108,7 +108,7 @@
       if(startGeneration!==generation)throw Error('The map changed before this layer finished opening.');
       map.addSource(id,source);layers.set(id,l);active=id;
       const before=isRaster(l)?(map.getStyle().layers.find(x=>!x.id.startsWith('base-')&&x.id!=='background')||{}).id:'measure-line';
-      function insert(spec){map.addLayer({...spec,id:id+'-'+spec.type,source:id,layout:{visibility:l.visible?'visible':'none'},...(isTiled(l)?{'source-layer':l.cfg.sourceLayer}:{})},before);l.renderIds.push(id+'-'+spec.type);if(spec.filter)l.filters[id+'-'+spec.type]=spec.filter;}
+      function insert(spec){map.addLayer({...spec,id:id+'-'+spec.type,source:id,...(l.cfg.driver==='usbf'&&l.cfg.type==='viewport'?{minzoom:14}:{}),layout:{visibility:l.visible?'visible':'none'},...(isTiled(l)?{'source-layer':l.cfg.sourceLayer}:{})},before);l.renderIds.push(id+'-'+spec.type);if(spec.filter)l.filters[id+'-'+spec.type]=spec.filter;}
       if(isRaster(l))insert({type:'raster',paint:{'raster-opacity':l.opacity}});
       else{
         insert({type:'fill',filter:['==',['geometry-type'],'Polygon'],paint:{'fill-color':l.color,'fill-opacity':l.opacity}});

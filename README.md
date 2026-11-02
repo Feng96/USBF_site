@@ -1,5 +1,23 @@
 # US Buildings
 
+## Navigation cache repair (2026-11-02)
+
+The GeoParquet viewer retains four decoded neighborhoods within a 24 MiB
+estimated serialized-payload cache budget,
+in addition to the currently displayed records. A covered camera change reuses
+the same MapLibre source without clearing it or calling `setData`; an uncached
+view loads in the background. A bounded margin covers nearby pans. Limited
+results are reusable only for their exact requested view. Changed published
+source bytes invalidate the cache. Original nulls, polygons and licenses remain.
+Below zoom 14, MapLibre hides these retained building layers without clearing.
+
+This repairs repeated navigation in the currently published original-data
+viewer. First-time GeoParquet decoding still takes time. The accepted national
+PMTiles display and the separate on-demand analysis candidate require their own
+verified publication before that faster display path can replace this viewer.
+If prefetching reaches the byte or record limit, the reader retries the exact
+requested view once. This does not raise either original-data limit.
+
 [Open the workspace](https://feng96.github.io/USBF_site/).
 
 A map for the published USBF U.S. building inventory, comparison datasets and
