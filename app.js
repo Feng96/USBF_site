@@ -44,20 +44,20 @@
       content='<p>The optional synthetic demo layer contains generated footprints, heights and edit flags for testing the interface.</p><p>The USBF and public catalog layers contain source-attributed published data. LoD2 samples remain experimental.</p><p>合成演示层用于测试界面；USBF 图层直接读取已发布的数据。</p>';
     } else if(kind==='bookmarks') {
       title='Places to start';
-      content='<p>Return to the demo area, or explore the reference basemap.</p><button class="dialog-option" data-bookmark="demo">'+icon('layers')+'<span><strong>Georgetown · Demo workspace</strong><small>Washington, DC · synthetic building features</small></span>'+icon('arrow-right')+'</button><button class="dialog-option" data-bookmark="conus">'+icon('map')+'<span><strong>Continental United States</strong><small>Explore the US map and added layers</small></span>'+icon('arrow-right')+'</button>';
+      content='<p>Return to the demo area, or explore the reference basemap.</p><button class="dialog-option" data-bookmark="demo">'+icon('layers')+'<span><strong>Georgetown · Demo workspace</strong><small>Washington, DC · synthetic building features</small></span>'+icon('arrow-right')+'</button><button class="dialog-option" data-bookmark="conus">'+icon('map')+'<span><strong>Continental United States</strong><small data-i18n>Explore the US map and added layers</small></span>'+icon('arrow-right')+'</button>';
     } else if(kind==='basemap') {
       title='Background map';
       content='<p>Reference maps give context to the layers you explore.</p>'+Object.keys(basemaps).map(function(k){return '<button class="dialog-option '+(k===activeBasemap?'selected':'')+'" data-basemap="'+k+'">'+icon('map')+'<span><strong>'+basemaps[k].name+'</strong><small>'+basemaps[k].description+'</small></span>'+(k===activeBasemap?'<span class="pill">Active</span>':icon('arrow-right'))+'</button>';}).join('');
     } else if(kind==='lod2') {if(window.PortalModels){PortalModels.open();return;}
-      title='3D models';content='<p>The model list is loading. Try again in a moment.</p>';
+      title='3D models';content='<p data-i18n>The model list is loading. Try again in a moment.</p>';
     } else if(kind==='connections') {
-      title='Add data';content='<p>Choose a dataset, open a local file or paste a link to data.</p>';
+      title='Add data';content='<p data-i18n>Choose a dataset, open a local file or paste a link to data.</p>';
     } else if(kind==='help') {
       title='Help';
-      content='<p>Add data from the catalog, a public URL or a local file.</p><dl class="help-grid"><dt>Layers</dt><dd>Choose a dataset; open its settings for opacity, source details and updates. Change colors or filter the buildings you want to see.</dd><dt>Tools</dt><dd>Open the attribute table, measure, draw an analysis boundary, calculate statistics, make charts or run spatial analysis.</dd><dt>Analysis data</dt><dd>Choose an area and a dataset, then view statistics or analyze it. Results describe that area. Use original data when a map layer only contains display tiles.</dd><dt>3D models</dt><dd>Browse experimental US roofs and training references, or place your own OBJ / GLB using explicit units and a geographic anchor.</dd><dt>CRS</dt><dd>Settings changes coordinate readouts and actual import / export conversions. The map renders in Web Mercator.</dd><dt>Create map</dt><dd>Save a PNG or PDF with title, legend, scale, north arrow and sources. PDF uses a readable paper layout.</dd><dt>Download</dt><dd>Export full loaded vector geometry, the buildings in your chosen area or the original raster. Use Save or open a map to keep local files, drawings and models for another day.</dd></dl>';
+      content='<p data-i18n>Add data from the catalog, a public URL or a local file.</p><dl class="help-grid"><dt data-i18n>Layers</dt><dd>Choose a dataset; open its settings for opacity, source details and updates. Change colors or filter the buildings you want to see.</dd><dt data-i18n>Tools</dt><dd data-i18n>Open the attribute table, measure, draw an analysis boundary, calculate statistics, make charts or run spatial analysis.</dd><dt data-i18n>Analysis data</dt><dd data-i18n>Choose an area and a dataset, then view statistics or analyze it. Results describe that area. Use original data when a map layer only contains display tiles.</dd><dt data-i18n>3D models</dt><dd>Browse experimental US roofs and training references, or place your own OBJ / GLB using explicit units and a geographic anchor.</dd><dt>CRS</dt><dd data-i18n>Settings changes coordinate readouts and actual import / export conversions. The map renders in Web Mercator.</dd><dt data-i18n>Create map</dt><dd data-i18n>Save a PNG or PDF with title, legend, scale, north arrow and sources. PDF uses a readable paper layout.</dd><dt data-i18n>Download</dt><dd data-i18n>Export full loaded vector geometry, the buildings in your chosen area or the original raster. Use Save or open a map to keep local files, drawings and models for another day.</dd></dl>';
     } else {
       title='About USBF';
-      content='<p>An open GIS workspace for <strong>building footprints, heights and roof models</strong>.</p><p>USBF reads our current Source Cooperative publication and checks for updates automatically. Inspect published footprints, inherited GBA heights and recorded edit attributes, or compare other datasets. Models contains experimental US roofs and actual 3DBAG training references.</p><p>Created for Yinan Feng.</p><a class="primary-button" href="https://feng96.github.io/research-daily/" target="_blank" rel="noopener">Research updates '+icon('external')+'</a>';
+      content='<p data-i18n>An open GIS workspace for <strong data-i18n>building footprints, heights and roof models</strong>.</p><p>USBF reads our current Source Cooperative publication and checks for updates automatically. Inspect published footprints, inherited GBA heights and recorded edit attributes, or compare other datasets. Models contains experimental US roofs and actual 3DBAG training references.</p><p>Created for Yinan Feng.</p><a class="primary-button" href="https://feng96.github.io/research-daily/" target="_blank" rel="noopener">Research updates '+icon('external')+'</a>';
     }
     $('#dialog-title').textContent=title;$('#dialog-eyebrow').textContent=eyebrow;$('#dialog-content').innerHTML=content;
     if(!$('#workspace-dialog').open)$('#workspace-dialog').showModal();
@@ -98,7 +98,7 @@
     $('#opacity-value').textContent=$('#opacity').value+'%';
     $('.height-ramp').hidden=!$('#layer-height').checked;
     var legend=$('.legend-body');
-    legend.innerHTML=$('#layer-height').checked?'<div><i class="legend-swatch" style="background:#c5b68c"></i>6–16 m</div><div><i class="legend-swatch" style="background:#ad90a4"></i>17–27 m</div><div><i class="legend-swatch" style="background:#796486"></i>28–38 m</div><p>Illustrative heights · not measurements</p>':'<div><i class="legend-swatch unchanged"></i>Illustrative unchanged</div><div><i class="legend-swatch modified"></i>Illustrative modified</div><p>Synthetic shapes · not real buildings</p>';
+    legend.innerHTML=$('#layer-height').checked?'<div><i class="legend-swatch" style="background:#c5b68c"></i>6–16 m</div><div><i class="legend-swatch" style="background:#ad90a4"></i>17–27 m</div><div><i class="legend-swatch" style="background:#796486"></i>28–38 m</div><p>Illustrative heights · not measurements</p>':'<div><i class="legend-swatch unchanged"></i><span data-i18n>Illustrative unchanged</span></div><div><i class="legend-swatch modified"></i><span data-i18n>Illustrative modified</span></div><p data-i18n>Synthetic shapes · not real buildings</p>';
     $$('.layer-row').forEach(function(row){var input=row.querySelector('input[type=checkbox]');row.classList.toggle('is-current',input.checked);});
     $('#legend-card').hidden=!visible;
     if(window.PortalLayers)PortalLayers.refresh();
@@ -124,7 +124,7 @@
     if(window.PortalLayers)PortalLayers.clearExternalSelection();
     var previous=selected;selected=id;$('#welcome-card').hidden=true;$('#properties').hidden=false;
     var p=feature.properties;
-    $('#properties-content').innerHTML='<span class="eyebrow">SYNTHETIC FEATURE</span><h2 class="feature-id">'+escapeHTML(id)+'</h2><span class="pill '+(p.demo_modified?'amber':'')+'">Illustrative '+(p.demo_modified?'modified':'unchanged')+'</span><div class="feature-preview" aria-hidden="true"><svg viewBox="0 0 100 75"><path d="M17 65 13 20 72 9 82 51 61 55 62 63Z"/></svg></div><div class="feature-values"><div><span>DEMO HEIGHT</span><strong>'+p.demo_height_m+' <small>m</small></strong></div><div><span>DEMO AREA</span><strong>'+p.demo_area_m2+' <small>m²</small></strong></div></div><dl class="feature-properties"><div><dt>Building ID</dt><dd>'+escapeHTML(id)+'</dd></div><div><dt>Source</dt><dd>Generated example</dd></div><div><dt>Data status</dt><dd>Synthetic demo</dd></div><div><dt>Version</dt><dd>Prototype 0.1</dd></div><div><dt>Geometry</dt><dd>Polygon</dd></div><div><dt>Coordinates</dt><dd>EPSG:4326</dd></div></dl><p class="feature-notice">This shape and its attributes are generated examples. They do not represent this location’s real building, height or quality.</p><button class="feature-action" data-action="export">'+icon('download')+' Export this demo feature</button>';
+    $('#properties-content').innerHTML='<span class="eyebrow">SYNTHETIC FEATURE</span><h2 class="feature-id">'+escapeHTML(id)+'</h2><span class="pill '+(p.demo_modified?'amber':'')+'">Illustrative '+(p.demo_modified?'modified':'unchanged')+'</span><div class="feature-preview" aria-hidden="true"><svg viewBox="0 0 100 75"><path d="M17 65 13 20 72 9 82 51 61 55 62 63Z"/></svg></div><div class="feature-values"><div><span>DEMO HEIGHT</span><strong>'+p.demo_height_m+' <small>m</small></strong></div><div><span>DEMO AREA</span><strong>'+p.demo_area_m2+' <small>m²</small></strong></div></div><dl class="feature-properties"><div><dt data-i18n>Building ID</dt><dd>'+escapeHTML(id)+'</dd></div><div><dt data-i18n>Source</dt><dd>Generated example</dd></div><div><dt data-i18n>Data status</dt><dd>Synthetic demo</dd></div><div><dt>Version</dt><dd>Prototype 0.1</dd></div><div><dt data-i18n>Geometry</dt><dd>Polygon</dd></div><div><dt data-i18n>Coordinates</dt><dd>EPSG:4326</dd></div></dl><p class="feature-notice">This shape and its attributes are generated examples. They do not represent this location’s real building, height or quality.</p><button class="feature-action" data-action="export">'+icon('download')+' Export this demo feature</button>';
     refreshSelection(previous);
     if(window.innerWidth<=700){$('#sidebar').classList.remove('is-open');$('[data-action=layers]').setAttribute('aria-expanded','false');}
     setTimeout(function(){map.resize();if(pan){var bounds=featureBounds(feature);map.easeTo({center:[(bounds[0][0]+bounds[1][0])/2,(bounds[0][1]+bounds[1][1])/2],duration:reducedMotion?0:300});}},30);
@@ -134,7 +134,7 @@
   function renderTable() {
     if(window.PortalLayers?.layers.size&&window.PortalInventory){PortalInventory.refresh();return;}
     if(!collection)return;
-    $('#attribute-head').innerHTML='<tr><th>Building ID</th><th>Revision</th><th>Demo height (m)</th><th>Demo area (m²)</th><th>Data status</th></tr>';$('#table-layer-name').textContent='Synthetic demo';$('#table-kind').textContent='DEMO';
+    $('#attribute-head').innerHTML='<tr><th data-i18n>Building ID</th><th>Revision</th><th>Demo height (m)</th><th>Demo area (m²)</th><th data-i18n>Data status</th></tr>';$('#table-layer-name').textContent='Synthetic demo';$('#table-kind').textContent='DEMO';
     var filtered=$('#selected-only').checked?collection.features.filter(function(f){return f.id===selected;}):collection.features;
     $('#table-count').textContent=filtered.length+' records';
     $('#attribute-rows').innerHTML=filtered.length?filtered.map(function(f){var p=f.properties;return '<tr tabindex="0" data-feature="'+f.id+'" class="'+(f.id===selected?'selected':'')+'" aria-selected="'+(f.id===selected)+'"><td>'+f.id+'</td><td>Illustrative '+(p.demo_modified?'modified':'unchanged')+'</td><td>'+p.demo_height_m+'</td><td>'+p.demo_area_m2+'</td><td>Synthetic demo</td></tr>';}).join(''):'<tr><td colspan="5">No selected feature. Click a demo footprint or turn off “Selected only”.</td></tr>';
@@ -203,7 +203,7 @@
   }
   async function action(name) {
     if(name==='close-dialog'){$('#workspace-dialog').close();return;}
-    if(name==='layers'){var open;if(innerWidth>700){open=!document.body.classList.toggle('sidebar-collapsed');}else{open=$('#sidebar').classList.toggle('is-open');}$('[data-action=layers]').setAttribute('aria-expanded',String(open));if(map)setTimeout(function(){map.resize();},0);return;}
+    if(name==='layers'){PortalSidebar.toggle('layers');return;}
     if(name==='table'){if(window.PortalLayers?.layers.size&&window.PortalInventory)PortalInventory.toggleTable();else toggleTable();return;}
     if(name==='close-welcome'){$('#welcome-card').hidden=true;return;}
     if(name==='export'){if(window.PortalComposer)PortalComposer.open('download');else exportData();return;}
@@ -223,12 +223,13 @@
     if(name==='share') {
       saveView();
       try{await navigator.clipboard.writeText(location.href);toast('Map link copied. Use a saved map file to include local data and models.');}
-      catch(e){$('#dialog-title').textContent='Share this view';$('#dialog-eyebrow').textContent='MAP LINK';$('#dialog-content').innerHTML='<p>Copy this link to reopen the map view and catalog layers. Use Tools → Save or open a map to include local files, drawings and models in a portable map file.</p><input id="share-url" readonly aria-label="Map sharing URL" style="width:100%;padding:10px;border:1px solid #dfe5d5;border-radius:5px">';$('#share-url').value=location.href;$('#workspace-dialog').showModal();$('#share-url').select();}
+      catch(e){$('#dialog-title').textContent='Share this view';$('#dialog-eyebrow').textContent='MAP LINK';$('#dialog-content').innerHTML='<p data-i18n>Copy this link to reopen the map view and catalog layers. Use Tools → Save or open a map to include local files, drawings and models in a portable map file.</p><input id="share-url" readonly aria-label="Map sharing URL" style="width:100%;padding:10px;border:1px solid #dfe5d5;border-radius:5px" data-i18n-aria-label>';$('#share-url').value=location.href;$('#workspace-dialog').showModal();$('#share-url').select();}
     }
   }
   document.addEventListener('click',function(e) {
-    var el=e.target.closest('[data-action],[data-modal],[data-tool],[data-layer-info],[data-tab],[data-basemap],[data-bookmark],[data-feature],[data-search-result]');
+    var el=e.target.closest('[data-action],[data-modal],[data-tool],[data-layer-info],[data-tab],[data-basemap],[data-bookmark],[data-feature],[data-search-result],[data-open-models]');
     if(!el)return;
+    if(el.hasAttribute('data-open-models'))PortalSidebar.toggle('models');
     if(el.dataset.action)action(el.dataset.action);
     if(el.dataset.modal)modal(el.dataset.modal);
     if(el.dataset.tool)setTool(el.dataset.tool);

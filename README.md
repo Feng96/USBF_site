@@ -310,3 +310,35 @@ and [QGIS interface / print layout documentation](https://docs.qgis.org/3.40/en/
 The application remains centered on the published U.S. building data rather than
 exposing every GIS operation on the starting map. Internal processing parameters
 stay in source metadata and developer documentation.
+
+### Interface languages and panel controls
+
+The header language selector supports English (default) and Chinese (`zh-CN`).
+The preference is browser-local and changing it does not reload the map or its
+data. English remains the source language in HTML and JavaScript. Chinese copy
+lives in `i18n-zh.js`; `i18n.js` binds only explicitly marked interface text,
+accessibility labels, placeholders and system messages. Unknown copy falls back
+to English. Dataset names, attributes, field keys, place names, model methods,
+technical format/CRS names and exported source data stay as supplied.
+
+Use `data-i18n` for direct, source-owned UI text, `data-i18n-system` for dynamic
+system messages, and `data-i18n-title`, `data-i18n-aria-label` or
+`data-i18n-placeholder` for interface attributes. Use `data-i18n-ignore` for raw
+data subtrees. Never mark a container whose direct text comes from a dataset.
+For a programmatically created button, set its binding attribute explicitly.
+`tools/i18n-markup.py` can annotate static copy already present in the dictionary;
+review its diff. It skips data cells and never processes `data/`, `vendor/`, or
+export engines. Interpolated message values remain opaque. Additional locales
+can register a dictionary and extend `PortalI18n.supported`'s source list and
+the header options. The `portal-language-changed` event is available for UI
+modules that need to react to a locale change.
+
+`PortalSidebar` owns Layers/Models visibility and toolbar accessibility state.
+Each toolbar button toggles its panel; switching panels keeps the sidebar open.
+Opening the Models panel does not fetch a sample, move the camera, or reset the
+selected model. Explicit research-sample links still load and locate the model.
+
+Validation: `node tools/i18n-qa.cjs` plus the browser workflow
+`tools/i18n-workflow-checks.cjs` through `tools/overnight-browser.cjs`.
+Set `PORTAL_I18N_LIVE_URL` to run the same acceptance against a deployed site
+without intercepting public network responses.
