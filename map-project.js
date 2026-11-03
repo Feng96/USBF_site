@@ -22,7 +22,7 @@
     for(let i=0;i<rows.length;i++){
       const l=rows[i],cfg=l.cfg,key='layer-'+(i+1),entry={key,name:cfg.name.slice(0,120),style:layerStyle(l)};layerKeys.set(l.id,key);if(PortalLayers.active?.id===l.id)p.active=key;
       const c=PortalLayers.catalog.find(c=>c.id===cfg.id&&c.type===cfg.type);
-      if(c){Object.assign(entry,{kind:'catalog',catalogId:c.id});if(l.release)entry.sourcePublication=pick(l.release,['name','updated','buildings','tiles']);}
+      if(c){Object.assign(entry,{kind:'catalog',catalogId:c.id});const release=l.renderTiled?l.displayRelease:l.release;if(release)entry.sourcePublication=pick(release,['name','updated','buildings','tiles']);if(l.renderTiled&&l.usbfConnection?.display)entry.displayArchive=pick(l.usbfConnection.display,['url','sha256','source_layer','minzoom','maxzoom']);}
       else if(cfg.type==='geojson')Object.assign(entry,{kind:'vector',data:clone(l.data),meta:pick(cfg,metadataKeys),asset:asset(cfg.originalFile)});
       else if(l.rasterResource){const options=pick(l.rasterResource.options,importKeys);if(options.type==='geotiff'&&options.viewOnly&&cfg.raster?.geographicExtent)options.readExtentWGS84=clone(cfg.raster.geographicExtent);Object.assign(entry,{kind:'raster',import:options,meta:pick(cfg,metadataKeys),asset:asset(cfg.originalFile||l.rasterResource.options.file)});}
       else if(cfg.type==='image'){
@@ -69,7 +69,7 @@
   }
   async function restore(prepared){
     const {project:p,files}=prepared,oldRows=Array.from(PortalLayers.layers.values()),oldIDs=new Set(oldRows.map(l=>l.id)),previous={view:state(),active:PortalLayers.active?.id,place:$('#map-place-name').textContent,name:$('#workspace-document').textContent,research:currentResearch()},added=new Map(),token=++serial;
-    document.querySelectorAll('dialog[open]').forEach(d=>{if(d.id!=='map-project-dialog')d.close();});portal.cancelPlaceSearch?.();root.PortalLoD1?.cancel?.({clear:true});root.PortalLocalModels?.cancelPending?.();root.PortalImport?.cancelPending?.();root.PortalLayers.invalidatePending?.();await root.PortalAnalysis?.cancel({clear:true});root.PortalDraw?.cancel();root.PortalExplorer?.clearLocation();portal.clearSelection();PortalLayers.clearExternalSelection();root.PortalModels?.hide();
+    document.querySelectorAll('dialog[open]').forEach(d=>{if(d.id!=='map-project-dialog')d.close();});portal.cancelPlaceSearch?.();root.PortalLoD1?.cancel?.({clear:true});root.PortalLocalModels?.cancelPending?.();root.PortalImport?.cancelPending?.();root.PortalLayers.invalidatePending?.();for(const l of oldRows)l.cancelAnalysis?.();await root.PortalAnalysis?.cancel({clear:true});root.PortalDraw?.cancel();root.PortalExplorer?.clearLocation();portal.clearSelection();PortalLayers.clearExternalSelection();root.PortalModels?.hide();
     try{
       setView(p.view);
       for(const e of p.layers){setMessage('Opening '+e.name+'…');let l;try{l=await addEntry(e,files,token);}catch(error){error.restoreImportType=e.kind==='raster'?e.import.type:null;error.restoreLayer=e.name;throw error;}added.set(e.key,l);root.PortalDraw?.restoreLayerLabels?.(l);}

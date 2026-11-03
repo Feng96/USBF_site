@@ -11,6 +11,11 @@ import re
 ROOT = Path(__file__).resolve().parent.parent
 COPY = (ROOT / 'i18n-zh.js').read_text().split('Object.fromEntries(`', 1)[1].split('`.trim()', 1)[0]
 KEYS = {row.split('|', 1)[0] for row in COPY.strip().splitlines()}
+for locale_file in ['i18n-projects-zh.js', 'i18n-usbf-zh.js']:
+    if (ROOT / locale_file).exists():
+        copy = (ROOT / locale_file).read_text().split('Object.fromEntries(`', 1)[1].split('`.trim()', 1)[0]
+        KEYS.update(row.split('|', 1)[0] for row in copy.strip().splitlines())
+OPAQUE_IDS = {'table-layer-name', 'workspace-document', 'model-collection-note', 'model-map-name', 'model-map-kind', 'study-area-name'}
 FILES = ['index.html', 'app.js', 'workspace-tools.js', 'workspace-crs.js',
          'model-browser.js', 'local-models.js', 'data-manager.js', 'data-import.js',
          'inventory.js', 'buildings-explorer.js', 'analysis-ui.js',
@@ -50,6 +55,9 @@ def annotate_text(source):
         if html.unescape(content).strip() not in KEYS:
             return match[0]
         if tag:
+            identifier = re.search(r'\bid="([\w-]+)"', attrs)
+            if identifier and identifier[1] in OPAQUE_IDS:
+                return match[0]
             if tag.lower() in ['script', 'style', 'svg', 'text', 'title', 'code', 'pre', 'td', 'dd']:
                 return match[0]
             if 'data-i18n' not in attrs:
