@@ -29,4 +29,19 @@ Original records|原始记录
 Display preview|显示预览
 No original data loaded yet.|尚未加载原始数据。
 Load an area to see original records.|加载区域以查看原始记录。
+Buildings appear as pages load. Coverage is incomplete until loading finishes.|建筑会随分页加载逐步显示，加载结束前覆盖仍不完整。
+Building coverage incomplete|建筑尚未完整加载
+Loading buildings in this view…|正在加载此视野内的建筑…
+Layer hidden · loading paused|图层已隐藏 · 加载已暂停
+Choose a place or zoom in to see buildings|请选择地点或放大以查看建筑
+Outside this source’s coverage|超出此数据源的覆盖范围
+This area is only partly loaded. Zoom in for a smaller area.|此区域仅部分加载，请放大以缩小加载范围。
+Numbers cover only the buildings loaded around this map view.|数量仅包含此地图视野周边已加载的建筑。
+Request timed out. Retry this view.|请求超时，请重试此视野。
+The provider timed out. Retry this view.|数据提供方响应超时，请重试此视野。
+This view exceeds the download limit. Zoom in and retry.|此视野超出下载上限，请放大后重试。
+This GBA view exceeds the download limit. Zoom in and retry.|此 GBA 视野超出下载上限，请放大后重试。
+The source changed or a page arrived incomplete. Retry this view.|数据源已变化或某一页未完整返回，请重试此视野。
+The source changed or duplicate pages arrived. Retry this view.|数据源已变化或返回了重复页，请重试此视野。
+Loading cancelled. Retry this view.|加载已取消，请重试此视野。
 `.trim().split('\n').map(row => { const i = row.indexOf('|'); return [row.slice(0, i), row.slice(i + 1)]; })));

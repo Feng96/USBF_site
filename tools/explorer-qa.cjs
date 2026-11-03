@@ -37,6 +37,10 @@ const layer={id:'usbf',cfg:{id:'usbf-live',driver:'usbf',type:'viewport',name:'U
   ok(overview.count===3&&overview.heightCount===2&&overview.meanHeight===18,'Available height summaries remain independent of elevation-input coverage');
   ok(overview.count!==layer.release.buildings&&overview.note.includes('only'),'Local building counts never borrow the national publication total');
   ok(api.summaryFor({...layer,viewLimited:true},17).note.includes('partly'),'A partially loaded area retains its visible scope warning');
+  const government={...layer,cfg:{id:'dc-government',type:'viewport',driver:'arcgis'}};
+  ok(api.summaryFor(government,15).visible&&api.summaryFor({...government,viewLimited:true},15).title.includes('partial coverage'),'Government layers expose incomplete coverage in the visible map summary');
+  ok(api.summaryFor({...government,viewLoading:true,viewNote:'Loading buildings… 1,000 / 15,000'},15).title.includes('1,000 / 15,000'),'Government pagination progress stays visible without opening layer settings');
+  ok(api.summaryFor({...government,error:true},15).state==='error','A failed government page cannot look like a completed neighborhood');
   ok(api.heightOf(layer,{properties:{height_m:0,height:-999,height_missing:false}})===null,'Zero and upstream missing-height sentinels are not presented as known heights');
   ok(api.changeLabel(null)==='Not recorded'&&api.changeLabel(false)==='Unchanged from source'&&api.changeLabel(true)==='Changed from source','Unknown, unchanged and changed footprint states stay distinct');
   let html=api.renderFeature(layer,full);ok(html.includes('12 <small>m</small>')&&html.includes('GlobalBuildingAtlas')&&html.includes('Not recorded'),'The building card presents an available inherited height even when elevation input is missing');

@@ -25,6 +25,8 @@ ok(i.t('Added Layers.') === '已添加 Layers。', 'An interpolated data name ma
 ok(i.t('3D uses height_m in metres. Inherited GBA height; nDSM input coverage is separate. Missing heights stay missing.').includes('height_m'), 'Height status keeps its source field name');
 ok(i.t('Show Download') === '显示 Download', 'Action accessibility text preserves its data name');
 ok(i.t('Model file returned HTTP 404').endsWith('HTTP 404'), 'System error translation retains technical status codes');
+ok(i.t('Loading buildings… 1,000 / 15,277') === '正在加载建筑… 1,000 / 15,277', 'Pagination progress translates without changing its counts');
+ok(i.t('50,000 buildings · partial coverage · zoom in').includes('尚未完整加载'), 'Partial source coverage has an explicit Chinese interface warning');
 ok(i.t('Unknown system message') === 'Unknown system message', 'Unknown messages fall back to their original English');
 ok(i.t('Value: {name}', { name: 'Layers <script>' }) === 'Value: Layers <script>', 'Parameter substitution does not recursively translate or interpret HTML');
 i.setLocale('en');

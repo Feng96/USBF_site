@@ -434,3 +434,33 @@ regional extracts. No global GeoParquet file is automatically downloaded.
 Attribution: OpenFreeMap © OpenMapTiles · Data from OpenStreetMap contributors;
 OSM data terms are ODbL 1.0. Upstream documentation: https://openfreemap.org/quick_start/
 and https://layercake.openstreetmap.us/layers/buildings/.
+
+### Complete non-PMTiles view loading
+
+Government footprint APIs load all pages for the requested neighborhood. DC
+first obtains the matching `OBJECTID` list and requests bounded batches; an
+ArcGIS transfer-limit response splits the batch until its IDs are complete.
+NYC obtains a count and requests 1,000-row pages with stable `:id` ordering.
+Returned IDs/row totals are checked, so short or repeated pages and HTTP failures
+cannot mark a view complete. Completed batches appear progressively. Old geometry
+stays visible during replacement, while analytical capture remains blocked until
+the current request finishes. Moving away cancels obsolete requests.
+
+GBA uses a persistent worker, explicit country/bbox statistics pruning and
+progressive row-group reads instead of stopping at 12,000 buildings. Bounded HTTP
+range caching survives camera changes and checks ETags before combining reads.
+Complete views have a small buffered extent and a five-minute bounded cache;
+zooming inside that extent reuses the completed data. Clear cache releases both
+view and worker caches while keeping the current project.
+
+API/GBA display reads stop at 50,000 records or 64 MiB per request. These limits,
+timeouts and incomplete responses show **partial coverage** or an error, never a
+complete-map claim. Zoom in for a smaller area when a limit is reached. The
+Microsoft Esri vector connection uses its published final level, 16; MapLibre
+overzooms those tiles at higher camera zooms instead of requesting nonexistent
+levels 17–19. Native OSM TileJSON and USBF PMTiles keep their own tile caches.
+
+Validation: `tools/viewport-source-qa.cjs`, `tools/gba-viewport-qa.cjs`, and
+`tools/non-pmtiles-workflow-checks.cjs`. The real-provider browser workflow checks
+DC IDs, NYC totals, GBA beyond the previous cutoff, cache reuse and Microsoft at
+camera zooms 16–19.
