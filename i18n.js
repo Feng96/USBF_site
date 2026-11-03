@@ -11,6 +11,7 @@
 
   // Interpolated values are copied verbatim, including field names, places and model names.
   const patterns = [
+    [/^Revision (\d+)$/, m => '修订 ' + m[1]],
     [/^(\d[\d,]*) buildings loaded( · zoom in to see more)?$/, m => '已加载 ' + m[1] + ' 栋建筑' + (m[2] ? ' · 放大以查看更多' : '')],
     [/^(\d+) added layers?$/, m => '已添加 ' + m[1] + ' 个图层'],
     [/^Added (.+)\.$/, m => '已添加 ' + m[1] + '。'],

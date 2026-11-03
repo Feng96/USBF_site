@@ -4,6 +4,11 @@
   const $=s=>document.querySelector(s),WGS84='EPSG:4326';
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   let lastExport=null,lastMap=null,previewURL=null,busy=false;
+  const layoutDefaults={title:'US Buildings',subtitle:'',paper:'letter',orientation:'landscape',margin:'12',resolution:'1',legend:true,scale:true,north:true,partial:false};
+  let projectLayout={...layoutDefaults};
+  function projectOptions(){const form=$('#composer-map-form');if(form)for(const key of Object.keys(layoutDefaults)){const el=$('#composer-'+key);projectLayout[key]=typeof layoutDefaults[key]==='boolean'?el.checked:el.value;}return {...projectLayout};}
+  function applyProjectOptions(value){projectLayout=Object.fromEntries(Object.keys(layoutDefaults).map(key=>[key,value?.[key]??layoutDefaults[key]]));if($('#composer-map-form')){for(const [key,value] of Object.entries(projectLayout)){const el=$('#composer-'+key);if(typeof value==='boolean')el.checked=value;else el.value=value;}pageSummary();}clearPreview();}
+  function clearPreview(){if(previewURL)URL.revokeObjectURL(previewURL);previewURL=null;lastMap=null;lastExport=null;if($('#composer-preview')){$('#composer-preview').hidden=true;$('#composer-preview-image').removeAttribute('src');$('#composer-map-metadata').disabled=true;}}
   const slug=name=>String(name||'map').replace(/[^\p{L}\p{N}_-]+/gu,'-').slice(0,90)||'map';
   function save(name,content,type){const url=URL.createObjectURL(content instanceof Blob?content:new Blob([content],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}
   function cell(value){let s=value===null||value===undefined?'':typeof value==='object'?JSON.stringify(value):String(value);if(typeof value==='string'&&/^[\s]*[=+\-@]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';}
@@ -188,6 +193,6 @@
     const href=l.cfg.downloadUrl||l.cfg.sourceUrl||l.cfg.page||l.cfg.url;a.hidden=!href||!/^https:\/\//i.test(href)||/[{}]/.test(href);if(!a.hidden)a.href=href;
   }
   function tab(name){const dialog=ensureDialog();dialog.querySelectorAll('[data-composer-tab]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.composerTab===name)));dialog.querySelectorAll('[data-composer-panel]').forEach(p=>p.hidden=p.dataset.composerPanel!==name);$('#map-composer-title').textContent=name==='download'?'Download data':'Save a map';if(name==='download'){const active=globalThis.PortalLayers?.active?.id,old=$('#composer-data-layer').value;$('#composer-data-layer').innerHTML=Array.from(globalThis.PortalLayers?.layers?.values()||[]).map(l=>'<option value="'+esc(l.id)+'">'+esc(l.cfg.name)+'</option>').join('');$('#composer-data-layer').value=PortalLayers.layers.has(active)?active:old;updateData();$('#composer-data-format').onchange();}}
-  function open(name='map'){if(name==='settings'){PortalSettings.open();return;}const dialog=ensureDialog();tab(name==='download'?'download':'map');if(!dialog.open)dialog.showModal();}
-  globalThis.PortalComposer={open,createMap,createPDF,makePDFBytes,pageLayout,prepareExport,wkt,csvCell:cell,sources,camera};
+  function open(name='map'){if(name==='settings'){PortalSettings.open();return;}const existed=!!$('#composer-map-form'),dialog=ensureDialog();if(!existed){applyProjectOptions(projectLayout);$('#composer-map-form').addEventListener('input',()=>document.dispatchEvent(new CustomEvent('portal-presentation-changed')));$('#composer-map-form').addEventListener('change',()=>document.dispatchEvent(new CustomEvent('portal-presentation-changed')));}tab(name==='download'?'download':'map');if(!dialog.open)dialog.showModal();}
+  globalThis.PortalComposer={projectOptions,applyProjectOptions,clearPreview,open,createMap,createPDF,makePDFBytes,pageLayout,prepareExport,wkt,csvCell:cell,sources,camera};
 })();

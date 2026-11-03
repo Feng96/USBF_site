@@ -28,7 +28,7 @@
     let manifest=null,checking=null,manifestController=null,lastCheck=0,stopped=false,queryTimer,queryTimeout,worker,revision=0;
     // A camera change is not a source change. Retain both decoded records and
     // MapLibre's prepared geometry while the requested view remains covered.
-    const cache=new Map(),cacheLimit=24*1024*1024;let cacheBytes=0,displayed=null,pendingBounds=null;
+    const cache=new Map(),cacheLimit=24*1024*1024;let cacheBytes=0,displayed=null,pendingBounds=null,displayedCacheValid=true;
     l.navigationMetrics={reads:0,cacheHits:0,pendingReuses:0,sourceWrites:0,cacheBytes:0,cacheEntries:0};
     const contains=(outer,inner)=>validBox(outer)&&validBox(inner)&&outer[0]<=inner[0]&&outer[1]<=inner[1]&&outer[2]>=inner[2]&&outer[3]>=inner[3];
     const sameBox=(a,b)=>a?.length===4&&b?.length===4&&a.every((v,i)=>v===b[i]);
@@ -44,7 +44,7 @@
     }
     function cached(box){
       const matches=result=>result.limited?sameBox(result.view,box):contains(result.bounds,box);
-      if(displayed&&matches(displayed))return displayed;
+      if(displayedCacheValid&&displayed&&matches(displayed))return displayed;
       for(const [key,result] of Array.from(cache).reverse())if(matches(result)){cache.delete(key);cache.set(key,result);return result;}
       return null;
     }
@@ -63,7 +63,7 @@
     function pause(s){cancel();l.loaded=false;note(s);}
     function invalidate(){cancel();cache.clear();cacheBytes=0;cacheState();displayed=null;l.loaded=false;l.viewBounds=null;l.viewLoadedAt=null;l.featureById=new Map();if(l.data?.features?.length){l.data=empty();write(l.data);l.onDataChanged?.();}}
     function publish(result){
-      const changed=displayed!==result;displayed=result;l.data=result.data;l.loaded=true;l.error=false;l.errorDetail='';
+      const changed=displayed!==result;displayed=result;displayedCacheValid=true;l.data=result.data;l.loaded=true;l.error=false;l.errorDetail='';
       l.viewBytes=result.bytes;l.viewLimited=result.limited;l.viewBounds=result.bounds.slice();l.viewLoadedAt=result.loadedAt;
       l.viewSelection='Published cx/cy ownership coordinates within the cached neighborhood bounds plus a 0.002-degree buffer';
       if(changed){l.featureById=new Map(result.data.features.map(f=>[String(f.properties.usbf_id),f]));l.fields=result.fields;write(result.data);l.onDataChanged?.();}
@@ -122,6 +122,7 @@
     const onVisible=()=>{if(document.visibilityState==='visible'&&l.visible&&Date.now()-lastCheck>30000)checkUpdates();};
     const interval=setInterval(()=>{if(l.visible&&document.visibilityState!=='hidden')checkUpdates();},pollMs);
     map.on('moveend',schedule);document.addEventListener('visibilitychange',onVisible);
+    l.clearCache=()=>{cancel();displayedCacheValid=false;cache.clear();cacheBytes=0;cacheState();l.viewLoading=false;l.loaded=!!displayed;note(displayed?'Cache cleared · current view kept':'Cache cleared · move the map to reload');};
     l.reload=()=>{coverageVisibility();if(l.visible&&Date.now()-lastCheck>pollMs)checkUpdates(true);else loadView();};l.checkUpdates=()=>checkUpdates(true);
     l.stop=()=>{stopped=true;cancel();cache.clear();cacheBytes=0;cacheState();displayed=null;clearInterval(interval);manifestController?.abort();map.off('moveend',schedule);document.removeEventListener('visibilitychange',onVisible);if(map.getLayer(coverageLayer))map.removeLayer(coverageLayer);if(map.getSource(coverageSource))map.removeSource(coverageSource);};
     checkUpdates();

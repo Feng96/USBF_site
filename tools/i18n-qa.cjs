@@ -9,7 +9,7 @@ function load(saved, blocked = false) {
     CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init.detail; } }
   };
   vm.createContext(context);
-  for (const file of ['i18n-zh.js', 'i18n.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context);
+  for (const file of ['i18n-zh.js', 'i18n-projects-zh.js', 'i18n.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context);
   return { ...context, api: context.window.PortalI18n, events };
 }
 const c = load(null), i = c.api;

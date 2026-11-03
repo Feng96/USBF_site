@@ -342,3 +342,50 @@ Validation: `node tools/i18n-qa.cjs` plus the browser workflow
 `tools/i18n-workflow-checks.cjs` through `tools/overnight-browser.cjs`.
 Set `PORTAL_I18N_LIVE_URL` to run the same acceptance against a deployed site
 without intercepting public network responses.
+
+### Project workspace (1.5)
+
+Open **Tools → Projects**, or click the project name in the desktop header.
+Projects have independent UUIDs, creation dates and saved revision numbers.
+Save stores the current document in this browser; Save a copy gives it a new
+identity and records its source project/revision. The local library survives
+page reloads. Ctrl/Cmd+S saves, Ctrl/Cmd+Shift+S saves a copy, and Ctrl/Cmd+O
+opens the project manager. Unsaved changes are tracked for camera, layer order,
+styles and names, CRS, drawings, model selection/placement and map layout.
+Replacing changed work offers Save and continue, Discard changes, or Cancel.
+Closing a changed workspace also requests the browser's unsaved-work warning.
+
+Export for sharing downloads a portable `.usbf.json` snapshot. Opening that file
+creates a separate unsaved local copy with a source-project reference; it never
+overwrites another saved project. Files include local vector records, original
+model/raster attachments, attribution, source rights, view and paper layout.
+Catalog connections record available publication metadata and reconnect to the
+latest publication rather than pinning historical server bytes. Exports with
+unsaved edits have `projectInfo.draft: true`; a saved revision has `draft: false`.
+Keep exported backups: clearing browser site storage or changing browser/device
+can remove browser-local projects. Files are checked before replacing a map,
+and failed staged restoration retains the prior resources. Existing version-1
+map files without project identity or presentation fields remain supported.
+
+Project metadata and document JSON are stored in separate IndexedDB stores in
+`usbf-project-library-v1`. A single read/write transaction commits both stores,
+checks the expected revision and increments it. Concurrent tabs cannot silently
+overwrite a newer revision or delete a changed saved copy. BroadcastChannel
+refreshes other tabs' library lists. Storage failures leave work open and permit
+file export. `PortalProjectStore` is the persistence boundary for a future cloud
+implementation; this release has no account system, remote project storage,
+permission roles, public project URLs or simultaneous team editing. Sharing
+currently means exchanging project files.
+
+**Clear cache** is available in Tools and Projects. It cancels pending USBF
+reads and clears decoded building neighborhoods and fetched model caches, while
+keeping current displayed records, drawings, language preference and saved
+projects. The next navigation can fetch fresh source bytes. It does not clear
+the browser-managed HTTP cache, other applications' storage, or the project
+database. **New project** starts an empty map with default view/CRS/layout,
+releases old layers/models and invalidates in-flight work. It keeps the library
+and asks about unsaved changes before replacing the open map.
+
+Project workflow acceptance: `tools/projects-library-workflow-checks.cjs`.
+Compatibility/rollback: `tools/project-workflow-checks.cjs`. Cache and schema
+contracts: `tools/usbf-navigation-cache-qa.cjs` and `tools/project-qa.cjs`.

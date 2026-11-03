@@ -15,12 +15,13 @@
   <script defer src="vendor/turf-7.2.0.min.js"></script>
   <script defer src="vendor/geotiff-2.1.3.js"></script>
   <script defer src="vendor/shp-6.2.0.js"></script>
-  <script defer src="i18n-zh.js?v=1.4"></script>
-  <script defer src="i18n.js?v=1.4"></script>
+  <script defer src="i18n-zh.js?v=1.5-projects"></script>
+  <script defer src="i18n-projects-zh.js?v=1.5-projects"></script>
+  <script defer src="i18n.js?v=1.5-projects"></script>
   <script defer src="sidebar.js?v=1.4"></script>
   <script defer src="workspace-crs.js?v=1.4-ui"></script>
   <script defer src="data-adapter.js"></script>
-  <script defer src="usbf-source.js?v=1.3.1-zoom-cache"></script>
+  <script defer src="usbf-source.js?v=1.5-projects"></script>
   <script defer src="public-sources.js?v=1.3"></script>
   <script defer src="map-legend.js?v=1.3"></script>
   <script defer src="source-features.js?v=1.3"></script>
@@ -30,13 +31,15 @@
   <script defer src="buildings-explorer.js?v=1.4-ui"></script>
   <script defer src="analysis-data.js?v=1.3"></script>
   <script defer src="analysis-ui.js?v=1.4-ui"></script>
-  <script defer src="map-composer.js?v=1.4-ui"></script>
+  <script defer src="map-composer.js?v=1.5-projects"></script>
   <script defer src="workspace-tools.js?v=1.4-ui"></script>
-  <script defer src="map-project-core.js?v=1.3"></script>
-  <script defer src="map-project.js?v=1.4-ui"></script>
-  <script defer src="app.js?v=1.4-ui"></script>
-  <script type="module" src="model-browser.js?v=1.4-ui"></script>
-  <script type="module" src="local-models.js?v=1.4-ui"></script>
+  <script defer src="map-project-core.js?v=1.5-projects"></script>
+  <script defer src="project-store.js?v=1.5-projects"></script>
+  <script defer src="map-project.js?v=1.5-projects"></script>
+  <script defer src="project-workspace.js?v=1.5-projects"></script>
+  <script defer src="app.js?v=1.5-projects"></script>
+  <script type="module" src="model-browser.js?v=1.5-projects"></script>
+  <script type="module" src="local-models.js?v=1.5-projects"></script>
   <script type="module" src="lod1-ui.js?v=1.4-ui"></script>
   <link rel="stylesheet" href="workspace.css?v=1.4-ui">
   <link rel="stylesheet" href="inventory.css?v=1.3">
@@ -45,13 +48,13 @@
   <link rel="stylesheet" href="buildings-explorer.css?v=1.3">
   <link rel="stylesheet" href="analysis.css?v=1.3">
   <link rel="stylesheet" href="map-composer.css?v=1.3">
-  <link rel="stylesheet" href="map-project.css?v=1.3">
+  <link rel="stylesheet" href="map-project.css?v=1.5-projects">
 </head>
 <body>
   <a class="skip-link" href="#map" data-i18n>Skip to map</a>
   <header class="app-header">
     <a class="brand" href="./" aria-label="US Buildings home" data-i18n-aria-label><span class="brand-mark"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 26V13l8-5v18M12 26V4l9 5v17M21 26V15l7-4v15M2 27h28"/></svg></span><strong>US Buildings</strong></a>
-    <span class="workspace-document" id="workspace-document">United States</span>
+    <div class="workspace-document-control"><button class="workspace-document" id="workspace-document" data-project-open>Untitled project</button><span id="project-state-dot" class="project-state-dot" aria-hidden="true"></span><span class="sr-only" data-project-status data-i18n-system></span></div>
     <div class="header-actions"><label class="language-control"><span class="sr-only" data-i18n>Language</span><select id="interface-language" aria-label="Language / 语言" data-i18n-aria-label><option value="en" lang="en">English</option><option value="zh-CN" lang="zh-CN">中文</option></select></label><button class="quiet-button" data-action="share" title="Copy this map view" data-i18n-title><span data-icon="share"></span><span data-i18n>Share</span></button><button class="quiet-button" data-workspace-tool="download"><span data-icon="download"></span><span data-i18n>Download</span></button><button class="icon-button" data-workspace-tool="settings" title="CRS and workspace settings" aria-label="Settings" data-i18n-title data-i18n-aria-label><span data-icon="settings"></span></button></div>
   </header>
   <div class="ribbon" role="toolbar" aria-label="Map tools" data-i18n-aria-label>
@@ -61,7 +64,7 @@
     <details class="tools-menu" id="workspace-tools-menu"><summary class="tool"><span data-icon="sliders"></span><span data-i18n>Tools</span><span data-icon="chevron-down"></span></summary><div class="tools-popover" role="group" aria-label="GIS tools" data-i18n-aria-label>
       <span class="menu-caption" data-i18n>EXPLORE</span><button data-tool="explore"><span data-icon="hand"></span><span data-i18n>Pan &amp; zoom</span></button><button data-tool="identify"><span data-icon="pointer"></span><span data-i18n>Identify</span></button><button data-tool="measure"><span data-icon="ruler"></span><span data-i18n>Measure distance</span></button><button data-action="table" id="table-toggle" aria-controls="attribute-table" aria-expanded="false"><span data-icon="table"></span><span data-i18n>Data table</span></button>
       <span class="menu-caption" data-i18n>WORK WITH DATA</span><button data-workspace-tool="statistics"><span data-icon="chart"></span><span data-i18n>Statistics</span></button><button data-workspace-tool="analysis"><span data-icon="analysis"></span><span data-i18n>Analyze an area</span></button><button data-workspace-tool="chart"><span data-icon="chart"></span><span data-i18n>Charts</span></button><button data-workspace-tool="draw"><span data-icon="draw"></span><span data-i18n>Draw on the map</span></button>
-      <span class="menu-caption" data-i18n>MAP</span><button data-project-open><span data-icon="map"></span><span data-i18n>Save or open a map</span></button><button data-explorer-choose><span data-icon="search"></span><span data-i18n>Choose a U.S. place</span></button><button data-modal="basemap"><span data-icon="map"></span><span data-i18n>Basemap</span></button><button data-action="legend"><span data-icon="layers"></span><span data-i18n>Legend</span></button><button data-workspace-tool="settings"><span data-icon="settings"></span><span data-i18n>CRS &amp; settings</span></button><button data-modal="help"><span data-icon="info"></span><span data-i18n>Help</span></button>
+      <span class="menu-caption" data-i18n>MAP</span><button data-project-open><span data-icon="map"></span><span data-i18n>Projects</span></button><button data-clear-cache><span data-icon="sliders"></span><span data-i18n>Clear cache</span></button><button data-explorer-choose><span data-icon="search"></span><span data-i18n>Choose a U.S. place</span></button><button data-modal="basemap"><span data-icon="map"></span><span data-i18n>Basemap</span></button><button data-action="legend"><span data-icon="layers"></span><span data-i18n>Legend</span></button><button data-workspace-tool="settings"><span data-icon="settings"></span><span data-i18n>CRS &amp; settings</span></button><button data-modal="help"><span data-icon="info"></span><span data-i18n>Help</span></button>
     </div></details>
     <div class="ribbon-end"><button class="tool map-output-tool" data-workspace-tool="map"><span data-icon="map"></span><span data-i18n>Create map</span></button></div>
   </div>
@@ -104,7 +107,7 @@
         <div class="map-bottom-note"><span data-icon="mouse"></span><span id="tool-hint" data-i18n-system>Drag to explore · Scroll to zoom · Click a building to inspect</span></div>
         <div class="tile-warning" id="tile-warning" hidden data-i18n>Basemap unavailable. Data layers remain available. <button data-action="retry-basemap" data-i18n>Retry</button></div>
       </div>
-      <section class="attribute-table" id="attribute-table" aria-label="Active dataset attributes" hidden><div class="table-header"><div><span data-icon="table"></span><strong id="table-layer-name" data-i18n>Attributes</strong><span class="table-badge" id="table-kind" data-i18n-system>IN VIEW</span><span id="table-count" data-i18n-system></span></div><div><label class="selected-filter"><input id="selected-only" type="checkbox" data-i18n>Selected only</label><button class="icon-button" data-export-table="csv" aria-label="Export table CSV"><span data-icon="download"></span></button><button class="icon-button" data-action="table" aria-label="Close attribute table"><span data-icon="close"></span></button></div></div><div class="table-query"><input id="table-search" placeholder="Search loaded attributes…" aria-label="Search attribute table"><label data-i18n>Sort<select id="table-sort"><option value="source" data-i18n>Source</option><option value="area-desc" data-i18n>Area · largest first</option><option value="height-desc" data-i18n>Height · tallest first</option></select></label><span id="table-scope-note" data-i18n-system>Only records loaded for this map view</span></div><div class="table-scroll"><table><thead id="attribute-head"><tr><th data-i18n>Record</th><th data-i18n>Source</th><th data-i18n>Area · m²</th><th data-i18n>Height · m</th></tr></thead><tbody id="attribute-rows"></tbody></table></div><div class="table-pagination"><button id="table-prev" data-i18n>← Previous</button><span id="table-page" data-i18n-system></span><button id="table-next" data-i18n>Next →</button></div></section>
+      <section class="attribute-table" id="attribute-table" aria-label="Active dataset attributes" hidden><div class="table-header"><div><span data-icon="table"></span><strong id="table-layer-name">Attributes</strong><span class="table-badge" id="table-kind" data-i18n-system>IN VIEW</span><span id="table-count" data-i18n-system></span></div><div><label class="selected-filter"><input id="selected-only" type="checkbox" data-i18n>Selected only</label><button class="icon-button" data-export-table="csv" aria-label="Export table CSV"><span data-icon="download"></span></button><button class="icon-button" data-action="table" aria-label="Close attribute table"><span data-icon="close"></span></button></div></div><div class="table-query"><input id="table-search" placeholder="Search loaded attributes…" aria-label="Search attribute table"><label data-i18n>Sort<select id="table-sort"><option value="source" data-i18n>Source</option><option value="area-desc" data-i18n>Area · largest first</option><option value="height-desc" data-i18n>Height · tallest first</option></select></label><span id="table-scope-note" data-i18n-system>Only records loaded for this map view</span></div><div class="table-scroll"><table><thead id="attribute-head"><tr><th data-i18n>Record</th><th data-i18n>Source</th><th data-i18n>Area · m²</th><th data-i18n>Height · m</th></tr></thead><tbody id="attribute-rows"></tbody></table></div><div class="table-pagination"><button id="table-prev" data-i18n>← Previous</button><span id="table-page" data-i18n-system></span><button id="table-next" data-i18n>Next →</button></div></section>
     </main>
     <aside class="properties" id="properties" aria-label="Selected feature properties" hidden><div class="properties-heading"><span data-i18n>Feature details</span><button class="icon-button" data-action="clear-selection" aria-label="Close feature details"><span data-icon="close"></span></button></div><div class="properties-content" id="properties-content"></div></aside>
   </div>

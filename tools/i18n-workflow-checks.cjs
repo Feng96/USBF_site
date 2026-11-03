@@ -52,7 +52,7 @@ module.exports = async qa => {
     ['PortalAnalysis', '[data-analysis-close]', '#analysis-title', '统计与分析'],
     ['PortalComposer', '[data-close-composer]', '#map-composer-title', '保存地图'],
     ['PortalLocalModels', '[data-close-local-model]', '#local-model-dialog h2', '添加 3D 模型'],
-    ['PortalProject', '[data-close-project]', '#project-dialog h2', '保存或打开地图']
+    ['PortalProject', '[data-close-project]', '#project-dialog h2', '项目']
   ]) {
     // Each API creates its dialog on demand, after the locale has changed.
     const exists = await page.evaluate(name => !!window[name]?.open, api);
@@ -75,6 +75,7 @@ module.exports = async qa => {
   await page.locator('.models-tool').click();
   ok(await page.evaluate(before => PortalModels.current.id === before.id && PortalModels.method === before.method && PortalModels.enabled === before.enabled && JSON.stringify(PortalModels.current) === before.data, selected), 'Toggling retains the selected model, method and original model data');
   await page.locator('#interface-language').selectOption('zh-CN');
+  await page.evaluate(() => window.PortalProjects?.save());
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.portal?.ready && window.PortalModels?.ready);
   await page.waitForFunction(() => document.documentElement.lang === 'zh-CN');

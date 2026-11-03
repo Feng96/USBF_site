@@ -10,6 +10,8 @@
   }
   function validate(p,options={}){
     if(!object(p)||p.format!=='USBF map'||p.version!==1)fail('Choose a USBF map file saved by this website.');
+    if(p.projectInfo!==undefined){const i=p.projectInfo;if(!object(i)||!/^([a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12})$/i.test(i.id)||!Number.isSafeInteger(i.revision)||i.revision<0||!string(i.createdAt,40)||!Number.isFinite(Date.parse(i.createdAt)))fail('The project identity or revision is invalid.');if(i.draft!==undefined&&typeof i.draft!=='boolean')fail('The project identity or revision is invalid.');if(i.origin!==undefined&&(!object(i.origin)||!string(i.origin.id,80)||!Number.isSafeInteger(i.origin.revision)||i.origin.revision<0))fail('The project source revision is invalid.');}
+    if(p.presentation!==undefined){if(!object(p.presentation)||typeof p.presentation.legendVisible!=='boolean')fail('The project map layout is invalid.');layout(p.presentation.layout);}
     if(!string(p.name,120)||!string(p.place,200)||!object(p.view)||!Array.isArray(p.view.center)||p.view.center.length!==2||!p.view.center.every(Number.isFinite)||Math.abs(p.view.center[0])>180||Math.abs(p.view.center[1])>85.05113||!Number.isFinite(p.view.zoom)||p.view.zoom<2||p.view.zoom>22||!Number.isFinite(p.view.pitch)||p.view.pitch<0||p.view.pitch>60||!Number.isFinite(p.view.bearing)||Math.abs(p.view.bearing)>360||typeof p.view.view3d!=='boolean'||!['light','streets','satellite'].includes(p.view.basemap)||!string(p.view.crs,4000))fail('This map file has an invalid map position or coordinate system.');
     if(!Array.isArray(p.layers)||p.layers.length>limits.layers||!Array.isArray(p.assets)||p.assets.length>60||!Array.isArray(p.models)||p.models.length>limits.models||!Array.isArray(p.order)||p.order.length>200)fail('This map file contains too many layers or files.');
     const assets=new Set(),keys=new Set();let bytes=0;
@@ -38,6 +40,10 @@
     if(p.research!==null&&(!object(p.research)||!string(p.research.id,150)||!string(p.research.method,150)||typeof p.research.roofOnly!=='boolean'||typeof p.research.edges!=='boolean'||typeof p.research.visible!=='boolean'))fail('The saved research model is invalid.');
     return p;
   }
+  function layout(v){
+    if(!object(v)||Object.keys(v).some(k=>!['title','subtitle','paper','orientation','margin','resolution','legend','scale','north','partial'].includes(k))||!string(v.title,120)||!string(v.subtitle,200)||!['letter','a4','a3'].includes(v.paper)||!['landscape','portrait'].includes(v.orientation)||!['6','12','20'].includes(String(v.margin))||!['1','2'].includes(String(v.resolution))||!['legend','scale','north','partial'].every(k=>typeof v[k]==='boolean'))fail('The project map layout is invalid.');
+    return v;
+  }
   async function digest(bytes){return Array.from(new Uint8Array(await root.crypto.subtle.digest('SHA-256',bytes)),n=>n.toString(16).padStart(2,'0')).join('');}
   async function encodeAsset(file,id){
     if(file.size>limits.asset)fail(file.name+' is too large to include in a map. Connect it with a web link or save a smaller file.');
@@ -47,5 +53,5 @@
   async function decodeAssets(p){
     const files=new Map();for(const a of p.assets){const text=root.atob(a.base64),bytes=Uint8Array.from(text,c=>c.charCodeAt(0));if(bytes.length!==a.bytes||await digest(bytes)!==a.sha256)fail(a.name+' does not match its saved contents. Choose an undamaged map file.');files.set(a.id,new root.File([bytes],a.name,{type:a.type}));}return files;
   }
-  root.PortalProjectCore={limits,validate,style,https,encodeAsset,decodeAssets,digest};
+  root.PortalProjectCore={limits,validate,layout,style,https,encodeAsset,decodeAssets,digest};
 })(globalThis);
