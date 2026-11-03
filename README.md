@@ -410,3 +410,27 @@ and asks about unsaved changes before replacing the open map.
 Project workflow acceptance: `tools/projects-library-workflow-checks.cjs`.
 Compatibility/rollback: `tools/project-workflow-checks.cjs`. Cache and schema
 contracts: `tools/usbf-navigation-cache-qa.cjs` and `tools/project-qa.cjs`.
+
+### Independent OpenStreetMap buildings
+
+**Add Data → OSM → OpenStreetMap buildings · OpenFreeMap** adds a direct
+OpenStreetMap building-layer connection using OpenFreeMap's OpenMapTiles vector
+service. It is independent of both USBF and the filtered **VIDA US · OpenStreetMap
+subset**, which remains available with its subset label. The OSM layer covers
+the globe, including the US. Adding it from a national overview opens a DC
+neighborhood; an existing neighborhood view stays in place. Native TileJSON
+resolves the upstream versioned tile URLs. Saved projects reconnect the logical
+OSM catalog source.
+
+The display polygons may be clipped or simplified. They are not exhaustive
+original OSM records. OpenMapTiles `render_height` / `render_min_height` are
+cartographic values that can include estimates or defaults, so this connection
+does not enable measured-height or LoD1 workflows from those fields. Original
+values remain inspectable. Geometry analysis retains the existing tiled-preview
+restrictions. The separate **OpenStreetMap · Original building data** resource
+links to OpenStreetMap US Layercake; provider details also link to Geofabrik
+regional extracts. No global GeoParquet file is automatically downloaded.
+
+Attribution: OpenFreeMap © OpenMapTiles · Data from OpenStreetMap contributors;
+OSM data terms are ODbL 1.0. Upstream documentation: https://openfreemap.org/quick_start/
+and https://layercake.openstreetmap.us/layers/buildings/.

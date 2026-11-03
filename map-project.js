@@ -28,7 +28,7 @@
       else if(cfg.type==='image'){
         Object.assign(entry,{kind:'image-preview',coordinates:clone(cfg.coordinates),meta:pick(cfg,metadataKeys),asset:null});
         const url=cfg.imageURL;previewJobs.push(async()=>{const r=await fetch(url);if(!r.ok)throw Error('The saved image for '+cfg.name+' is unavailable.');const b=await r.blob();entry.asset=asset(new File([b],key+'-preview.png',{type:b.type||'image/png'}));});p.notes.push(cfg.name+': display preview included; original raster pixels are not included.');
-      }else if(['pmtiles','raster-pmtiles','vector','raster'].includes(cfg.type))Object.assign(entry,{kind:'connection',connection:pick(cfg,['type','url','sourceLayer','maxzoom','service','sourceKind','analysisQuality']),meta:pick(cfg,metadataKeys),asset:asset(cfg.originalFile)});
+      }else if(['pmtiles','raster-pmtiles','vector','raster'].includes(cfg.type))Object.assign(entry,{kind:'connection',connection:pick(cfg,['type','url','sourceLayer','maxzoom','service','sourceKind','analysisQuality','tilejson']),meta:pick(cfg,metadataKeys),asset:asset(cfg.originalFile)});
       else throw Error('Save '+cfg.name+' separately before saving this map. Its source cannot be reopened here.');
       p.layers.push(entry);
     }
@@ -56,7 +56,7 @@
     else if(e.kind==='image-preview'){
       const url=URL.createObjectURL(files.get(e.asset));try{l=await PortalLayers.add({...meta,id,name:e.name,type:'image',imageURL:url,coordinates:e.coordinates,color:e.style.color,sourceKind:'raster',analysisQuality:'display-raster',cleanup:()=>URL.revokeObjectURL(url)},options);}catch(err){URL.revokeObjectURL(url);throw err;}
     }else if(e.kind==='connection'){
-      const cfg={...pick(e.connection,['type','url','sourceLayer','maxzoom','service','sourceKind','analysisQuality']),...meta,id,name:e.name,color:e.style.color,originalFile:files.get(e.asset)||null};
+      const cfg={...pick(e.connection,['type','url','sourceLayer','maxzoom','service','sourceKind','analysisQuality','tilejson']),...meta,id,name:e.name,color:e.style.color,originalFile:files.get(e.asset)||null};
       if(e.asset){const source=new pmtiles.FileSource(files.get(e.asset));source.getKey=()=>id+'.pmtiles';cfg.localArchive=new pmtiles.PMTiles(source);cfg.type='pmtiles';}
       if(cfg.type==='raster-pmtiles')cfg.type='pmtiles';l=await PortalLayers.add(cfg,options);
     }

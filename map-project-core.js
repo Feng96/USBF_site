@@ -31,7 +31,7 @@
       }else if(l.kind==='image-preview'){
         if(!l.asset||!Array.isArray(l.coordinates)||l.coordinates.length!==4||!l.coordinates.every(c=>Array.isArray(c)&&c.length===2&&c.every(Number.isFinite)&&Math.abs(c[0])<=180&&Math.abs(c[1])<=85.05113))fail('A saved image preview has invalid map corners.');
       }else if(l.kind==='connection'){
-        if(!object(l.connection)||!['pmtiles','raster-pmtiles','raster','vector'].includes(l.connection.type)||!l.asset&&!l.connection.url)fail('A saved connection is invalid.');if(l.connection.url)https(l.connection.url);if(l.connection.type==='vector'&&!string(l.connection.sourceLayer,200))fail('A vector tile source needs a layer name.');
+        if(!object(l.connection)||!['pmtiles','raster-pmtiles','raster','vector'].includes(l.connection.type)||!l.asset&&!l.connection.url)fail('A saved connection is invalid.');if(l.connection.url)https(l.connection.url);if(l.connection.tilejson!==undefined&&(typeof l.connection.tilejson!=='boolean'||l.connection.type!=='vector'))fail('A saved connection is invalid.');if(l.connection.type==='vector'&&!string(l.connection.sourceLayer,200))fail('A vector tile source needs a layer name.');
       }else fail('This map uses a layer type that cannot be opened here.');
     }
     for(const o of p.order)if(!Array.isArray(o)||o.length!==2||!keys.has(o[0])||!['fill','line','circle','fill-extrusion','raster','publication-grid'].includes(o[1])&&!/^annotation(?:-\d+)?$/.test(o[1]))fail('The saved layer order is invalid.');

@@ -28,5 +28,7 @@ const fixture=()=>({format:'USBF map',version:1,name:'Saved neighborhood',place:
  for(const patch of [{id:'<script>'},{revision:-1},{revision:1.2},{createdAt:'invalid'},{draft:'false'}]){const x=copy(identified);Object.assign(x.projectInfo,patch);assert.throws(()=>A.validate(x),/identity/);}ok(true,'Malformed project identities and revisions cannot enter restoration');
  const badLayout=copy(identified);badLayout.presentation.layout.unknownField='injected';assert.throws(()=>A.validate(badLayout),/layout/);ok(true,'Unknown layout fields are rejected before any map resources are replaced');
  const badPaper=copy(identified);badPaper.presentation.layout.paper='unknown';assert.throws(()=>A.validate(badPaper),/layout/);ok(true,'Invalid layout choices cannot reach the composer');
+ const tilejson=fixture();tilejson.layers[0]={key:'layer-1',name:'Independent OSM',kind:'connection',connection:{type:'vector',url:'https://tiles.openfreemap.org/planet/latest',sourceLayer:'building',tilejson:true},meta:{allowHeight:false,dataRole:'buildings'},style:copy(style)};A.validate(tilejson);ok(tilejson.layers[0].connection.tilejson===true,'A saved independent TileJSON source keeps its connection type');
+ tilejson.layers[0].connection.tilejson='true';assert.throws(()=>A.validate(tilejson),/connection/);ok(true,'An invalid TileJSON connection flag is rejected before restoration');
  console.log(JSON.stringify({passed:true,checks:checks.length}));
 })().catch(e=>{console.error(e.stack);process.exitCode=1;});
