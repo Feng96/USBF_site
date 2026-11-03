@@ -27,7 +27,8 @@ module.exports = async qa => {
   ok(await p.evaluate(id => { const c = PortalAnalysisData.capabilities(PortalLayers.layers.get(id)); return c.attributePreview && !c.geometryAnalysis; }, id), 'Clipped OSM map tiles cannot masquerade as full analytical geometry');
   const project = await p.evaluate(async () => (await PortalProject.collect('Independent OSM map')).project);
   ok(project.layers.length === 1 && project.layers[0].kind === 'catalog' && project.layers[0].catalogId === 'osm-buildings', 'Project files preserve the independent OSM connection');
-  await p.evaluate(async project => { await PortalProject.restore(await PortalProject.prepare(project)); }, project); await p.waitForFunction(() => PortalLayers.active?.cfg.id === 'osm-buildings');
+  await p.evaluate(async project => { await PortalProject.restore(await PortalProject.prepare(project)); }, project);
+  await p.waitForFunction(() => { const l = PortalLayers.active; return l?.cfg.id === 'osm-buildings' && portal.map.isSourceLoaded(l.id) && portal.map.queryRenderedFeatures({ layers: l.renderIds }).length > 0; }, null, { timeout: 90000 });
   ok(await p.evaluate(() => PortalLayers.active.cfg.tilejson === true && !PortalLayers.active.cfg.fixedSource), 'Reopening the project reconnects direct OSM without converting it to a subset');
   await p.locator('#interface-language').selectOption('zh-CN');
   await qa.screenshot('independent-osm-desktop.png');
