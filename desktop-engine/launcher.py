@@ -95,6 +95,30 @@ def default_workspace() -> Path:
     return Path.home() / 'Documents' / 'USBF'
 
 
+def workspace_lock(workspace: Path):
+    """A second desktop process must not recover another running engine's jobs."""
+    folder = workspace.resolve() / 'Engine'
+    if folder.is_symlink() or (folder / 'desktop.lock').is_symlink():
+        raise RuntimeError('The engine lock must be a real file inside the workspace.')
+    folder.mkdir(parents=True, exist_ok=True)
+    handle = (folder / 'desktop.lock').open('a+b')
+    try:
+        if not handle.seek(0, 2):
+            handle.write(b'0')
+            handle.flush()
+        handle.seek(0)
+        if os.name == 'nt':
+            import msvcrt
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return handle
+    except OSError:
+        handle.close()
+        raise RuntimeError('USBF Engine is already running for this workspace. Use its existing window.') from None
+
+
 def bundled_extension(workspace: Path) -> Path | None:
     compressed = resources() / 'spatial.duckdb_extension.gz'
     direct = resources() / 'spatial.duckdb_extension'
@@ -134,21 +158,35 @@ def backend(workspace: Path, port: int, origins: list[str]):
         sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'native-engine'))
     from usbf_engine import Engine
     from usbf_engine.server import serve
-    extension = bundled_extension(workspace)
-    if extension is None and not getattr(sys, 'frozen', False) and os.environ.get('USBF_ENGINE_TEST_EXTENSION'):
-        extension = Path(os.environ['USBF_ENGINE_TEST_EXTENSION'])
-    engine = Engine(workspace, extension_path=extension)
-    if hasattr(engine, 'set_build_info'):
-        engine.set_build_info(build_info())
-    server = serve(engine, port=port, origins=origins)
-    threading.Thread(target=server.serve_forever, name='usbf-http', daemon=True).start()
-    return engine, server
+    lock = workspace_lock(workspace)
+    engine = None
+    try:
+        extension = bundled_extension(workspace)
+        if extension is None and not getattr(sys, 'frozen', False) and os.environ.get('USBF_ENGINE_TEST_EXTENSION'):
+            extension = Path(os.environ['USBF_ENGINE_TEST_EXTENSION'])
+        engine = Engine(workspace, extension_path=extension)
+        engine._desktop_lock = lock
+        if hasattr(engine, 'set_build_info'):
+            engine.set_build_info(build_info())
+        server = serve(engine, port=port, origins=origins)
+        threading.Thread(target=server.serve_forever, name='usbf-http', daemon=True).start()
+        return engine, server
+    except Exception:
+        if engine is not None:
+            engine.close(revoke=True)
+        lock.close()
+        raise
 
 
 def shutdown(engine, server) -> None:
     server.shutdown()
     server.server_close()
-    engine.close(revoke=True)
+    try:
+        engine.close(revoke=True)
+    finally:
+        lock = getattr(engine, '_desktop_lock', None)
+        if lock is not None:
+            lock.close()
 
 
 def run_headless(args) -> int:
@@ -326,11 +364,27 @@ def main(argv=None) -> int:
         return 0
     if args.gui_smoke:
         import tkinter as tk
-        window = tk.Tk()
-        window.withdraw()
-        window.update()
-        window.destroy()
-        return 0
+        if args.workspace is None:
+            raise RuntimeError('GUI acceptance requires an explicit temporary workspace.')
+        args.workspace = args.workspace.resolve()
+        args.language = args.language or 'en'
+        args.port = 0
+        original_tk = tk.Tk
+        def acceptance_window(*values, **options):
+            window = original_tk(*values, **options)
+            def close_window():
+                command = window.protocol('WM_DELETE_WINDOW')
+                if command:
+                    window.tk.call(command)
+                else:
+                    window.destroy()
+            window.after(1000, close_window)
+            return window
+        tk.Tk = acceptance_window
+        try:
+            return setup_gui(args) if args.install else run_gui(args)
+        finally:
+            tk.Tk = original_tk
     if args.self_test:
         if args.workspace is None or args.report is None:
             raise RuntimeError('Self-test requires explicit workspace and report paths.')

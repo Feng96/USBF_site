@@ -19,7 +19,9 @@ def main():
     build = json.loads(metadata[0].read_text(encoding='utf-8'))
     executable = Path(build['executable'])
     prefix = ['xvfb-run', '-a'] if platform.system() == 'Linux' else []
-    subprocess.run(prefix + [str(executable), '--gui-smoke'], check=True, timeout=60)
+    for mode in (['--install'], []):
+        subprocess.run(prefix + [str(executable), '--gui-smoke', '--workspace', str(args.work / 'gui-smoke')] + mode,
+                       check=True, timeout=90)
     workspace = args.work / 'installed workspace'
     args.work.mkdir(parents=True, exist_ok=True)
     asset = args.assets / build['asset']
@@ -57,13 +59,22 @@ def main():
         marker = workspace / name / 'user-file-kept.txt'
         marker.write_text('user data', encoding='utf-8')
         markers.append(marker)
-    # Launch from the original bundle to test cleanup independently of locked binaries.
-    subprocess.run([str(executable), '--uninstall', '--yes', '--workspace', str(workspace)],
+    # Windows must exercise deletion of the runtime whose executable is running.
+    cleanup_executable = installed if platform.system() == 'Windows' else executable
+    subprocess.run([str(cleanup_executable), '--uninstall', '--yes', '--workspace', str(workspace),
+                    '--report', str(args.work / 'uninstall-command.json')],
                    check=True, timeout=60)
-    deadline = time.monotonic() + 45
+    deadline = time.monotonic() + 90
     while time.monotonic() < deadline and (workspace / receipt['runtime']).exists():
         time.sleep(.2)
-    assert not (workspace / receipt['runtime']).exists(), 'The managed runtime was not removed'
+    if (workspace / receipt['runtime']).exists():
+        status = workspace / 'Engine' / 'uninstall-status.json'
+        detail = status.read_text(encoding='utf-8-sig') if status.is_file() else 'No cleanup worker status was written.'
+        worker_log = workspace / 'Engine' / 'uninstall-worker.log'
+        if worker_log.is_file():
+            detail += '\n' + worker_log.read_text(encoding='utf-8-sig', errors='replace')[-12000:]
+        (args.assets / 'uninstall-failure.txt').write_text(detail, encoding='utf-8')
+        raise AssertionError('The managed runtime was not removed: ' + detail)
     assert all(p.read_text(encoding='utf-8') == 'user data' for p in markers)
     assert json.loads(receipt_path.read_text(encoding='utf-8'))['installed'] is False
     result['checks'] += ['Actual installer installs into the chosen workspace',
