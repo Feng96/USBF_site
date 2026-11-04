@@ -20,6 +20,13 @@ function client(saved=null,userAgent='Desktop'){
  ok(c.memory.get('usbf-native-session-v1').includes('secret-tab-token')&&!JSON.stringify(N.status()).includes('secret-tab-token'),'Only tab session storage receives the pairing token; public status and UI events exclude it');
  await N.jobs();const jobs=c.requests.at(-1);
  ok(jobs.options.headers.Authorization==='Bearer secret-tab-token'&&jobs.options.credentials==='omit'&&jobs.options.redirect==='error','Protected requests use the paired bearer and cannot forward it through redirects or cookies');
+ const tileBytes=new Uint8Array([26,0]).buffer;c.setRespond(url=>url.includes('/tiles/')?{ok:true,status:200,arrayBuffer:async()=>tileBytes}:url.endsWith('/query')?c.json({rows:[],total:0}):url.endsWith('/selection')?c.json({selectionId:'snapshot',count:0}):null);
+ const tile=await N.resultTile('job-one',17,37486,49729,{selectionId:'snapshot-one'}),tileRequest=c.requests.at(-1);
+ ok(tile===tileBytes&&tileRequest.options.headers.Authorization==='Bearer secret-tab-token'&&!tileRequest.url.includes('secret-tab-token')&&tileRequest.url.endsWith('.pbf?selectionId=snapshot-one'),'Binary native tiles use bearer headers while map URLs contain only opaque selection identities');
+ await N.queryResult('job-one',{filters:[{field:'original_id',op:'eq',value:'9007199254740993123'}],highlightSelectionId:'snapshot-one'});const query=JSON.parse(c.requests.at(-1).options.body);
+ ok(query.filters[0].value==='9007199254740993123'&&query.highlightSelectionId==='snapshot-one','Complete-result queries preserve exact long identifiers and selection membership independently of the page');
+ await N.selectResult('job-one',{mode:'replace',scope:{geometry:{type:'Polygon',coordinates:[]},crs:'EPSG:4326'}});
+ ok(c.requests.at(-1).options.method==='POST'&&JSON.parse(c.requests.at(-1).options.body).scope.crs==='EPSG:4326','Native selection sends the explicit original-geometry scope to the protected service');
  let cancelledBody=false;c.setRespond(url=>url.includes('/download?')?{ok:true,status:200,headers:{get:key=>key==='content-length'?String(1024**3):'application/octet-stream'},body:{async cancel(){cancelledBody=true;}}}:null);await assert.rejects(()=>N.download('large-job','parquet'),/too large/);ok(cancelledBody,'A result beyond the browser fallback budget cancels its response stream instead of holding a native download open');
  let resolveOld;c.setRespond(url=>url.endsWith('/v1/status')?new Promise(resolve=>{resolveOld=resolve;}):null);const old=N.refresh();await Promise.resolve();const disconnect=N.unpair();
  ok(!N.status().paired&&!c.memory.has('usbf-native-session-v1'),'Disconnect forgets credentials immediately while token revocation is in flight');

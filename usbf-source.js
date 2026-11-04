@@ -4,7 +4,7 @@
   const base='https://data.source.coop/opengeos/us-buildings/USBF_v1/';
   const manifestURL=base+'manifest.json',pollMs=5*60*1000;
   const columns=['usbf_id','source','id','state','cx','cy','height','gba_var','modified','modification_type','added_area_m2','removed_area_m2','hollow_cut','shape_changed','possible_small_FP','height_coverage_status','height_valid_fraction','height_missing','height_incomplete','inference_input_mode','update_date','footprint_license','height_license','source_generation','source_identity_basis','release_status','processing_status','is_gba_only','height_source','geometry_fallback','gba_region','region','var'];
-  const entry={id:'usbf-live',name:'USBF · U.S. Building Footprints',type:'viewport',driver:'usbf',releaseRef:{version:1,sourceId:'usbf-live',policy:'latest'},fields:[...columns,'height_m','country_iso'],heightField:'height_m',color:'#287f76',category:'Our USBF data',recommended:true,description:'Our U.S. building footprints and available heights. Browse the map, then load original data when you analyze or download an area.',scope:'Our data · CONUS48 + DC',provider:'USBF / opengeos',page:'https://source.coop/opengeos/us-buildings',license:'Per-record ODbL 1.0 / CC BY-NC 4.0 components',attribution:'USBF / opengeos; upstream GBA, OpenStreetMap, Microsoft and Google · per-component ODbL / CC BY-NC 4.0',bounds:[[-125,24],[-66,50]],minViewZoom:14,sourceNote:'Full published polygons selected by source cx/cy ownership coordinates around the map view. height_m is a positive inherited GBA height; nDSM input coverage is separate. Original null flags and component licenses are retained.',links:[['Live release manifest',manifestURL],['Schema',base+'schema.json'],['Component licenses',base+'LICENSES.md']]};
+  const entry={id:'usbf-live',name:'USBF · U.S. Building Footprints',type:'viewport',driver:'usbf',releaseRef:{version:1,sourceId:'usbf-live',policy:'latest'},fields:[...columns,'height_m','country_iso'],heightField:'height_m',color:'#287f76',category:'Our USBF data',recommended:true,description:'Our U.S. building footprints and available heights. Browse the map, then load original data when you analyze or download an area.',scope:'Our data · CONUS48 + DC',provider:'USBF / opengeos',page:'https://source.coop/opengeos/us-buildings',license:'Per-record ODbL 1.0 / CC BY-NC 4.0 components',attribution:'USBF / opengeos; upstream GBA, OpenStreetMap, Microsoft and Google · per-component ODbL / CC BY-NC 4.0',bounds:[[-125,24],[-66,50]],minViewZoom:14,sourceNote:'Whole published polygons intersecting the saved boundary, including touching outlines; candidate parts use published file bounds whose completeness is not certified. height_m is a positive inherited GBA height; nDSM input coverage is separate. Original null flags and component licenses are retained.',links:[['Live release manifest',manifestURL],['Schema',base+'schema.json'],['Component licenses',base+'LICENSES.md']]};
   const intersects=(a,b)=>a[0]<=b[2]&&a[2]>=b[0]&&a[1]<=b[3]&&a[3]>=b[1];
   const validBox=b=>Array.isArray(b)&&b.length===4&&b.every(Number.isFinite)&&b[0]<=b[2]&&b[1]<=b[3]&&b[0]>=-180&&b[2]<=180&&b[1]>=-90&&b[3]<=90;
   const empty=()=>({type:'FeatureCollection',features:[]});
@@ -15,15 +15,15 @@
       if(typeof f.path!=='string'||!/^USBF_x[+-]\d+_y[+-]\d+\.parquet$/.test(f.path))continue;
       if(seen.has(f.path)||!validBox(f.bbox)||!validBox(f.tile_bbox)||!Number.isSafeInteger(f.bytes)||f.bytes<=0||!Number.isSafeInteger(f.rows)||f.rows<0)throw Error('The USBF manifest contains an invalid tile entry.');
       if(typeof f.sha256!=='string'||!/^[a-f0-9]{64}$/i.test(f.sha256))throw Error('USBF tile checksums are missing.');
-      seen.add(f.path);rows+=f.rows;tiles.push({path:f.path,bytes:f.bytes,rows:f.rows,sha256:f.sha256.toLowerCase(),bbox:f.bbox.slice(),tile_bbox:f.tile_bbox.slice()});
+      seen.add(f.path);rows+=f.rows;tiles.push({path:f.path,bytes:f.bytes,rows:f.rows,sha256:f.sha256.toLowerCase(),bbox:f.bbox.slice(),tile_bbox:f.tile_bbox.slice(),...(validBox(f.geometry_bbox)?{geometry_bbox:f.geometry_bbox.slice(),geometry_bounds_complete:f.geometry_bounds_complete===true}:{} )});
     }
     if(!tiles.length||tiles.length!==data.tiles||rows!==data.buildings||!Number.isSafeInteger(rows)||!Number.isFinite(Date.parse(data.updated_utc)))throw Error('The USBF manifest counts or publication date are inconsistent.');
-    return {release:data.release,updated:data.updated_utc,buildings:rows,count:tiles.length,tiles,signature:JSON.stringify([data.release,data.updated_utc,tiles.map(t=>[t.path,t.sha256,t.bytes,t.bbox])])};
+    return {release:data.release,updated:data.updated_utc,buildings:rows,count:tiles.length,tiles,geometryBoundsGuaranteed:tiles.every(t=>t.geometry_bounds_complete===true),signature:JSON.stringify([data.release,data.updated_utc,tiles.map(t=>[t.path,t.sha256,t.bytes,t.bbox])])};
   }
   function buffered(box){const padding=.002;return [Math.max(-180,box[0]-padding),Math.max(-90,box[1]-padding),Math.min(180,box[2]+padding),Math.min(90,box[3]+padding)];}
-  const selectTiles=(manifest,box)=>manifest.tiles.filter(t=>intersects(t.bbox,buffered(box)));
-  function tileURL(tile){if(!/^USBF_x[+-]\d+_y[+-]\d+\.parquet$/.test(tile.path)||!/^[a-f0-9]{64}$/.test(tile.sha256))throw Error('Invalid USBF tile address.');return base+encodeURIComponent(tile.path)+'?v='+tile.sha256;}
-  function normalize(row,geometry){const properties={};for(const key of columns)if(Object.hasOwn(row,key)){const v=row[key];properties[key]=typeof v==='bigint'?String(v):v;}properties.height_m=typeof row.height==='number'&&Number.isFinite(row.height)&&row.height>0?row.height:null;properties.country_iso='USA';return {type:'Feature',geometry,properties};}
+  const selectTiles=(manifest,box)=>manifest.tiles.filter(t=>intersects(t.geometry_bounds_complete===true&&validBox(t.geometry_bbox)?t.geometry_bbox:t.bbox,box));
+  function tileURL(tile){if(!/^USBF_x[+-]\d+_y[+-]\d+\.parquet$/.test(tile.path)||!/^[a-f0-9]{64}$/.test(tile.sha256))throw Error('Invalid USBF tile address.');const url=new URL((tile.baseUrl||base)+encodeURIComponent(tile.path));if(url.origin!=='https://data.source.coop'||!url.pathname.startsWith('/opengeos/us-buildings/')||url.username||url.password||url.hash)throw Error('Invalid USBF tile address.');url.searchParams.set('v',tile.sha256);return url.href;}
+  function normalize(row,geometry){const properties=Object.fromEntries(Object.entries(row).filter(([key])=>key!=='geometry'&&key!=='original_geometry').map(([key,v])=>[key,typeof v==='bigint'?String(v):v]));properties.height_m=typeof row.height==='number'&&Number.isFinite(row.height)&&row.height>0?row.height:null;properties.country_iso='USA';return {type:'Feature',geometry,properties};}
   const displayManifestURL='https://data.source.coop/opengeos/us-buildings/USBF_display/manifest.json';
   const aborted=()=>new DOMException('Cancelled.','AbortError');
   const clone=value=>JSON.parse(JSON.stringify(value));
@@ -47,7 +47,7 @@
     return {...data,url:url.href+'?v='+data.sha256,source_release:clone(release)};
   }
   async function getDisplay(signal){const url=new URL(displayManifestURL);url.searchParams.set('_check',Date.now());return parseDisplay(await readJSON(url,{signal,optional:true}));}
-  async function getPublication(signal){const url=new URL(manifestURL);url.searchParams.set('_check',Date.now());return parseManifest(await readJSON(url,{signal}));}
+  async function getPublication(signal){const url=new URL(manifestURL);url.searchParams.set('_check',Date.now());const manifest=parseManifest(await readJSON(url,{signal}));return globalThis.PortalReleases?.enrichManifest?PortalReleases.enrichManifest(manifest,{signal}):manifest;}
   async function prepare(l){
     if(l.cfg.releaseRef?.policy==='pinned'){if(!globalThis.PortalReleases)throw Error('The release registry is unavailable.');const pinned=await PortalReleases.resolve(l);l.cfg.analysisMode='on-demand';l.renderTiled=true;l.displayMode='pmtiles';l.displayRelease=clone(pinned.display.source_release);l.release=clone(pinned.display.source_release);l.usbfConnection={display:pinned.display,manifest:pinned.manifest,displayWarning:'',pinned:true,releaseRef:pinned.ref};l.cfg.sourceLayer=pinned.display.source_layer;l.cfg.displayTiles=true;l.fields=pinned.display.fields.slice();return l.usbfConnection;}
     let display=null,displayWarning='';
@@ -89,7 +89,7 @@
     }
     function startWorker(){
       if(worker)return worker;
-      worker=new Worker(new URL('./usbf-analysis-worker.js?v=1.11-tasks',document.baseURI),{type:'module'});
+      worker=new Worker(new URL('./usbf-analysis-worker.js?v=1.12-results',document.baseURI),{type:'module'});
       worker.onmessage=event=>{
         const data=event.data,job=jobs.get(data.id);if(!job)return;
         if(data.progress){job.progress?.(data.progress.done,data.progress.total);return;}
@@ -97,7 +97,7 @@
         l.analysisState.loading=jobs.size>0;
         if(data.error){if(data.code==='RELEASE_CHANGED'){manifestAt=0;cache.clear();cacheSize=0;worker?.postMessage({type:'clear-cache'});}const error=Error(data.error);error.name=data.name||'Error';error.code=data.code;l.analysisState.error=error.message;job.reject(error);update();return;}
         if(stopped||job.generation!==generation){job.reject(aborted());return;}
-        const result={data:data.data,fields:Array.from(new Set(data.data.features.flatMap(feature=>Object.keys(feature.properties||{})))),viewBounds:job.bounds.slice(),viewLimited:!!data.limited,viewLoadedAt:new Date().toISOString(),viewBytes:data.networkBytes??data.bytes,readBytes:data.bytes,release:clone(job.release),loaded:true,error:false,viewLoading:false,viewSelection:'Complete source polygons selected by published cx/cy ownership coordinates in the requested bounds plus a 0.002-degree buffer; not an exhaustive intersection query for large buildings centered outside that buffer.'};
+        const result={data:{...data.data,provenance:{...(data.data.provenance||{}),coverageContract:{version:1,spatialRule:'whole-geometry-intersects-v1',candidateIndex:'published-file-bbox',geometryBoundsGuaranteed:job.geometryBoundsGuaranteed===true?true:null,providerCompleteness:null,requestComplete:!data.limited}}},fields:Array.from(new Set(data.data.features.flatMap(feature=>Object.keys(feature.properties||{})))),viewBounds:job.bounds.slice(),viewLimited:!!data.limited,viewLoadedAt:new Date().toISOString(),viewBytes:data.networkBytes??data.bytes,readBytes:data.bytes,release:clone(job.release),loaded:true,error:false,viewLoading:false,viewSelection:'Whole source geometries intersecting the requested boundary; touching is included. Candidate files use published bounds; uncertified bounds and provider completeness are reported separately.'};
         const size=JSON.stringify(result.data).length*2;
         if(size<=24*1024*1024){if(cache.has(job.key))cacheSize-=cache.get(job.key).size;cache.set(job.key,{result,size,featureId:job.featureId,signature:job.signature,verified:job.verified});cacheSize+=size;while(cache.size>3||cacheSize>24*1024*1024){const key=cache.keys().next().value;cacheSize-=cache.get(key).size;cache.delete(key);}}
         publishRaw(result);job.resolve(result);
@@ -109,7 +109,7 @@
       if(l.cfg.releaseRef?.policy==='pinned'){if(!manifest||pinnedManifestIdentity!==l.cfg.releaseRef.releaseId){const pinned=await PortalReleases.resolve(l,{signal});manifest=pinned.manifest;connection.manifest=manifest;pinnedManifestIdentity=l.cfg.releaseRef.releaseId;}if(signal?.aborted||stopped)throw aborted();return manifest;}
       if(!manifest||Date.now()-manifestAt>pollMs){
         // A shared metadata read does not belong to any one analytical operation.
-        if(!manifestRequest)manifestRequest=getPublication().then(next=>{manifest=next;pinnedManifestIdentity=null;manifestAt=Date.now();if(l.displayMode!=='original')l.release=releaseOf(next);l.displayStale=!!l.displayRelease&&l.displayRelease.updated!==next.updated;return next;}).finally(()=>{manifestRequest=null;});
+        if(!manifestRequest)manifestRequest=getPublication().then(next=>{manifest=next;connection.manifest=next;pinnedManifestIdentity=null;manifestAt=Date.now();if(l.displayMode!=='original')l.release=releaseOf(next);l.displayStale=!!l.displayRelease&&l.displayRelease.updated!==next.updated;return next;}).finally(()=>{manifestRequest=null;});
         await new Promise((resolve,reject)=>{
           const cancel=()=>{cleanup();reject(aborted());};
           const cleanup=()=>{metadataWaits.delete(cancel);signal?.removeEventListener('abort',cancel);};
@@ -139,7 +139,7 @@
       const ownGeneration=generation,bounds=requestBounds(options),featureId=options.scope==='selection'?options.selection.feature.properties.usbf_id:undefined;
       options.onProgress?.(0,1);const current=await publication(options.signal,ownGeneration);
       if(stopped||generation!==ownGeneration||options.signal?.aborted)throw aborted();
-      const tiles=selectTiles(current,bounds);
+      const tiles=featureId===undefined?selectTiles(current,bounds):current.tiles.filter(tile=>intersects(tile.tile_bbox,bounds));
       if(tiles.length>9)throw Error('Choose a smaller area to load original buildings.');
       const verified=l.cfg.releaseRef?.policy==='pinned',key=JSON.stringify([current.updated,verified?l.cfg.releaseRef.manifestSha256:null,bounds,featureId||null,tiles.map(tile=>[tile.path,tile.sha256])]);
       let hit=cache.get(key);
@@ -151,7 +151,7 @@
         const cancel=()=>{const job=jobs.get(id);if(!job)return;jobs.delete(id);worker?.postMessage({type:'cancel',id});job.cleanup();l.analysisState.loading=jobs.size>0;reject(aborted());update();};
         const timer=setTimeout(()=>{const job=jobs.get(id);if(!job)return;jobs.delete(id);worker?.postMessage({type:'cancel',id});job.cleanup();l.analysisState.loading=jobs.size>0;reject(Error('Original data is taking too long. Choose a smaller area or try again.'));update();},90000);
         const cleanup=()=>{clearTimeout(timer);signal?.removeEventListener('abort',cancel);};
-        jobs.set(id,{resolve,reject,cleanup,bounds,key,release:{...releaseOf(current),releaseRef:clone(l.cfg.releaseRef||{version:1,sourceId:'usbf-live',policy:'latest'}),files:tiles.map(tile=>({path:tile.path,sha256:tile.sha256,bytes:tile.bytes,rows:tile.rows}))},generation:ownGeneration,featureId,signature:current.signature,verified,progress:options.onProgress});
+        jobs.set(id,{resolve,reject,cleanup,bounds,key,release:{...releaseOf(current),releaseRef:clone(l.cfg.releaseRef||{version:1,sourceId:'usbf-live',policy:'latest'}),files:tiles.map(tile=>({path:tile.path,sha256:tile.sha256,bytes:tile.bytes,rows:tile.rows}))},generation:ownGeneration,featureId,signature:current.signature,geometryBoundsGuaranteed:current.geometryBoundsGuaranteed,verified,progress:options.onProgress});
         l.analysisState={...l.analysisState,loading:true,error:null};signal?.addEventListener('abort',cancel,{once:true});
         if(signal?.aborted){cancel();return;}
         try{startWorker().postMessage({id,bounds,tiles,verifyHashes:l.cfg.releaseRef?.policy==='pinned',...(featureId===undefined?{}:{featureId})});update();}catch(error){jobs.delete(id);cleanup();l.analysisState.loading=jobs.size>0;reject(error);}

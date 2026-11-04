@@ -15,7 +15,7 @@ import tarfile
 import urllib.request
 import zipfile
 
-VERSION = '0.1.0-preview.1'
+VERSION = '0.2.0-preview.1'
 
 
 def digest(path: Path) -> str:

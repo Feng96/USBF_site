@@ -5,13 +5,13 @@
  const states=new WeakMap();let map,mode='',operation='replace',busy=false,origin=null,lastBox=null,vertices=[],overlay,strip,anchor=new WeakMap();
  const empty=()=>({type:'FeatureCollection',features:[]}),active=()=>root.PortalLayers?.active;
  function state(l){let s=states.get(l);if(!s||s.data!==l.data){s={data:l.data,set:new Set(),engaged:false};states.set(l,s);}return s;}
- function features(l=active()){return l?Array.from(state(l).set):[];}
- function engaged(l=active()){return !!l&&state(l).engaged;}
- function count(l=active()){return l?state(l).set.size:0;}
+ function features(l=active()){if(l?.cfg.nativeSource)return [];return l?Array.from(state(l).set):[];}
+ function engaged(l=active()){if(l?.cfg.nativeSource)return !!root.PortalNativeResults?.selection(l);return !!l&&state(l).engaged;}
+ function count(l=active()){if(l?.cfg.nativeSource)return root.PortalNativeResults?.count(l)||0;return l?state(l).set.size:0;}
  function has(l,f){return !!l&&state(l).set.has(f);}
  function update(){
   if(!map)return;const l=active(),items=l?features(l):[];map.getSource('gis-bulk-selection')?.setData({type:'FeatureCollection',features:items});
-  const label=document.querySelector('[data-gis-selection-count]');if(label)label.textContent=items.length.toLocaleString('en-US');
+  const label=document.querySelector('[data-gis-selection-count]');if(label)label.textContent=count(l).toLocaleString('en-US');
   root.PortalInventory?.refresh();document.dispatchEvent(new CustomEvent('portal-bulk-selection-changed'));
  }
  function set(l,items,op=operation){
@@ -22,7 +22,7 @@
   if(op==='add')for(const f of incoming)next.add(f);if(op==='subtract')for(const f of incoming)next.delete(f);if(op==='intersect')next=new Set([...next].filter(f=>incoming.has(f)));
   if(next.size>20000)throw Error('Select up to 20,000 original records at a time.');s.set=next;s.engaged=true;update();return next.size;
  }
- function clear(l=active()){if(l){state(l).set.clear();state(l).engaged=true;anchor.delete(l);if(root.PortalLayers.selection?.layer===l.id)root.PortalLayers.clearExternalSelection();}update();}
+ function clear(l=active()){if(l?.cfg.nativeSource){root.PortalNativeResults.select(l,{mode:'clear'}).catch(notify);return;}if(l){state(l).set.clear();state(l).engaged=true;anchor.delete(l);if(root.PortalLayers.selection?.layer===l.id)root.PortalLayers.clearExternalSelection();}update();}
  function row(l,f,event,rows){
   if(!root.PortalInventory.tableData.supportsLoaded(l))return;
   const prior=anchor.get(l),i=rows.indexOf(f);
@@ -38,7 +38,7 @@
  }
  async function selectMask(mask,op=operation){
   if(busy)return;const source=active();if(!source)throw Error('Choose a layer first.');busy=true;
-  try{const range=root.PortalGISRange.value(root.PortalGISCore.validateMask(mask),'Map selection',{kind:'map-selection',crs:'EPSG:4326'}),l=await original(source,range);set(l,await root.PortalGISCore.filterAsync(l.data.features,range.mask),op);}
+  try{if(source.cfg.nativeSource)return await root.PortalNativeResults.selectMask(source,mask,op);const range=root.PortalGISRange.value(root.PortalGISCore.validateMask(mask),'Map selection',{kind:'map-selection',crs:'EPSG:4326'}),l=await original(source,range);set(l,await root.PortalGISCore.filterAsync(l.data.features,range.mask),op);}
   finally{busy=false;}
  }
  function notify(error){root.portal?.toast(error.message||String(error));}
@@ -55,7 +55,7 @@
   if(!mode)return false;if(mode==='box'||mode==='area-box')return true;
   if(mode==='polygon'||mode==='area-polygon'){if(vertices.length>=500){notify('Use up to 500 selection vertices.');return true;}vertices.push([e.lngLat.lng,e.lngLat.lat]);sketch();strip.querySelector('[data-gis-selection-help]').textContent=vertices.length+' polygon corners';return true;}
   if(busy)return true;busy=true;const l=active(),point=[e.lngLat.lng,e.lngLat.lat],event=e.originalEvent||{};
-  (async()=>{if(!l)throw Error('Choose a layer first.');const local=await original(l,null),hits=root.PortalGISCore.filter(local.data.features,root.turf.bboxPolygon([point[0]-.000001,point[1]-.000001,point[0]+.000001,point[1]+.000001]));if(hits.length){const f=hits[0],op=event.ctrlKey||event.metaKey?(has(local,f)?'subtract':'add'):event.shiftKey?'add':operation;set(local,[f],op);if(has(local,f))root.PortalLayers.inspect(local,f);else root.PortalLayers.clearExternalSelection();}})().catch(notify).finally(()=>busy=false);return true;
+  (async()=>{if(!l)throw Error('Choose a layer first.');if(l.cfg.nativeSource){await root.PortalNativeResults.selectClick(l,e,operation);return;}const local=await original(l,null),hits=root.PortalGISCore.filter(local.data.features,root.turf.bboxPolygon([point[0]-.000001,point[1]-.000001,point[0]+.000001,point[1]+.000001]));if(hits.length){const f=hits[0],op=event.ctrlKey||event.metaKey?(has(local,f)?'subtract':'add'):event.shiftKey?'add':operation;set(local,[f],op);if(has(local,f))root.PortalLayers.inspect(local,f);else root.PortalLayers.clearExternalSelection();}})().catch(notify).finally(()=>busy=false);return true;
  }
  function init(){if(map||!root.portal?.ready)return;map=root.portal.map;const s='gis-bulk-selection';map.addSource(s,{type:'geojson',data:empty()});map.addLayer({id:s+'-fill',type:'fill',source:s,filter:['==',['geometry-type'],'Polygon'],paint:{'fill-color':'#8952b3','fill-opacity':.2}});map.addLayer({id:s+'-line',type:'line',source:s,paint:{'line-color':'#8b3db8','line-width':2.5}});map.addLayer({id:s+'-point',type:'circle',source:s,filter:['==',['geometry-type'],'Point'],paint:{'circle-color':'#8b3db8','circle-radius':7,'circle-opacity':.6}});
   map.addSource('gis-selection-sketch',{type:'geojson',data:empty()});map.addLayer({id:'gis-selection-sketch-line',type:'line',source:'gis-selection-sketch',filter:['==',['geometry-type'],'LineString'],paint:{'line-color':'#8b3db8','line-width':2,'line-dasharray':[2,2]}});map.addLayer({id:'gis-selection-sketch-points',type:'circle',source:'gis-selection-sketch',filter:['==',['geometry-type'],'Point'],paint:{'circle-radius':4,'circle-color':'#8b3db8'}});

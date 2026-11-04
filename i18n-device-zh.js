@@ -1,5 +1,34 @@
 /* Device/files interface only. Filenames, data values and format names remain opaque. */
 Object.assign(window.PortalTranslations['zh-CN'], Object.fromEntries(`
+Local resources and verified cache|本地资源和已验证缓存
+Execution location|执行位置
+Verified source-cache size|已验证源数据缓存大小
+Source-cache target|源数据缓存目标
+Protected unfinished-task cache|受保护的未完成任务缓存
+Reused verified downloads|已复用的已验证下载次数
+CPU threads|CPU 线程数
+Memory limit (MiB)|内存限制 (MiB)
+Source-cache target (MiB)|源数据缓存目标 (MiB)
+The cache exceeds its soft target. Clean unused cache after active tasks finish.|缓存超过软限制，请在当前任务结束后清理不再使用的缓存。
+Resource settings apply to new native connections. Finish or cancel active tasks before changing them.|资源设置用于后续本地连接，请先结束或取消当前任务。
+The cache target is soft. Unfinished-task checkpoints, Projects, Results and Files are always kept. Cleanup removes only checksum-verified disposable files.|缓存目标为软限制。始终保留未完成任务的检查点、Projects、Results 和 Files。清理仅移除通过校验的可清理文件。
+Save resource settings|保存资源设置
+Refresh native cache|刷新本地缓存
+Clean unused native cache|清理未使用的本地缓存
+Run local health checks|运行本地健康检查
+Local health checks passed|本地健康检查通过
+Some local health checks need attention|部分本地健康检查需要处理
+Native resource settings saved.|本地资源设置已保存。
+Clean unused native cache?|清理未使用的本地缓存？
+Only verified disposable native cache files will be removed. Results, source files, projects and unfinished-task checkpoints are kept.|只移除通过校验的可清理本地缓存文件。保留结果、源文件、项目和未完成任务的检查点。
+Unused native cache cleaned. User data and unfinished tasks were kept.|未使用的本地缓存已清理，用户数据和未完成任务已保留。
+Update the local engine to use resource settings, diagnostics and safe native-cache cleanup.|请更新本地引擎以使用资源设置、健康检查和安全缓存清理功能。
+Local engine cache|本地引擎缓存
+Verified native downloads are reused across tasks. Inspect their size and clean unused native cache in Local engine settings.|已验证的本地下载会在任务间复用。请在本地引擎设置中查看大小并清理未使用的缓存。
+Open native cache settings|打开本地缓存设置
+files|个文件
+Native runtime caches are managed by the local engine.|本地运行环境缓存由本地引擎管理。
+Native caches and task checkpoints are managed by the local engine and are read-only here. Browser cache cleanup never deletes them.|本地缓存和任务检查点由本地引擎管理，在此处只读。浏览器缓存清理不会删除它们。
 Device settings|设备设置
 WORKSPACE SETTINGS|工作区设置
 Overview|概览

@@ -3,7 +3,7 @@ const fs=require('fs');
 module.exports=async qa=>{
  const p=qa.page,{ok}=qa;await qa.open('?empty=1');
  await p.waitForFunction(()=>window.PortalInterface&&PortalInterface.panels.every(row=>!document.querySelector(row.selector)||document.querySelector(row.selector).querySelector('[data-interface-close="'+row.id+'"]')));
- ok(await p.evaluate(()=>PortalInterface.panels.length===19),'The registry covers all workspace panels and map toolboxes with close controls');
+ ok(await p.evaluate(()=>PortalInterface.panels.length===20),'The registry covers all workspace panels and map toolboxes with close controls');
  const selected=await p.evaluate(()=>{portal.selectFeature(portal.data.features[0].id,false);return portal.selected;});
  await p.locator('#properties [data-interface-close=properties]').click();
  ok(await p.evaluate(selected=>portal.selected===selected&&!PortalInterface.visible('properties'),selected),'Closing feature details retains the selected original feature');

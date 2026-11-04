@@ -11,7 +11,7 @@ repo = os.environ['GITHUB_REPOSITORY']
 if repo != 'Feng96/USBF_site':
     raise RuntimeError('Release publication is restricted to the USBF repository.')
 token = os.environ['GITHUB_TOKEN']
-tag = 'engine-v0.1.0-preview.1-r' + os.environ['GITHUB_RUN_NUMBER']
+tag = os.environ.get('USBF_ENGINE_RELEASE_TAG', 'engine-v0.2.0-preview.1-r5')
 root = Path(os.environ['USBF_RELEASE_ASSETS'])
 base = 'https://api.github.com/repos/' + repo
 
@@ -62,7 +62,7 @@ notes = ('Self-contained preview runtime for large USBF tasks. Install into a ch
          'paired loopback API, geographic extraction, exact attributes, paginated table and '
          'data-preserving uninstall checks. See desktop-engine/README.md for requirements and limits.')
 release = request(base + '/releases', json.dumps({'tag_name': tag, 'target_commitish': os.environ['GITHUB_SHA'],
-                  'name': 'USBF Engine 0.1.0 preview · build ' + os.environ['GITHUB_RUN_NUMBER'],
+                  'name': 'USBF Engine 0.2.0 preview · build ' + os.environ['GITHUB_RUN_NUMBER'],
                   'body': notes, 'draft': False, 'prerelease': True}).encode())
 upload = release['upload_url'].split('{')[0]
 for asset in [p[0] for p in packages] + [document]:

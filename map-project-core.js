@@ -9,7 +9,7 @@
     if(!object(v)||!/^#[a-f0-9]{6}$/i.test(v.color)||!Number.isFinite(v.opacity)||v.opacity<0||v.opacity>1||typeof v.visible!=='boolean'||!['uniform','source','height','change'].includes(v.colorMode)||!string(v.sourceFilter,500)||!Number.isFinite(v.minArea)||v.minArea<0||v.minArea>1e12||!(v.heightField===null||string(v.heightField,200)))fail('A saved layer has invalid display settings.');
   }
   const basemapIDs=['light','streets','satellite','dark','topo','terrain','blank','custom'];
-  const interfacePanels=['sidebar','attributes','properties','legend','search','navigation','viewMode','scope','dataWorkspace','draw','measure','selection','placeShortcuts','neighborhood','modelCaption','location','welcome','statusbar','mapHints'];
+  const interfacePanels=['sidebar','attributes','properties','legend','search','navigation','viewMode','scope','dataWorkspace','draw','measure','selection','nativeResults','placeShortcuts','neighborhood','modelCaption','location','welcome','statusbar','mapHints'];
   function interfaceState(v){
     if(!object(v)||Object.keys(v).some(k=>!['version','density','sidebarWidth','sidebarTab','panels'].includes(k))||v.version!==1||!['comfortable','compact'].includes(v.density)||!['narrow','normal','wide'].includes(v.sidebarWidth)||(v.sidebarTab!==undefined&&!['layers','models','catalog'].includes(v.sidebarTab))||!object(v.panels)||Object.keys(v.panels).some(k=>!interfacePanels.includes(k)||!['auto','show','hide'].includes(v.panels[k])))fail('The saved interface layout is invalid.');
     return v;
@@ -56,7 +56,7 @@
       if(!object(l)||!/^layer-\d+$/.test(l.key)||keys.has(l.key)||!string(l.name,120)||!l.name)fail('A saved layer is invalid.');keys.add(l.key);style(l.style);asset(l.asset);if(l.releaseRef!==undefined)releaseRef(l.releaseRef);if(l.meta?.releaseRef!==undefined)releaseRef(l.meta.releaseRef);if(l.meta?.nativeSource!==undefined)nativeSource(l.meta.nativeSource);if(l.meta!==undefined&&!object(l.meta))fail('A saved layer has invalid source details.');for(const k of ['page','sourceUrl'])if(l.meta?.[k])https(l.meta[k]);
       if(l.kind==='catalog'){if(!string(l.catalogId,120)||!l.catalogId)fail('A saved catalog source is invalid.');}
       else if(l.kind==='vector'){
-        if(!object(l.data)||l.data.type!=='FeatureCollection'||!Array.isArray(l.data.features)||!l.data.features.length||l.data.features.length>50000||!object(l.meta))fail('A saved vector layer is invalid.');options.validateVector?.(l.data);
+        if(!object(l.data)||l.data.type!=='FeatureCollection'||!Array.isArray(l.data.features)||!l.data.features.length&&!(l.data.provenance?.geometryQuality==='bounded-native-preview'&&l.data.provenance.spatialEligible===false)||l.data.features.length>50000||!object(l.meta))fail('A saved vector layer is invalid.');options.validateVector?.(l.data);
         for(const k of ['page','sourceUrl'])if(l.meta[k])https(l.meta[k]);
       }else if(l.kind==='raster'){
         if(!object(l.import)||!['geotiff','image'].includes(l.import.type)||!l.asset&&!l.import.url)fail('A saved raster is missing its source.');if(l.import.url)https(l.import.url);if(l.import.readExtentWGS84!==undefined){const b=l.import.readExtentWGS84;if(!Array.isArray(b)||b.length!==4||!b.every(Number.isFinite)||b[0]>=b[2]||b[1]>=b[3]||Math.abs(b[0])>180||Math.abs(b[2])>180||Math.abs(b[1])>85.05113||Math.abs(b[3])>85.05113)fail('A saved raster has an invalid read area.');}

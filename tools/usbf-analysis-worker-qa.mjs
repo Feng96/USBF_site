@@ -21,7 +21,7 @@ const bootstrap=String.raw`
 import {parentPort,workerData} from 'node:worker_threads';
 import fs from 'node:fs';
 const bytes=fs.readFileSync(workerData.file),held=new Map();
-let etag='"qa-release-a"',holdNext=false,fetchSequence=0,corrupt=false;
+let etag='"qa-release-a"',nextEtag=null,holdNext=false,fetchSequence=0,corrupt=false;
 globalThis.self=globalThis;
 globalThis.postMessage=message=>parentPort.postMessage(message);
 globalThis.fetch=async(raw,options={})=>{
@@ -32,7 +32,7 @@ globalThis.fetch=async(raw,options={})=>{
   const start=match?Number(match[1]):0,end=match?Number(match[2])+1:bytes.byteLength;
   if(start<0||end>bytes.byteLength||end<=start)throw Error('Invalid fixture range.');
   if(options.signal?.aborted)throw new DOMException('Fixture request cancelled.','AbortError');
-  const fetchId=++fetchSequence,tag=etag;
+  const fetchId=++fetchSequence,tag=etag;if(nextEtag){etag=nextEtag;nextEtag=null;}
   parentPort.postMessage({qa:'fetch',fetchId,start,end,etag:tag,full:!match});
   if(holdNext){
     holdNext=false;
@@ -48,7 +48,7 @@ parentPort.on('message',async message=>{
     try{
       if(message.action==='hold-next')holdNext=true;
       else if(message.action==='release'){for(const resolve of held.values())resolve();held.clear();}
-      else if(message.action==='etag')etag=message.value;
+      else if(message.action==='etag')etag=message.value;else if(message.action==='next-etag')nextEtag=message.value;
       else if(message.action==='corrupt')corrupt=message.value;
       else if(message.action==='clear-cache')await self.onmessage({data:{type:'clear-cache'}});
       else throw Error('Unknown QA control.');
@@ -79,7 +79,7 @@ class Harness{
   async close(){this.closing=true;for(const waiter of this.waiters)clearTimeout(waiter.timer);this.waiters=[];await this.worker.terminate();}
 }
 
-let main,cancelled;
+let main,cancelled,indexed;
 try{
   main=new Harness();await main.ready();
   ok(source.subarray(0,4).toString()==='PAR1'&&source.subarray(-4).toString()==='PAR1'&&index.codec.includes('ZSTD'),'The checked fixture is an actual PyArrow ZSTD Parquet file with matching native byte length and SHA256');
@@ -90,6 +90,9 @@ try{
   ok(courtyard.properties.height_m===18&&courtyard.properties.height_missing===true&&courtyard.properties.modified===null&&zero.properties.modified===false&&zero.properties.height_missing===false&&zero.properties.height_m===null,'Native null and false values survive decoding, and a positive inherited height remains independent of its missing-input flag');
   ok(courtyard.properties.id==='1152921504606846977'&&courtyard.properties.footprint_license.includes('ODbL')&&courtyard.properties.height_license.includes('CC BY-NC'),'The native INT64 identifier and both component licenses retain their exact original meanings');
   ok(main.messages.some(m=>m.id==='original-near'&&m.progress?.done===1)&&main.messages.some(m=>m.qa==='fetch'&&m.end-m.start===tile.bytes),'Actual worker progress and full native footer-range fetching are observable without replacing the parser');
+  const crossing=await main.request('crossing-owner-outside',[-77.0751,38.9101,-77.0745,38.9105]);same(crossing.data.features,[courtyard],'Whole geometry intersection includes a boundary-crossing building whose ownership coordinate lies outside the former buffer');
+  const holeOnly=await main.request('inside-courtyard-hole',[-77.0729,38.9111,-77.0721,38.9119]);ok(!holeOnly.error&&holeOnly.data.features.length===0,'A study area wholly inside a courtyard hole does not select the surrounding building');
+  const touching=await main.request('touching-boundary',[-77.0752,38.9101,-77.075,38.9105]);same(touching.data.features,[courtyard],'Exact boundary touching is included, matching the native ST_Intersects rule');
   const cached=await main.request('cached-near');same(cached.data.features,first.data.features,'A repeated explicit request returns the same complete original records');
   ok(cached.networkBytes===0&&cached.cacheHits>0,'Repeated original-data reads reuse cached real byte ranges without network transfer');
   const pinned=await main.request('pinned-original',index.near.bounds,{verifyHashes:true});assert(!pinned.error,pinned.error);same(pinned.data.features,index.near.features,'A pinned read verifies the full real Parquet shard before decoding its original records');
@@ -99,9 +102,9 @@ try{
   const selected=await main.request('selected-original',index.near.bounds,{featureId:'qa-courtyard'});same(selected.data.features,[courtyard],'Selecting a USBF ID returns only that complete original building and its courtyard rather than a display fragment');
   const missing=await main.request('missing-selection',index.near.bounds,{featureId:'not-a-real-qa-id'});ok(!missing.error&&missing.data.features.length===0,'An unknown selected identifier cannot fall back to unrelated original buildings');
 
-  await main.control('etag','"qa-release-b"');const beforeMismatch=main.messages.filter(m=>m.qa==='fetch').length;
+  await main.control('clear-cache');await main.control('next-etag','"qa-release-b"');const beforeMismatch=main.messages.filter(m=>m.qa==='fetch').length;
   const changed=await main.request('changed-publication',index.far.bounds);
-  ok(changed.code==='RELEASE_CHANGED'&&!changed.data&&main.messages.filter(m=>m.qa==='fetch').length>beforeMismatch,'A cached footer plus a newly read row group with a changed ETag rejects the whole mixed-publication result');
+  ok(changed.code==='RELEASE_CHANGED'&&!changed.data&&main.messages.filter(m=>m.qa==='fetch').length>beforeMismatch,'A changed ETag between real footer and geometry ranges rejects the whole mixed-publication result');
   const retried=await main.request('retry-new-publication',index.far.bounds);assert(!retried.error,retried.error);same(retried.data.features,index.far.features,'Retry after ETag rejection clears stale byte ranges and decodes the new publication consistently');
   ok(retried.networkBytes>0&&main.messages.some(m=>m.id==='retry-new-publication'&&m.data),'The successful retry performs fresh native range reads instead of reusing rejected publication bytes');
   const cachedNew=await main.request('cached-new-publication',index.far.bounds);ok(!cachedNew.error&&cachedNew.networkBytes===0&&cachedNew.cacheHits>0,'The replacement publication can be cached normally after a complete successful retry');
@@ -116,6 +119,11 @@ try{
   const afterCached=await cancelled.request('cached-after-cancel');ok(afterCached.networkBytes===0&&afterCached.cacheHits>0,'Only the subsequent successful job populates reusable original-data ranges');
 
   const invalid=await main.request('too-many-source-tiles',index.near.bounds,{tiles:Array.from({length:10},()=>tile)});ok(invalid.error&&!invalid.data,'The actual worker rejects an oversized tile list before decoding or allocating larger inputs');
+  indexed=new Harness();await indexed.ready();const indexedTile={...tile,rowGroupsVerified:true,rowGroups:[{rowStart:0,rowEnd:4,geometry_bbox:[-77.075,38.910,-77.069,38.914],geometry_bounds_complete:true},{rowStart:4,rowEnd:8,geometry_bbox:[-77.301,38.600,-77.298,38.601],geometry_bounds_complete:true}]};
+  const indexedNear=await indexed.request('indexed-near',index.near.bounds,{tiles:[indexedTile]});assert(!indexedNear.error,indexedNear.error);same(indexedNear.data.features,index.near.features,'Verified geometry row-group pruning preserves every original intersecting feature');
+  ok(indexedNear.networkBytes<first.networkBytes,'The real parser reads fewer byte ranges when a verified distant row group can be skipped');
+  const indexedCrossing=await indexed.request('indexed-crossing',[-77.0751,38.9101,-77.0745,38.9105],{tiles:[indexedTile]});same(indexedCrossing.data.features,[courtyard],'Verified group bounds retain the large crossing geometry outside the former ownership-coordinate buffer');
+  const gap={...indexedTile,rowGroups:[indexedTile.rowGroups[0],{...indexedTile.rowGroups[1],rowStart:5}]},badGroup=await indexed.request('invalid-index-gap',index.near.bounds,{tiles:[gap]});ok(badGroup.error?.includes('row-group index')&&!badGroup.data,'A row-group index with an omitted original row range is rejected rather than silently losing buildings');
   console.log(JSON.stringify({passed:true,checks:checks.length,fixtureDirectory:directory,fixtureBytes:tile.bytes,rows:tile.rows,codec:index.codec,nearNetworkBytes:first.networkBytes,nearCacheHits:cached.cacheHits}));
 }catch(error){console.error(error.stack||error);process.exitCode=1;}
-finally{await Promise.all([main?.close(),cancelled?.close()]);}
+finally{await Promise.all([main?.close(),cancelled?.close(),indexed?.close()]);}

@@ -7,6 +7,8 @@ for(const url of ['https://example.org','http://127.0.0.1.evil.test:52763','http
 ok(true,'Remote hosts, credentials, endpoint paths and query-string credentials cannot receive the local token');
 for(const value of ['/v1/../other','//other/v1/status','/v1/jobs/%2e%2e/status','/v1/status#fragment'])assert.throws(()=>N.safePath(value));
 ok(N.safePath('/v1/files/stat?path=Results%2Ffile..parquet').startsWith('/v1/files/stat'),'API traversal is rejected without rejecting ordinary dotted filenames in query data');
+ok(T.conditionValue({type:'HUGEINT'},'+9007199254740993123')==='+9007199254740993123'&&T.conditionValue({type:'DECIMAL(38,20)'},'0.12345678901234567890')==='0.12345678901234567890','Native numeric conditions preserve signed long identifiers and exact decimal text for typed server comparisons');
+ok(T.conditionValue({type:'BOOLEAN'},'false')===false&&T.conditionValue({type:'VARCHAR'},'false')==='false'&&T.conditionValue({type:'VARCHAR'},'001')==='001','Boolean conditions respect the original column type without changing textual values or identifiers');
 const row={id:'browser:qa',execution:'browser',status:'completed',progress:{completedParts:3,plannedParts:4,failedParts:0,actualRows:90}};
 ok(T.normalize(row).status==='partial'&&row.status==='completed','An incomplete source plan cannot be displayed as completed, and normalization leaves the original receipt unchanged');
 ok(T.normalize({...row,progress:{completedParts:5,plannedParts:4}}).status==='partial','Contradictory part totals cannot silently become a completed task');

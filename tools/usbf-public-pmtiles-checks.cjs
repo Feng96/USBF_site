@@ -62,11 +62,12 @@ module.exports = async qa => {
     await PortalDataWorkspace.saveArea(range, range.label);
     const workset = await PortalAnalysisLayers.load(l, {range});
     const f = workset?.data?.features.find(f => f.properties.usbf_id === buildingId);
-    if (!f) throw Error('The selected building was absent from the explicitly loaded original workset.');
+    if (!workset) throw Error(PortalAnalysisLayers.message(l)?.text||l.analysisState?.error||'The explicit original workset failed to load.');if (!f) throw Error('The selected building was absent from the explicitly loaded original workset.');
     PortalLayers.selectLayer(workset.id);PortalLayers.inspect(workset,f);PortalDataWorkspace.hide();
     return {id:f.properties.usbf_id,height:f.properties.height_m,fields:Object.keys(f.properties),geometry:f.geometry.type,area:PortalExplorer.footprintArea(workset,f),workset:workset.id};
   }, {id,buildingId:preview.id});
   ok(raw.length > 0 && original.id === preview.id && original.height === preview.height && original.area > 0 && original.fields.includes('footprint_license') && original.fields.includes('height_license'), 'The saved-area browser workset retains the real selected ID, supplied height, full footprint and component licenses');
+  ok(original.fields.length===69&&['engineering_policy','original_wkb_sha','height_coverage_pixels'].every(name=>original.fields.includes(name)), 'The real browser workset preserves all 67 ordinary original attributes plus its two labelled display aliases');
   await qa.screenshot('public-pmtiles-desktop.png');
   const beforeMove = raw.length;
   await p.evaluate(() => { portal.map.jumpTo({ zoom: 17.4 }); }); await waitBuildings();

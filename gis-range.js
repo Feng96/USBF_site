@@ -2,7 +2,7 @@
    bbox/polygon input, loaded layer extent or polygon mask. */
 (function(root){
  'use strict';
- const nativePreview=l=>!!l?.cfg?.nativeSource||l?.data?.provenance?.geometryQuality==='bounded-native-preview';
+ const nativePreview=l=>(!!l?.cfg?.nativeSource||l?.data?.provenance?.geometryQuality==='bounded-native-preview')&&!root.PortalNativeResults?.live(l);
  const base='https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/',cache=new Map(),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  async function request(layer,params,signal){
   const u=new URL(base+layer+'/query');u.search=new URLSearchParams({f:'geojson',outFields:'GEOID,STATE,NAME,STUSAB',outSR:'4326',...params});
@@ -36,14 +36,14 @@
   $('[data-range-file]').onchange=async e=>{const file=e.target.files[0];if(!file)return;if(file.size>12*1024*1024){$('[data-range-status]').textContent='Choose a smaller boundary file.';return;}$('[data-range-text]').value=await file.text();};kind.onchange=()=>{update();if(kind.value==='county'&&$('[data-range-state]').value)$('[data-range-state]').onchange();};update();
   async function resolve(signal){const k=kind.value,crs=workingCRS,G=root.PortalGISCore;
    if(k==='saved')return root.PortalDataWorkspace.range();
-   if(k==='selected-extent'){const l=root.PortalLayers.active;if(nativePreview(l))throw Error('A bounded native preview cannot define the full result extent. Choose a saved study area.');const fs=root.PortalGISSelection.features(l);if(!fs.length)throw Error('Select original records first.');return value(root.turf.bboxPolygon(root.turf.bbox(root.turf.featureCollection(fs))),l.cfg.name+' · selected extent',{kind:k,crs:'EPSG:4326'});}
+   if(k==='selected-extent'){const l=root.PortalLayers.active;if(nativePreview(l))throw Error('A bounded native preview cannot define the full result extent. Choose a saved study area.');if(l?.cfg.nativeSource){const b=root.PortalNativeResults.selection(l)?.bounds;if(!b)throw Error('Select original records first.');return value(root.turf.bboxPolygon(b),l.cfg.name+' · selected extent',{kind:k,crs:'EPSG:4326'});}const fs=root.PortalGISSelection.features(l);if(!fs.length)throw Error('Select original records first.');return value(root.turf.bboxPolygon(root.turf.bbox(root.turf.featureCollection(fs))),l.cfg.name+' · selected extent',{kind:k,crs:'EPSG:4326'});}
    if(k==='state'||k==='county')return administrative(k,k==='state'?$('[data-range-state]').value:$('[data-range-county]').value,signal);
    if(k==='view'){const b=root.portal.map.getBounds();return value(root.turf.bboxPolygon([b.getWest(),b.getSouth(),b.getEast(),b.getNorth()]),'Current map view',{kind:k,crs:'EPSG:4326'});}
    if(k==='drawn'){if(!root.PortalGISSelection?.lastBox)throw Error('Draw a selection box on the map first.');return value(root.PortalGISSelection.lastBox,'Last map box',{kind:k,crs:'EPSG:4326'});}
    if(k==='box'){const raw=$('[data-range-coordinates]').value.split(/[\s,]+/).filter(Boolean).map(Number);return value(G.box(raw,crs),'Bounding box',{kind:k,crs,coordinates:raw});}
    if(k==='boundary')return value(G.boundary($('[data-range-text]').value,crs),'Input boundary',{kind:k,crs});
    const l=root.PortalLayers.layers.get($('[data-range-layer]').value);if(!l)throw Error('Choose a reference layer.');if(nativePreview(l))throw Error('A bounded native preview cannot define the full result extent. Choose a saved study area.');
-   if(k==='extent'){const box=!l.renderTiled&&l.cfg.analysisMode!=='on-demand'&&l.data?.features?.length?root.turf.bbox(l.data):l.bounds?.flat();if(!box)throw Error('This layer has no known extent.');return value(root.turf.bboxPolygon(box),l.cfg.name+' · extent',{kind:k,layer:l.cfg.name,crs:'EPSG:4326'});}
+   if(k==='mask'&&l.cfg.nativeSource)throw Error('Use a saved boundary layer as a mask; native previews are display-only.');if(k==='extent'){const box=l.cfg.nativeSource?l.nativeMap.bounds:!l.renderTiled&&l.cfg.analysisMode!=='on-demand'&&l.data?.features?.length?root.turf.bbox(l.data):l.bounds?.flat();if(!box)throw Error('This layer has no known extent.');return value(root.turf.bboxPolygon(box),l.cfg.name+' · extent',{kind:k,layer:l.cfg.name,crs:'EPSG:4326'});}
    const originals=l.data.features;if(!originals.length||originals.length>100)throw Error('Choose a mask with up to 100 polygons.');const mask=originals.length===1?originals[0]:root.turf.union(root.turf.featureCollection(originals));return value(G.validateMask(mask),l.cfg.name,{kind:k,layer:l.cfg.name,crs:'EPSG:4326',licenses:[l.cfg.license,...(l.data.provenance?.licenses||[])].filter(Boolean),limited:!!l.viewLimited||!!l.data.provenance?.limited});
   }
   return {resolve,update,setKind:k=>{kind.value=k;kind.onchange();},element:container};

@@ -35,7 +35,7 @@ def run(workspace: Path, report: Path) -> int:
         item = urllib.request.Request(base + path, method=method, headers=headers,
             data=json.dumps(data).encode() if data is not None else None)
         with urllib.request.urlopen(item, timeout=60) as response:
-            return json.load(response)
+            return json.load(response) if 'json' in response.headers.get('Content-Type', '') else response.read()
 
     def ok(condition, name):
         if not condition:
@@ -69,6 +69,15 @@ def run(workspace: Path, report: Path) -> int:
             ok(error.code == 403, 'An untrusted origin cannot access the paired runtime')
         status = request('GET', '/v1/status')
         ok(bool(status), 'Paired status reports the actual runtime')
+        settings = request('GET', '/v1/maintenance')
+        ok(settings['execution'] == 'local' and settings['automaticDeletion'] is False,
+           'Native cache maintenance reports its real local data-preserving policy')
+        configured = request('POST', '/v1/maintenance/settings', {'threads': 1, 'memoryMiB': 512})
+        ok(configured['settings']['threads'] == 1 and configured['settings']['memoryMiB'] == 512,
+           'Packaged runtime applies bounded native resource settings')
+        diagnostics = request('GET', '/v1/diagnostics')
+        ok(diagnostics['passed'] and not diagnostics['networkTested'],
+           'Local diagnostics load the bundled spatial runtime and verify workspace/cache ownership')
         spec = {'schema': 1, 'operation': 'load',
                 'inputs': [{'kind': 'file', 'path': 'Files/packaging-fixture.geojson'}],
                 'scope': {'crs': 'EPSG:4326', 'label': 'Packaging test county',
@@ -92,6 +101,20 @@ def run(workspace: Path, report: Path) -> int:
            'Bounded previews preserve original long IDs, nulls and boolean values')
         table = request('GET', '/v1/jobs/' + job['id'] + '/table?offset=1&limit=1')
         ok(bool(table), 'The installed result exposes paginated attributes')
+        metadata = request('GET', '/v1/jobs/' + job['id'] + '/map')
+        ok(metadata['recordCount'] == 2 and metadata['spatialIndex'] == 'DuckDB RTree',
+           'The installed engine indexes every result record for full viewport browsing')
+        condition = {'filters': [{'field': 'original_id', 'op': 'eq', 'value': '9007199254740993123'}]}
+        matching = request('POST', '/v1/jobs/' + job['id'] + '/query', condition)
+        ok(matching['total'] == 1 and matching['rows'][0]['properties']['flag'] is False,
+           'Full native attribute queries preserve exact identifiers and original values')
+        selected = request('POST', '/v1/jobs/' + job['id'] + '/selection', {'mode': 'replace', 'query': condition})
+        ok(selected['count'] == 1, 'Native selection stores full-record query membership outside the preview')
+        tile = request('GET', '/v1/jobs/' + job['id'] + '/tiles/0/0/0.pbf')
+        ok(isinstance(tile, bytes) and len(tile) > 0, 'The packaged engine produces real MapLibre MVT bytes')
+        cleanup = request('POST', '/v1/maintenance/cleanup', {'dryRun': True, 'allUnused': True})
+        ok(cleanup['dryRun'] and cleanup['userDataKept'] and cleanup['unfinishedTasksKept'],
+           'Packaged native cleanup previews disposable files without deleting user data')
         result = {'passed': True, 'checks': checks, 'build': build_info(),
                   'resultRows': job['result']['rows']}
         report.parent.mkdir(parents=True, exist_ok=True)

@@ -71,27 +71,35 @@ async function rejected(task,message){await assert.rejects(task,error=>error.nam
   const replaced=fixture(),replacedWork=replaced.A.capture(replaced.layer,{scope:'view',map:replaced.map});replaced.context.PortalLayers.layers.set(replaced.layer.id,{...replaced.layer});replaced.calls[0].resolve(response([box(0,0,.001,.001,{usbf_id:'old-project'})]));await rejected(()=>replacedWork,'Replacing a project layer with the same ID still rejects the old pending snapshot');
   const bad=fixture(),badWork=bad.A.capture(bad.layer,{scope:'view',map:bad.map});bad.calls[0].resolve(response([box(0,0,.001,.001,{usbf_id:'fragment'})],undefined,{data:{type:'FeatureCollection',features:[box(0,0,.001,.001)],provenance:{spatialEligible:false,geometryQuality:'clipped-or-simplified-tile-fragments'}}}));await assert.rejects(()=>badWork,/Original vector geometry/);ok(true,'An analytical backing response cannot relabel declared tile fragments as original geometry');
 
-  // Exercise the actual UI eligibility and model binding functions without a browser.
-  const ui=fixture(),elements={'analysis-layer':{value:ui.layer.id},'analysis-scope':{value:'view'},'analysis-tile-optin':{checked:false}};
-  ui.context.document={addEventListener(){},getElementById:id=>elements[id]||null};ui.context.localStorage={getItem:()=>null};
+  // Exercise the current fixed-workset contract through the actual scope API.
+  const ui=fixture(),elements={'analysis-layer':{value:ui.layer.id},'analysis-scope':{value:'all'},'analysis-tile-optin':{checked:false}};
+  ui.context.document={addEventListener(){},querySelector(){return null;},getElementById:id=>elements[id]||null};ui.context.localStorage={getItem:()=>null};
+  const selectedRecords=new Map();ui.context.PortalGISSelection={features:l=>selectedRecords.get(l)||[],count:l=>(selectedRecords.get(l)||[]).length};
+  vm.runInContext(read('data-workspace.js'),ui.context);
   vm.runInContext(read('analysis-ui.js').replace('root.PortalAnalysis={','root.__analysisChecks={available,inputBinding,sourceNote};root.PortalAnalysis={'),ui.context);
-  ok(ui.context.__analysisChecks.available()&&ui.context.__analysisChecks.sourceNote(ui.layer,ui.A.capabilities(ui.layer)).includes('Original buildings'),'Statistics remain actionable on an empty logical layer even while display tiles report loading or failure');
-  const before=ui.context.__analysisChecks.inputBinding();ui.layer.data=turf.featureCollection([box(0,0,.001,.001)]);ui.layer.viewLoadedAt='new-cache';ui.layer.release={name:'new-release'};
-  ok(ui.context.__analysisChecks.inputBinding()===before,'Raw cache population cannot make the newly captured on-demand result immediately stale');
-  elements['analysis-scope'].value='selection';ui.context.PortalLayers.selection={layer:ui.layer.id,feature:box(0,0,.001,.001,{usbf_id:'same-building'})};const selectedBinding=ui.context.__analysisChecks.inputBinding();ui.context.PortalLayers.selection={layer:ui.layer.id,feature:box(-.001,-.001,.002,.002,{usbf_id:'same-building'})};
-  ok(ui.context.__analysisChecks.inputBinding()===selectedBinding,'Resolving the selected display fragment to the same original USBF ID does not falsely mark its result stale');elements['analysis-scope'].value='view';
-  const lodContext=vm.createContext({console,setTimeout,clearTimeout,Date,AbortController,PortalAnalysisData:ui.A,PortalLayers:ui.context.PortalLayers,portal:{map:ui.map,ready:false}});
+  ok(!ui.context.__analysisChecks.available()&&ui.context.__analysisChecks.sourceNote(ui.layer).includes('fixed analysis workset'),'An empty logical source routes statistics to fixed workset preparation rather than treating its display cache as an analytical input');
+  ui.layer.data=turf.featureCollection([box(0,0,.001,.001,{usbf_id:'cached',height_m:14})]);ui.layer.viewLoadedAt='new-cache';ui.layer.release={name:'new-release'};
+  ok(!ui.context.__analysisChecks.available(),'A populated live display cache still cannot bypass fixed workset preparation');
+  const workset={id:'fixed-buildings',cfg:{type:'geojson',name:'Fixed original buildings',dataRole:'buildings'},data:turf.featureCollection([box(0,0,.001,.001,{usbf_id:'duplicate-id',height_m:10}),box(.002,0,.003,.001,{usbf_id:'duplicate-id',height_m:20})]),fields:['usbf_id','height_m'],heightField:'height_m'};
+  ui.context.PortalLayers.layers.set(workset.id,workset);elements['analysis-layer'].value=workset.id;
+  ok(ui.context.__analysisChecks.available()&&ui.context.__analysisChecks.sourceNote(workset).includes('Fixed workset'),'A fixed original workset exposes statistics with its explicit stable-input explanation');
+  const before=ui.context.__analysisChecks.inputBinding();ui.pan([70,30,71,31]);workset.visible=false;workset.sourceFilter='not-in-analysis';
+  ok(ui.context.__analysisChecks.inputBinding()===before,'Map movement, layer visibility and display filters do not change a fixed statistical input');
+  elements['analysis-scope'].value='selection';ok(!ui.context.__analysisChecks.available(),'Selected-record statistics require an actual selected original record');
+  selectedRecords.set(workset,[workset.data.features[0]]);const selectedBinding=ui.context.__analysisChecks.inputBinding();ok(ui.context.__analysisChecks.available(),'An explicit original-record selection enables selected-workset statistics');
+  selectedRecords.set(workset,[workset.data.features[1]]);ok(ui.context.__analysisChecks.inputBinding()!==selectedBinding,'Changing to a distinct original record with a duplicate provider ID changes the statistical input binding');elements['analysis-scope'].value='all';
+  const lodContext=vm.createContext({console,setTimeout,clearTimeout,Date,AbortController,PortalAnalysisData:ui.A,PortalLayers:ui.context.PortalLayers,PortalDataWorkspace:ui.context.PortalDataWorkspace,PortalGISSelection:ui.context.PortalGISSelection,portal:{map:ui.map,ready:false}});
   const guard=read('lod1-export.js').split('export function sourceGuard')[1].split('const coordinateEpsilon')[0];
   const lodSource=read('lod1-ui.js').replace(/^import .*;\n/m,'').replace(/\bexport /g,'');
   vm.runInContext('function sourceGuard'+guard+'\nconst build=()=>{},makeOBJ=()=>{},makeGLB=()=>{},exportPackage=()=>{},limits={};\n'+lodSource+'\nglobalThis.__lodChecks={usable,numericFields,captureBinding,bindingCurrent};',lodContext);
-  ui.layer.data=turf.featureCollection([]);ok(lodContext.__lodChecks.usable(ui.layer)&&lodContext.__lodChecks.numericFields(ui.layer).includes('height_m'),'LoD1 accepts declared buildings with metadata height fields before their first original-data load');
-  const modelBinding=lodContext.__lodChecks.captureBinding(ui.layer,{scope:'view',field:'height_m',units:'metres',confirmed:true});ui.pan([70,30,71,31]);ui.layer.data=turf.featureCollection([box(70,30,71,31)]);ui.layer.release={name:'cache-update'};
-  ok(lodContext.__lodChecks.bindingCurrent(modelBinding),'A completed on-demand model remains bound to its captured originals when map bounds or the cache change');
-  ui.context.PortalLayers.layers.delete(ui.layer.id);ok(!lodContext.__lodChecks.bindingCurrent(modelBinding),'A model still invalidates when its source layer is removed');
-  const imported={id:'imported-buildings',cfg:{type:'geojson',name:'Imported buildings',dataRole:'buildings'},data:turf.featureCollection([box(0,0,.001,.001,{height_m:10})]),fields:['height_m'],heightField:'height_m'};ui.context.PortalLayers.layers.set(imported.id,imported);
-  const importedBinding=lodContext.__lodChecks.captureBinding(imported,{scope:'view'});ui.pan([0,0,.01,.01]);
-  ok(!lodContext.__lodChecks.bindingCurrent(importedBinding),'Imported-layer model bindings retain their existing view-change invalidation behavior');
-  ok(ui.calls.length===0,'Statistics eligibility and LoD1 preparation do not implicitly load GeoParquet');
+  ok(!lodContext.__lodChecks.usable(ui.layer)&&lodContext.__lodChecks.usable(workset)&&lodContext.__lodChecks.numericFields(workset).includes('height_m'),'LoD1 requires a fixed complete-outline workset and retains its supplied numeric height field');
+  const modelBinding=lodContext.__lodChecks.captureBinding(workset,{scope:'layer',field:'height_m',units:'metres',confirmed:true});ui.pan([60,20,61,21]);
+  ok(lodContext.__lodChecks.bindingCurrent(modelBinding),'An all-workset model stays bound to its fixed original outlines while the map moves');
+  const selectedModel=lodContext.__lodChecks.captureBinding(workset,{scope:'selection',field:'height_m',units:'metres',confirmed:true});selectedRecords.set(workset,[workset.data.features[0]]);
+  ok(!lodContext.__lodChecks.bindingCurrent(selectedModel),'LoD1 invalidates a changed exact original-record selection even when provider IDs coincide');
+  workset.data=turf.featureCollection([box(0,0,.001,.001,{height_m:10})]);ok(!lodContext.__lodChecks.bindingCurrent(modelBinding),'Replacing the fixed original workset invalidates a model bound to its previous data');
+  ui.context.PortalLayers.layers.delete(workset.id);ok(!lodContext.__lodChecks.bindingCurrent(modelBinding),'Removing the fixed original workset invalidates its model binding');
+  ok(ui.calls.length===0,'Statistics eligibility and LoD1 preparation never implicitly load GeoParquet');
 
   const metadata=fixture(),displayRelease={name:'USBF_v1',updated:'2026-10-27T10:00:00Z'},analysisRelease={name:'USBF_v1',updated:'2026-10-28T10:00:00Z'};metadata.layer.visible=true;metadata.layer.renderTiled=true;metadata.layer.displayRelease=displayRelease;metadata.layer.release=analysisRelease;metadata.layer.analysisRelease=analysisRelease;metadata.layer.bounds=[[-125,24],[-66,50]];metadata.layer.viewLimited=true;metadata.layer.analysisState={bounds:[0,0,.01,.01]};
   metadata.context.document={querySelector:()=>null,createElement:()=>({set innerHTML(value){this.content={textContent:value};}})};metadata.map.getStyle=()=>({layers:[],sources:{}});

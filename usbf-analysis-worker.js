@@ -1,10 +1,11 @@
 /* Original USBF records are read only for an explicit analytical request. */
-import './usbf-source.js?v=1.11-tasks';
+import './usbf-source.js?v=1.12-results';
+import * as turfModule from './vendor/turf-7.2.0.min.js';
 import {parquetMetadataAsync,parquetReadObjects} from './vendor/hyparquet-1.31.5/index.js';
 import {wkbToGeojson} from './vendor/hyparquet-1.31.5/wkb.js';
 import {decompress} from './vendor/fzstd-0.1.1.js';
 
-const api=globalThis.PortalUSBF,budget=32*1024*1024,limit=12000;
+const api=globalThis.PortalUSBF,turf=globalThis.turf||turfModule.default,budget=32*1024*1024,limit=12000;
 const cache=new Map(),jobs=new Map();let cacheBytes=0;
 const cacheLimit=64*1024*1024;
 function remember(key,buffer,etag){
@@ -14,6 +15,17 @@ function remember(key,buffer,etag){
   while(cacheBytes>cacheLimit){const key=cache.keys().next().value;cacheBytes-=cache.get(key).buffer.byteLength;cache.delete(key);}
 }
 function aborted(signal){if(signal.aborted)throw new DOMException('Cancelled.','AbortError');}
+function rangesFor(tile,bounds,featureId){
+ if(!tile.rowGroupsVerified)return [{rowStart:0,rowEnd:tile.rows}];
+ if(!Array.isArray(tile.rowGroups)||!tile.rowGroups.length||tile.rowGroups.length>10000)throw Error('The original geometry row-group index is invalid.');
+ let next=0;const groups=[];
+ for(const group of tile.rowGroups){
+  if(group.rowStart!==next||!Number.isSafeInteger(group.rowEnd)||group.rowEnd<=next||group.rowEnd>tile.rows||typeof group.geometry_bounds_complete!=='boolean'||group.geometry_bounds_complete&&!api.validBox(group.geometry_bbox))throw Error('The geometry row-group index does not cover the original file.');
+  next=group.rowEnd;const b=group.geometry_bbox;
+  if(featureId!==undefined||!group.geometry_bounds_complete||b[0]<=bounds[2]&&b[2]>=bounds[0]&&b[1]<=bounds[3]&&b[3]>=bounds[1])groups.push(group);
+ }
+ if(next!==tile.rows)throw Error('The geometry row-group index is incomplete.');return groups;
+}
 self.onmessage=async event=>{
   const request=event.data;
   if(request.type==='cancel'){jobs.get(request.id)?.abort();return;}
@@ -22,9 +34,10 @@ self.onmessage=async event=>{
   const signal=controller.signal;let bytes=0,networkBytes=0,cacheHits=0;
   try{
     if(!api.validBox(request.bounds)||!Array.isArray(request.tiles)||request.tiles.length>9)throw Error('Choose a smaller area to load original buildings.');
-    const [w,s,east,n]=api.buffered(request.bounds),features=[],seen=new Set();let limited=false;
+    const mask=turf.bboxPolygon(request.bounds),features=[],seen=new Set();let limited=false;
     for(let index=0;index<request.tiles.length;index++){
-      aborted(signal);const tile=request.tiles[index],url=api.tileURL(tile);let etag=null,verifiedBuffer=null;
+      aborted(signal);const tile=request.tiles[index],ranges=rangesFor(tile,request.bounds,request.featureId),url=api.tileURL(tile);let etag=null,verifiedBuffer=null;
+      if(!ranges.length){self.postMessage({id,progress:{done:index+1,total:request.tiles.length,groupsRead:0}});continue;}
       if(request.verifyHashes){
         if(bytes+tile.bytes>budget)throw Error('This pinned release needs a full checksum-verified shard read. Use the local engine for this area.');
         const response=await fetch(url,{credentials:'omit',signal:AbortSignal.any([signal,AbortSignal.timeout(45000)])});
@@ -39,7 +52,7 @@ self.onmessage=async event=>{
         aborted(signal);
         if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start<0||end>tile.bytes||end<=start)throw Error('Invalid USBF byte range.');
         if(verifiedBuffer)return verifiedBuffer.slice(start,end);
-        bytes+=end-start;if(bytes>budget)throw Error('This area needs more than 32 MB of original data. Zoom in and retry.');
+        bytes+=end-start;if(bytes>budget)throw Error('Reading full geometries exceeds the 32 MB browser budget. Use the local engine for this study area.');
         const key=url+'|'+start+'|'+end;
         if(cache.has(key)){const result=cache.get(key);if(etag&&result.etag&&etag!==result.etag){const error=Error('Original data changed between cached ranges. Refresh the layer and retry.');error.code='RELEASE_CHANGED';throw error;}if(result.etag)etag=result.etag;cache.delete(key);cache.set(key,result);cacheHits++;return result.buffer;}
         const timeout=AbortSignal.timeout(45000),combined=AbortSignal.any([signal,timeout]);
@@ -54,20 +67,31 @@ self.onmessage=async event=>{
         networkBytes+=buffer.byteLength;remember(key,buffer,tag);return buffer;
       }};
       const metadata=await parquetMetadataAsync(file,{geoparquet:false});aborted(signal);
+      if(Number(metadata.num_rows)!==tile.rows){const error=Error('The original file row count no longer matches its source manifest.');error.code='RELEASE_CHANGED';throw error;}
       const names=new Set(metadata.schema.map(field=>field.name));
       if(!['geometry','usbf_id','cx','cy'].every(name=>names.has(name)))throw Error('This USBF file has an unsupported schema.');
-      const columns=['geometry',...api.columns.filter(name=>names.has(name))];
-      const rows=await parquetReadObjects({file,metadata,geoparquet:false,utf8:false,columns,compressors:{ZSTD:(input,length)=>decompress(input,new Uint8Array(length))},filter:{$and:[{cx:{$gte:w,$lte:east}},{cy:{$gte:s,$lte:n}}]}});
+      if(metadata.schema.slice(1).some(field=>field.num_children>0))throw Error('Use the local engine for this hierarchical original-data schema.');
+      // Keep every ordinary published attribute. Secondary WKB geometry remains
+      // in the original GeoParquet file rather than becoming an opaque JS blob.
+      const columns=metadata.schema.slice(1).map(field=>field.name).filter(name=>name!=='original_geometry');
+      // Ownership coordinates cannot safely reject a building: a long polygon
+      // can cross the study boundary while its cx/cy lies far outside it.
+      for(const range of ranges){
+      const rows=await parquetReadObjects({file,metadata,rowStart:range.rowStart,rowEnd:range.rowEnd,geoparquet:false,utf8:false,columns,compressors:{ZSTD:(input,length)=>decompress(input,new Uint8Array(length))}});
       aborted(signal);
       for(const row of rows){
         if(row.usbf_id===null||row.usbf_id===undefined)throw Error('An original building record has no identifier.');
         const recordId=String(row.usbf_id);if(request.featureId!==undefined&&recordId!==request.featureId)continue;
-        if(seen.has(recordId))continue;seen.add(recordId);
-        if(features.length===limit){limited=true;break;}
+        if(seen.has(recordId))continue;
         const binary=row.geometry;if(!(binary instanceof Uint8Array))throw Error('An original building outline has an unsupported encoding.');
         const geometry=wkbToGeojson({view:new DataView(binary.buffer,binary.byteOffset,binary.byteLength),offset:0});
         if(!['Polygon','MultiPolygon'].includes(geometry.type))throw Error('An original building outline is not a polygon.');
+        if(request.featureId===undefined&&!turf.booleanIntersects({type:'Feature',properties:{},geometry},mask))continue;
+        seen.add(recordId);
+        if(features.length===limit){limited=true;break;}
         features.push(api.normalize(row,geometry));
+      }
+      if(limited||request.featureId!==undefined&&features.length)break;
       }
       self.postMessage({id,progress:{done:index+1,total:request.tiles.length}});
       if(limited||request.featureId!==undefined&&features.length)break;

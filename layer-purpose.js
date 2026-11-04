@@ -16,6 +16,7 @@
  function describe(layer,{catalog=false}={}){
   const c=layer?.cfg||{},cap=root.PortalAnalysisData?.capabilities(layer)||{},fileFormat=format(layer);
   const demand=cap.kind==='on-demand'||catalog&&c.driver==='usbf';
+  if(c.nativeSource&&root.PortalNativeResults?.live(layer))return {kind:'native',label:'Complete local result · view tiles',format:fileFormat,note:'Map tiles browse the complete local file. Attributes, selection and processing use original records through the local engine.'};
   if(c.nativeSource)return {kind:'native',label:'Native result · bounded map preview',format:fileFormat,note:'Complete records stay in the local Results file. The map shows a bounded preview; tables and processing use the full native result.'};
   if(cap.kind==='native-preview')return {kind:'preview',label:'Bounded native preview',format:fileFormat,note:'This shared preview contains display records only. The full native result is a separate local dependency.'};
   if(root.PortalDataWorkspace?.isArea(layer))return {kind:'original',label:'Saved study area',format:fileFormat,note:'Saved boundary · not building records'};

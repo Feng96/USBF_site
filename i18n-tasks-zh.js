@@ -222,5 +222,36 @@ Remove the layer referencing this native result before deleting or renaming it.|
 Maps run in this browser. Loading and processing use the execution location chosen for each task. Cloud data hosting is separate from cloud computation.|地图在当前浏览器中显示。加载与处理使用每个任务选择的执行位置。云端数据托管与云端计算相互独立。
 Browser and connected local engine|浏览器与已连接的本地引擎
 The local engine requires a desktop computer. Continue in this browser on this device.|本地引擎需要桌面计算机。当前设备可继续使用浏览器功能。
+
+Aggregated cells show counts. Attribute styling applies to individual features.|汇总网格显示记录数，属性样式应用于单独要素。
+Display filters apply to individual features. Aggregated cells are hidden; zoom in for detail.|显示筛选应用于单独要素，汇总网格已隐藏；请放大查看详情。
+Original attributes and complete geometry read from the local result file.|从本地结果文件读取的原始属性与完整几何。
+Fixed table input|固定的属性表输入
+Save table input file|保存属性表输入数据
+Height styling uses original values; native view tiles show 2D geometry.|高度样式使用原始值，本地视野瓦片显示 2D 几何。
+View tiles of the complete local file|完整本地文件的视野瓦片
+The native result changed. Select its records again.|本地结果已改变，请重新选择记录。
+Local result status|本地结果状态
+Complete local result · view tiles|完整本地结果 · 按视野加载瓦片
+Map tiles browse the complete local file. Attributes, selection and processing use original records through the local engine.|地图瓦片可浏览完整本地文件；属性、选择和处理通过本地引擎使用原始记录。
+Preparing complete local map…|正在准备完整本地地图…
+Saved preview · connect or update local engine|已保存预览 · 请连接或更新本地引擎
+Aggregated records. Zoom in for individual buildings.|当前显示汇总记录，请放大查看单独建筑。
+selected records|条已选记录
+Select records in the complete native result first.|请先在完整本地结果中选择记录。
+Update the local engine to select complete result records.|请更新本地引擎，以选择完整结果中的记录。
+Add complete result map|添加完整结果地图
+Search all result records|搜索完整结果中的记录
+No attribute filter|不使用属性筛选
+Is not null|不是 null
+Apply to full result|应用于完整结果
+Reset query|重置查询
+Selected records only|仅显示已选记录
+Select all matching records|选择全部匹配记录
+Clear selection|清除选择
+Update the local engine for complete-result queries and selection.|请更新本地引擎，以查询和选择完整结果中的记录。
+matching result records|条匹配记录
+Select record|选择记录
+Select|选择
 `.trim().split('\n')){const separator=line.indexOf('|'),key=line.slice(0,separator);if(separator>0&&!Object.prototype.hasOwnProperty.call(dictionary,key))dictionary[key]=line.slice(separator+1);}
 })();

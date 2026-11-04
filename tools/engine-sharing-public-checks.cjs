@@ -2,11 +2,11 @@
 const fs=require('fs');
 module.exports=async qa=>{
  qa.fixtures=false;qa.base=process.env.PORTAL_PUBLIC_URL||'https://feng96.github.io/USBF_site/';process.env.PORTAL_PM_LIVE_URL=qa.base;
- await qa.open('?empty=1&acceptance=1.11#base=blank');
+ await qa.open('?empty=1&acceptance=1.12#base=blank');
  await qa.page.evaluate(()=>PortalDeviceSettings.open('engine'));
  qa.ok(await qa.page.locator('.device-engine-downloads a').count()===4,'The live website exposes all four published preview installers');
  const manifest=await qa.page.evaluate(()=>fetch('data/engine-releases.json',{cache:'no-store'}).then(r=>r.json()));
- qa.ok(manifest.tag==='engine-v0.1.0-preview.1-r6'&&Object.values(manifest.platforms).every(p=>p.testedChecks===13),'The live download manifest references only the tested native release');
+ qa.ok(manifest.version==='0.2.0-preview.1'&&/^[a-f0-9]{40}$/.test(manifest.revision)&&Object.keys(manifest.platforms).length===4&&Object.values(manifest.platforms).every(p=>p.testedChecks>=22&&/^[a-f0-9]{64}$/.test(p.sha256)&&p.bytes>1000000),'The live download manifest references only the tested native release');
  await qa.page.locator('[data-ds-action=close]').first().click();
  await qa.run('tools/usbf-public-pmtiles-checks.cjs');
  await qa.run('tools/releases-sharing-workflow-checks.cjs');

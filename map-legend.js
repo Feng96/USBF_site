@@ -23,8 +23,8 @@
  freeze(palettes);
  const copy=value=>JSON.parse(JSON.stringify(value));
  const raster=l=>['raster','image','raster-pmtiles'].includes(l?.cfg?.type)||l?.cfg?.sourceKind==='raster';
- function sourceField(l){return fields.find(field=>l?.fields?.includes(field))||null;}
- function mode(l){if(raster(l))return 'raster';if(l?.colorMode==='source'&&sourceField(l))return 'source';if(l?.colorMode==='change'&&l.fields?.includes('modified'))return 'change';if(l?.colorMode==='height'&&l.heightField)return 'height';return 'uniform';}
+ function sourceField(l){return fields.find(field=>(l?.nativeMap?.displayFields||l?.fields)?.includes(field))||null;}
+ function mode(l){if(raster(l))return 'raster';if(l?.colorMode==='source'&&sourceField(l))return 'source';if(l?.colorMode==='change'&&(l.nativeMap?.displayFields||l.fields)?.includes('modified'))return 'change';if(l?.colorMode==='height'&&l.heightField&&(!l.nativeMap||l.nativeMap.displayFields?.includes(l.heightField)))return 'height';return 'uniform';}
  function colorExpression(l){
   const effective=mode(l);if(effective==='raster')return null;
   if(effective==='source')return ['match',['downcase',['to-string',['get',sourceField(l)]]],...palettes.source.filter(e=>e.values).flatMap(e=>[e.values.slice(),e.color]),palettes.source.at(-1).color];

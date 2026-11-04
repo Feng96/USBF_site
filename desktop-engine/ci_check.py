@@ -45,6 +45,12 @@ def main():
     receipt_path = workspace / 'Engine' / 'install-receipt.json'
     receipt = json.loads(receipt_path.read_text(encoding='utf-8'))
     assert receipt['installed'] is True
+    shortcut_receipt = workspace / 'Engine' / 'shortcuts.json'
+    shortcuts = json.loads(shortcut_receipt.read_text(encoding='utf-8'))
+    assert shortcuts['workspaceId'] == receipt['workspaceId']
+    assert len(shortcuts['entries']) == 2, 'Workspace launcher and per-user application entry are installed'
+    for entry in shortcuts['entries']:
+        assert Path(entry['path']).exists()
     installed = workspace / receipt['executable']
     report = args.work / 'runtime-selftest.json'
     tls_environment = {**os.environ,
@@ -77,8 +83,11 @@ def main():
         raise AssertionError('The managed runtime was not removed: ' + detail)
     assert all(p.read_text(encoding='utf-8') == 'user data' for p in markers)
     assert json.loads(receipt_path.read_text(encoding='utf-8'))['installed'] is False
+    assert not json.loads(shortcut_receipt.read_text(encoding='utf-8'))['entries'], 'Owned launchers are removed on uninstall'
+    assert all(not Path(entry['path']).exists() for entry in shortcuts['entries'])
     result['checks'] += ['Actual installer installs into the chosen workspace',
                          'Packaged Tk interface opens on the target OS',
+                         'Workspace and application-menu launch entries are installed and removed by ownership',
                          'Uninstall removes its runtime and preserves user folders']
     (args.assets / 'acceptance.json').write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
     print(json.dumps({'passed': True, 'checks': len(result['checks']), 'platform': platform.system()}))

@@ -14,7 +14,14 @@
         "url": "data/releases/usbf-v1-f496596a4a78-original-manifest.json",
         "sha256": "f496596a4a78e1dbbae1db41e76cac6e7524ceb4ee0b6cfa75b7b26d6ab3e8d1",
         "sourceUrl": "https://data.source.coop/opengeos/us-buildings/USBF_v1/manifest.json",
-        "baseUrl": "https://data.source.coop/opengeos/us-buildings/USBF_v1/"
+        "baseUrl": "https://data.source.coop/opengeos/us-buildings/USBF_v1/",
+        "immutable": false,
+        "archiveStatus": "pending-upload-credentials",
+        "geometryIndex": {
+          "url": "data/releases/usbf-v1-2fde03b97b2d-rowgroup-index.json",
+          "sha256": "2fde03b97b2d9c40c2ed714632b5cabe961028b2ea0e9a4bc29f54bd4b549565",
+          "bytes": 3254932
+        }
       },
       "display": {
         "url": "data/releases/usbf-v1-a2f7afa583c7-display-manifest.json",
@@ -41,7 +48,9 @@
         "originalManifest": "SHA256 of exact upstream bytes",
         "displayManifest": "SHA256 of exact upstream bytes and matching source manifest hash",
         "displayArchive": "Expected SHA256 recorded; the 33.96 GB archive is not rehashed by the browser",
-        "originalFiles": "Flat upstream keys may be replaced; pinned processing must verify expected bytes and fail if unavailable"
+        "originalFiles": "Flat upstream keys may be replaced; pinned processing must verify expected bytes and fail if unavailable",
+        "geometryIndex": "Every original shard byte length, SHA256, row count and finite full-geometry envelope verified. This index does not certify topology or real-world provider completeness.",
+        "rowGroups": "5,512 contiguous original row ranges with verified whole-geometry envelopes; large-shard SHA256 rechecked and physical Parquet row groups used. Smaller files retain a complete logical range."
       },
       "schema": {
         "url": "data/releases/usbf-v1-41a2d43c39c6-schema.json",
@@ -54,8 +63,8 @@
       "coverage": {
         "scope": "CONUS48+DC",
         "requestCompletion": "Task completion measures successfully read source parts and processed records, not real-world provider completeness.",
-        "sourceOwnership": "Browser subsets use inherited cx/cy ownership coordinates plus a 0.002-degree buffer. Native processing intersects full geometry from the selected published file bboxes.",
-        "geometryBoundsGuarantee": null,
+        "sourceOwnership": "Browser and native processing retain whole geometries intersecting the exact study boundary, including touching outlines. Candidate files use SHA256-bound full-geometry envelopes verified against all 3,522 original shards.",
+        "geometryBoundsGuarantee": true,
         "providerRealWorldCompleteness": null
       }
     }

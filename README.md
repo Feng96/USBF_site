@@ -1,5 +1,39 @@
 # US Buildings
 
+## Complete results and portable Projects (workspace 1.12 / engine 0.2)
+
+- A local GeoParquet result has one layer with authenticated MapLibre MVT,
+  low-zoom aggregates and original-feature inspection. The saved bounded preview
+  is a disconnected fallback; selection and analysis use the complete local file.
+- Full-result attribute search, typed sorting, box/polygon selection and selected
+  records stay linked. A fixed table area, its matching selection and its export
+  use the same immutable input scope. CSV, GeoJSON and GeoParquet export support
+  full or selected records. Display filters are separate from analytical scope.
+- Browser and native USBF readers use whole geometry intersection, including
+  touching outlines. SHA256-bound full geometry envelopes cover every published
+  shard. Verified internal row ranges allow safe browser pruning without
+  rejecting long buildings by their ownership coordinates. Request completion,
+  index coverage and real-world provider completeness are separate statuses.
+- **Projects → Project dependencies** creates a local `.usbf.zip` package with
+  complete native results and embedded map assets. Copy it into another engine's
+  `Files` folder, verify it and restore it, or relink a moved dependency by its
+  saved SHA256. Public catalogs, basemaps and the online renderer remain internet
+  dependencies; a package is not a national-data mirror or an offline renderer.
+- **Start a task** guides area selection, fixed worksets, summaries and maps.
+  **Files & device** manages actual CPU/memory limits, health checks, shared
+  verified downloads and safe cleanup. Installed workspace and user application
+  entries start the isolated runtime; existing system GIS packages remain separate.
+
+The current original source uses mutable flat keys. Checksums verify identities,
+but permanent remote availability still needs the original-data release upload.
+`tools/publish-original-release.py` prepares and verifies a separate hash-addressed
+release and never overwrites an existing object. Actual Source Cooperative
+publication requires configured upload credentials. Publisher signing and Apple
+notarization are not supplied by this preview.
+
+See [the implementation acceptance record](docs/five-updates-acceptance.md) for
+verification, benchmark limits and publication receipts.
+
 ## Versioned USBF map display (1.6)
 
 The default USBF map reads a pre-generated national PMTiles archive from Source

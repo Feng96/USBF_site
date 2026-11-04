@@ -14,6 +14,7 @@
   ['draw','Drawing controls','#drawing-strip','flex',true],
   ['measure','Measurement controls','#measure-card','flex',true],
   ['selection','Selection controls','.gis-selection-strip','flex',true],
+  ['nativeResults','Local result status','.native-result-strip','flex',true],
   ['placeShortcuts','Place shortcuts','#explorer-quick-places','flex',false],
   ['neighborhood','Nearby building summary','#explorer-neighborhood','block',true],
   ['modelCaption','Model map caption','#model-map-caption','flex',true],
@@ -50,6 +51,7 @@
   const def=entry(id),node=def&&$(def[2]);if(!node)return;
   if(id==='sidebar'){root.PortalSidebar?.open(state.sidebarTab);return;}
   if(id==='dataWorkspace'){root.PortalDataWorkspace?.open();return;}
+  if(id==='nativeResults'){if(root.PortalLayers?.active?.cfg.nativeSource)node.hidden=false;return;}
   if(id==='legend'){document.body.classList.add('legend-visible');node.hidden=false;return;}
   if(!def[4])node.hidden=false;
  }
@@ -70,6 +72,7 @@
   if(id==='properties')return node.querySelector('[data-action="clear-selection"]');
   if(id==='welcome')return node.querySelector('[data-action="close-welcome"]');
   if(id==='dataWorkspace')return node.querySelector('[data-dw-close]');
+  if(id==='nativeResults')return node.querySelector('[data-native-strip-close]');
   return null;
  }
  function decorate(){
