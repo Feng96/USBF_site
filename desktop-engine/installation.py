@@ -165,8 +165,11 @@ def _system_dll_search():
     previous = None
     if size:
         buffer = ctypes.create_unicode_buffer(size + 1)
-        if not get_directory(len(buffer), buffer):
-            raise ctypes.WinError(ctypes.get_last_error())
+        ctypes.set_last_error(0)
+        copied = get_directory(len(buffer), buffer)
+        error = ctypes.get_last_error()
+        if not copied and error:
+            raise ctypes.WinError(error)
         previous = buffer.value
     if not set_directory(None):
         raise ctypes.WinError(ctypes.get_last_error())
@@ -210,7 +213,12 @@ function Write-Status([string]$State, [string]$Message) {
     updatedAt=[DateTime]::UtcNow.ToString('o');error=$Message}
   $temporary = $statusPath + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
   [IO.File]::WriteAllText($temporary, ($data | ConvertTo-Json -Depth 10), $utf8)
-  if ([IO.File]::Exists($statusPath)) { [IO.File]::Replace($temporary, $statusPath, $null) }
+  if ([IO.File]::Exists($statusPath)) {
+    # PowerShell 5 converts a null string argument to an empty backup path.
+    $backup = $statusPath + '.' + [Guid]::NewGuid().ToString('N') + '.backup'
+    [IO.File]::Replace($temporary, $statusPath, $backup)
+    [IO.File]::Delete($backup)
+  }
   else { [IO.File]::Move($temporary, $statusPath) }
 }
 function Assert-RealDirectory([string]$Directory) {
