@@ -131,8 +131,10 @@ class ResultsMixin:
                 "displayRule": "All intersecting records contribute. Dense tiles aggregate adaptively; tiles generalize display geometry only."}
 
     def result_summary(self, job_id, value):
-        if not isinstance(value, dict) or set(value) - {"selectionId", "field"}:
+        if not isinstance(value, dict) or set(value) - {"selectionId", "field", "positiveOnly"}:
             raise ValueError("Unsupported native summary options.")
+        if "positiveOnly" in value and not isinstance(value["positiveOnly"], bool):
+            raise ValueError("The positive-value summary rule must be true or false.")
         with self._indexed_result(job_id) as (c, info):
             numeric = [column["name"] for column in info["columns"] if re.fullmatch(r"(?:U?TINYINT|U?SMALLINT|U?INTEGER|U?BIGINT|HUGEINT|UHUGEINT|FLOAT|DOUBLE|DECIMAL\([0-9]+,[0-9]+\))", str(column["type"]))]
             field = value.get("field")
@@ -145,11 +147,14 @@ class ResultsMixin:
             if field:
                 expression = "f." + ident(field)
                 finite = "isfinite(TRY_CAST(" + expression + " AS DOUBLE))"
+                if value.get("positiveOnly"):
+                    finite += " AND " + expression + ">0"
                 aggregations.extend(["count(*) FILTER (WHERE " + finite + ")", "min(" + expression + ") FILTER (WHERE " + finite + ")", "max(" + expression + ") FILTER (WHERE " + finite + ")", "avg(" + expression + ") FILTER (WHERE " + finite + ")", "sum(" + expression + ") FILTER (WHERE " + finite + ")"])
             result = c.execute("SELECT " + ",".join(aggregations) + " FROM native_result.features f WHERE " + where).fetchone()
             output = {"records": result[0], "sourceTotal": info["recordCount"], "field": field, "numericFields": numeric,
                       "extent": list(result[1:5]) if all(x is not None for x in result[1:5]) else None,
                       "coverage": self.get_job(job_id).get("coverage", {}), "execution": "native-full-result"}
+            output["valueRule"] = "positive-finite-values" if value.get("positiveOnly") else "finite-values"
             if field:
                 output.update(valid=result[5], missing=result[0] - result[5], min=result[6], max=result[7], mean=result[8], sum=result[9])
             else:
@@ -329,6 +334,8 @@ class ResultsMixin:
                 parameters.append(json.dumps(geometry, allow_nan=False))
             else:
                 where, parameters = self._query_where(info, value["query"])
+                if value["query"].get("selectionId"):
+                    where += " AND " + self._selection_clause(job_id, value["query"]["selectionId"], info)
             target = "SELECT " + row + " AS native_row FROM native_result.features f WHERE " + where
             base_id = value.get("baseSelectionId")
             if mode in {"add", "remove", "intersect", "invert"}:

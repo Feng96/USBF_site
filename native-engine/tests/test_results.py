@@ -219,6 +219,16 @@ class CompleteResultTests(unittest.TestCase):
         self.assertEqual(selected["count"], 2)
         self.assertEqual(self.engine.result_feature(job["id"], 0)["geometry"], data["features"][0]["geometry"])
 
+    def test_select_matching_records_cannot_escape_fixed_area_snapshot(self):
+        self.fixture()
+        scope = {"crs": "EPSG:4326", "geometry": {"type": "Polygon", "coordinates": [[[-77.0001, 38.9999], [-76.99959, 38.9999], [-76.99959, 39.00011], [-77.0001, 39.00011], [-77.0001, 38.9999]]]}}
+        area = self.engine.result_selection(self.job_id, {"scope": scope})
+        self.assertEqual(area["count"], 3)
+        matches = self.engine.result_selection(self.job_id, {"query": {"selectionId": area["selectionId"], "filters": [{"field": "source_row", "op": "gte", "value": 1}]}})
+        self.assertEqual(matches["count"], 2)
+        page = self.engine.result_query(self.job_id, {"selectionId": matches["selectionId"]})
+        self.assertEqual([row["properties"]["source_row"] for row in page["rows"]], [1, 2])
+
     def test_full_exports_exact_values_and_selection(self):
         self.fixture()
         selected = self.engine.result_selection(self.job_id, {"query": {"filters": [{"field": "source_row", "op": "gte", "value": 2490}]}})
@@ -243,6 +253,20 @@ class CompleteResultTests(unittest.TestCase):
         summary = self.engine.result_summary(self.job_id, {"field": "height", "selectionId": selected["selectionId"]})
         self.assertEqual(summary["records"], 2)
         self.assertEqual(summary["missing"], 1)
+
+    def test_positive_height_summary_retains_original_nonpositive_values(self):
+        data = {"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"height": height}, "geometry": {"type": "Point", "coordinates": [-77, 39]}} for height in [-999, 0, None, 10]]}
+        job = wait(self.engine, self.engine.create_job({"operation": "load", "inputs": [{"kind": "geojson", "data": data}]}))
+        summary = self.engine.result_summary(job["id"], {"field": "height", "positiveOnly": True})
+        self.assertEqual(summary["records"], 4)
+        self.assertEqual(summary["valid"], 1)
+        self.assertEqual(summary["missing"], 3)
+        self.assertEqual(float(summary["mean"]), 10)
+        self.assertEqual(summary["valueRule"], "positive-finite-values")
+        generic = self.engine.result_summary(job["id"], {"field": "height"})
+        self.assertEqual(generic["valid"], 3)
+        self.assertEqual(generic["min"], -999)
+        self.assertEqual(self.engine.result_feature(job["id"], 0)["properties"]["height"], -999)
 
     def test_source_field_names_do_not_conflict_with_internal_helpers(self):
         data = {"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"file_row_number": 99, "__usbf_row": "source", "__usbf_map_geometry": 17, "__usbf_feature_json": "raw", "native_json": "kept"}, "geometry": {"type": "Point", "coordinates": [-77, 39]}}]}

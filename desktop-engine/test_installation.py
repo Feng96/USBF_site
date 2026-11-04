@@ -9,6 +9,7 @@ import tempfile
 import time
 import unittest
 from unittest import mock
+import psutil
 from installation import install, uninstall, workspace_identity, workspace_root, windows_deferred_uninstall
 
 
@@ -165,6 +166,15 @@ class InstallationTests(unittest.TestCase):
             status = json.loads(status_path.read_text())
             if status['state'] in {'complete', 'error'}: break
             time.sleep(.1)
+        # A terminal receipt is written before the PowerShell process returns.
+        # Wait for that owned helper to release its redirected log handle before
+        # TemporaryDirectory cleanup, rather than ignoring a Windows file lock.
+        cleanup_pid = status.get('cleanupPid')
+        if cleanup_pid:
+            try:
+                psutil.Process(cleanup_pid).wait(timeout=15)
+            except psutil.NoSuchProcess:
+                pass
         self.assertEqual(status['state'], 'complete', status)
         self.assertFalse(runtime.exists())
 

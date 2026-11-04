@@ -30,7 +30,7 @@ class ShortcutTests(unittest.TestCase):
     def test_linux_launcher_passes_exact_workspace_without_shell_expansion(self):
         value = install_shortcuts(self.workspace, self.receipt, platform='linux', user_directory=self.user)
         subprocess.run([str(self.workspace / value['launcher'])], check=True)
-        self.assertEqual((self.root / 'args.txt').read_text().splitlines(), ['--workspace', str(self.workspace)])
+        self.assertEqual((self.root / 'args.txt').read_text().splitlines(), ['--workspace', str(self.workspace.resolve())])
         menu = list((self.user / 'applications').glob('*.desktop'))
         self.assertEqual(len(menu), 1)
         self.assertIn('Terminal=false', menu[0].read_text())
@@ -73,7 +73,7 @@ class ShortcutTests(unittest.TestCase):
             self.skipTest('Symbolic links unavailable')
         alias = next((self.user / 'Applications').glob('*.app'))
         self.assertTrue(alias.is_symlink())
-        self.assertTrue(alias.resolve().is_relative_to(self.workspace / 'Engine' / 'runtime'))
+        self.assertTrue(alias.resolve().is_relative_to(self.workspace.resolve() / 'Engine' / 'runtime'))
         self.assertTrue((self.workspace / value['launcher']).is_file())
         remove_shortcuts(self.workspace, platform='darwin', user_directory=self.user)
         self.assertFalse(alias.is_symlink())
