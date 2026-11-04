@@ -94,7 +94,8 @@ class ShortcutTests(unittest.TestCase):
     def test_equivalent_relative_symlink_target_is_removed_without_touching_app(self):
         alias, target = self.app_alias()
         alias.unlink()
-        alias.symlink_to(os.path.relpath(target, alias.parent), target_is_directory=True)
+        alias.symlink_to(os.path.relpath(target.resolve(), alias.parent.resolve()), target_is_directory=True)
+        self.assertEqual(alias.resolve(), target.resolve())
         removed = remove_shortcuts(self.workspace, platform='darwin', user_directory=self.user)
         self.assertIn(str(alias), removed['removed'])
         self.assertFalse(alias.is_symlink())
