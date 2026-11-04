@@ -195,15 +195,17 @@
   function schedule(){clearTimeout(refreshTimer);refreshTimer=setTimeout(refresh,180);}
   async function loadOriginalSelected(){
     const chosen=root.PortalLayers?.selection;if(!chosen){notify('Select a building first.');return;}const layer=PortalLayers.layers.get(chosen.layer);if(!layer)return;
+    if(root.PortalDataWorkspace){root.PortalDataWorkspace.open({layer,intent:'inspect'});return;}
     try{notify('Loading the original building…');const snapshot=await PortalAnalysisData.capture(layer,{scope:'selection',selection:chosen});if(snapshot.features.length!==1)throw Error('This building was not found in the original data. Select it again.');if(PortalLayers.selection===chosen&&PortalLayers.layers.get(layer.id)===layer)PortalLayers.inspect(layer,snapshot.features[0]);}catch(error){if(error.name!=='AbortError')notify(error.message||'The original building could not load. Try selecting it again.');}
   }
   async function loadOriginalArea(){
-    const layer=root.PortalLayers?.active;if(!onDemand(layer)||!map)return;const b=map.getBounds(),bounds=[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()];
+    const layer=root.PortalLayers?.active;if(root.PortalDataWorkspace){root.PortalDataWorkspace.open({layer});return;}if(!onDemand(layer)||!map)return;const b=map.getBounds(),bounds=[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()];
     try{await layer.ensureData({scope:'view',bounds});}catch(error){if(error.name!=='AbortError')notify(error.message||'Original buildings could not load. Try a smaller area.');}finally{schedule();}
   }
   async function downloadSelected(){
     const chosen=root.PortalLayers?.selection;if(!chosen){notify('Select a building first.');return;}const layer=PortalLayers.layers.get(chosen.layer);if(!layer)return;
-    try{const snapshot=await PortalAnalysisData.capture(layer,{scope:'selection',selection:chosen}),file=PortalComposer.prepareExport(snapshot,{format:'geojson',crs:'EPSG:4326',name:'building-'+String(chosen.feature.properties?.usbf_id??chosen.feature.id??'selected')}),url=URL.createObjectURL(new Blob([file.body],{type:file.mime})),a=document.createElement('a');a.href=url;a.download=file.name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(error){notify(error.message||'The building could not be downloaded. Try selecting it again.');}
+    if(!root.PortalDataWorkspace.ready(layer)){root.PortalDataWorkspace.open({layer,intent:'download'});return;}
+    try{root.PortalGISSelection.set(layer,[chosen.feature],'replace');const snapshot=await root.PortalDataWorkspace.capture(layer,{mode:'selection'}),file=PortalComposer.prepareExport(snapshot,{format:'geojson',crs:'EPSG:4326',name:'building-'+String(chosen.feature.properties?.usbf_id??chosen.feature.id??'selected')}),url=URL.createObjectURL(new Blob([file.body],{type:file.mime})),a=document.createElement('a');a.href=url;a.download=file.name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(error){notify(error.message||'The building could not be downloaded. Try selecting it again.');}
   }
   function init(){
     if(started||!root.portal?.ready)return;started=true;map=root.portal.map;

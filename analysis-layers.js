@@ -6,21 +6,22 @@
  const linked=l=>!!(l&&root.PortalLayers?.layers.get(l.id)===l);
  const direct=l=>!!root.PortalAnalysisData?.capabilities(l).geometryAnalysis;
  function note(l,text,error=false){messages.set(l,{text,error});root.PortalLayers?.refresh();}
- async function load(l,{range=null}={}){
-  if(!linked(l)||!direct(l)||jobs.has(l))return;
-  const controller=new AbortController();jobs.set(l,controller);note(l,'Loading original records for this area…');
+ async function load(l,{range=null,signal=null}={}){
+  if(!linked(l)||!direct(l)||jobs.has(l))return;if(!range)throw Error('Save and choose a study area before loading original records.');
+  const controller=new AbortController(),stop=()=>controller.abort();signal?.addEventListener('abort',stop,{once:true});if(signal?.aborted)controller.abort();jobs.set(l,controller);note(l,'Loading original records for this area…');
   try{
    const snapshot=root.PortalGISCore?await root.PortalGISCore.capture(l,{range:range||await root.PortalGISRange.view(),signal:controller.signal,onProgress:(n,t)=>note(l,'Loading area parts… '+n+' / '+t)}):await root.PortalAnalysisData.capture(l,{scope:'view',map:root.portal.map,signal:controller.signal});
    if(!linked(l)||controller.signal.aborted)throw new DOMException('Loading cancelled.','AbortError');
-   const data=root.PortalAnalysisData.sourceGeoJSON(snapshot),p=snapshot.provenance;
+   const data=root.PortalAnalysisData.sourceGeoJSON(snapshot);root.PortalDataWorkspace?.tag(data,l,range);const p=data.provenance;
    const loaded=await root.PortalLayers.addGeoJSON(l.cfg.name+' · '+(range?.label||'analysis area'),data,{sourceFormat:'geojson',dataRole:p.featureRole,heightField:p.heightField||undefined,allowHeight:p.autoHeight,license:l.cfg.license,attribution:l.cfg.attribution,page:l.cfg.page,sourceUrl:l.cfg.page,provider:l.cfg.provider,provenance:p,sourceNote:'Original records for the captured area. This layer stays fixed when the map moves.'},{restore:true});
    if(range&&range.meta.kind!=='view')root.portal.map.fitBounds([[range.bounds[0],range.bounds[1]],[range.bounds[2],range.bounds[3]]],{padding:50,maxZoom:18,duration:0});note(l,'Analysis layer added for the captured area.');root.PortalInventory?.openTable(loaded.id,{scope:'loaded'});return loaded;
   }catch(error){note(l,error.name==='AbortError'?'Loading cancelled.':error.message||'Original data could not load. Try again.',error.name!=='AbortError');}
-  finally{jobs.delete(l);root.PortalLayers?.refresh();}
+  finally{signal?.removeEventListener('abort',stop);jobs.delete(l);root.PortalLayers?.refresh();}
  }
  function cancel(l){jobs.get(l)?.abort();}
  function safeLinks(l){return (l?.cfg?.links||[]).filter(link=>{try{const u=new URL(link[1]);return u.protocol==='https:'&&!u.username&&!u.password;}catch(_){return false;}});}
  function open(l){
+  if(root.PortalDataWorkspace){root.PortalDataWorkspace.open({layer:l});return;}
   if(!linked(l))return;source=l;
   if(!dialog){dialog=document.createElement('dialog');dialog.id='analysis-data-options';dialog.className='analysis-data-options';document.body.append(dialog);dialog.addEventListener('close',()=>boundaryController?.abort());dialog.addEventListener('click',event=>{
    const b=event.target.closest('button');if(!b)return;

@@ -15,13 +15,11 @@
   function selectedKey(selection){const id=selection?.feature?.properties?.usbf_id;return [selection?.layer,id!==null&&id!==undefined&&String(id).trim()!==''?String(id):identity(selection?.feature)];}
   function layer(){return root.PortalLayers?.layers.get($('layer')?.value);}
   function studyLayer(){return root.PortalLayers?.layers.get($('study-area')?.value);}
-  function available(){const l=layer(),c=A().capabilities(l);return !!(c.supported&&(!c.attributePreview||$('tile-optin').checked)&&!(c.kind!=='on-demand'&&l.cfg.type==='viewport'&&(l.viewLoading||!l.loaded||l.error))&&($('scope').value!=='study-area'||A().isBuildingLayer(l)&&studyLayer()));}
+  function available(){const l=layer();return !!root.PortalDataWorkspace?.ready(l)&&($('scope').value!=='selection'||root.PortalGISSelection.count(l)>0)&&($('scope').value!=='area'||!!root.PortalDataWorkspace.area());}
   function bounds(){const b=root.portal?.map.getBounds();return b?[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()]:null;}
   function inputBinding(){
-    const l=layer();if(!l)return '';
-    const scope=$('scope').value,selected=root.PortalLayers.selection,area=scope==='study-area'?studyLayer():null;
-    if(A().capabilities(l).kind==='on-demand')return JSON.stringify([l.id,identity(l),l.sourceFilter||'',l.cfg.fixedSource||'',l.minArea||0,scope,['view','layer'].includes(scope)?bounds():null,scope==='selection'?selectedKey(selected):null,area?[area.id,identity(area.data),area.data?.features.length]:null]);
-    return JSON.stringify([l.id,identity(l.data),l.data?.features.length,l.sourceFilter||'',l.cfg.fixedSource||'',l.minArea||0,l.viewLoadedAt,l.release?[l.release.name,l.release.updated,l.release.tiles,l.release.buildings]:null,l.viewLoading,scope,scope==='view'||l.cfg.type==='viewport'?bounds():null,scope==='selection'?[selected?.layer,identity(selected?.feature)]:null,area?[area.id,identity(area.data),area.data?.features.length]:null,$('tile-optin').checked]);
+    const l=layer();if(!l)return '';const mode=$('scope').value,area=mode==='area'?root.PortalDataWorkspace.area():null;
+    return JSON.stringify([l.id,identity(l.data),l.data?.features.length,mode,mode==='selection'?root.PortalGISSelection.features(l).map(identity):null,area?[area.id,identity(area.data)]:null]);
   }
   function fieldLabel(key){
     if(key==='$area_m2')return snapshot?.provenance.featureRole==='buildings'?'Footprint area · m²':'Area · m²';
@@ -31,25 +29,8 @@
     const names={height_m:'Building height · m',height:'Original height value',render_height:'Building height · m',source:'Footprint source',bf_source:'Footprint source',state:'State',usbf_id:'Building ID',modified:'Footprint change'};
     return names[key]||String(key).replace(/_/g,' ').replace(/^./,c=>c.toUpperCase());
   }
-  function sourceNote(l,c){
-    if(!l)return 'Choose a dataset, or add a file to the map.';
-    if(!c.supported)return 'This layer is an image. Choose building footprints or another vector layer for these tools.';
-    if(c.kind==='on-demand')return 'Original buildings are loaded for your chosen area when you run a tool. Results keep the area you requested.';
-    if(c.attributePreview)return 'This map uses display tiles. Open the original outlines for building counts, areas and spatial analysis.';
-    if(l.cfg.type==='viewport'&&l.viewLoading)return 'Buildings are loading for this area.';
-    if(l.cfg.type==='viewport'&&l.error)return 'Buildings could not be loaded here. Return to the map and try another area.';
-    if(l.cfg.type==='viewport'&&!l.loaded)return 'Zoom into a neighborhood to see building statistics.';
-    return l.cfg.type==='viewport'?'Results cover the records available in this neighborhood.':'Choose this map area, the whole dataset, or one selected feature.';
-  }
-  function scopeLabel(p){
-    if(p.fragmentCount!==undefined)return 'Display samples from the current map';
-    if(p.studyArea)return p.studyArea.name+(p.sourceType==='viewport'?' · available original records':'');
-    if(p.operation)return 'Study-area result';
-    if(p.requestedScope==='selection'||p.scope==='selection')return 'Selected feature';
-    if(p.scope==='whole-layer')return 'Whole dataset';
-    if(p.scope==='view-intersection'||p.requestedView)return 'Captured map area';
-    return 'Loaded neighborhood';
-  }
+  function sourceNote(l){return root.PortalDataWorkspace?.ready(l)?'Fixed workset. Map movement, visibility and style filters do not change analysis records.':'Create a fixed analysis workset in Data & scope first.';}
+  function scopeLabel(p){return p.inputContract?p.scopeLabel:p.scopeLabel||'Explicit input records';}
   function featureWord(s=snapshot){return s?.provenance.featureRole==='buildings'?'buildings':'features';}
   function save(name,data,type){const u=URL.createObjectURL(data instanceof Blob?data:new Blob([data],{type})),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),30000);}
   function csv(rows){return rows.map(row=>row.map(v=>{let s=v===null||v===undefined?'':typeof v==='object'?JSON.stringify(v):String(v);if(typeof v==='string'&&/^\s*[=+@-]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';}).join(',')).join('\r\n');}
@@ -69,7 +50,7 @@
   function updateFreshness(){
     if(!dialog)return;
     const changed=!!snapshot&&binding!==inputBinding();$('changed').hidden=!changed;
-    if(changed)$('changed').textContent='The map or data has changed. Refresh to use the latest area and records.';
+    if(changed)$('changed').textContent='The input records or saved study area changed. Prepare a fresh snapshot before using the result.';
   }
   function setBusy(on){
     busy=on;dialog.setAttribute('aria-busy',String(on));
@@ -123,25 +104,23 @@
   function refreshLayers(){
     if(!dialog)return;const layers=root.PortalLayers?.layers;if(!layers)return;
     const old=$('layer').value,selected=old&&layers.has(old)?old:root.PortalLayers.active?.id;
-    fillSelect('layer',Array.from(layers.values()).map(l=>[l.id,l.cfg.name]),selected);
+    fillSelect('layer',root.PortalDataWorkspace.worksets().map(l=>[l.id,l.cfg.name]),selected);
     const reference=$('reference').value;
     const areas=Array.from(layers.values()).filter(l=>{const c=A().capabilities(l);return c.wholeLayer&&c.geometryAnalysis&&l.data?.features.length&&l.data.features.every(f=>['Polygon','MultiPolygon'].includes(f.geometry?.type));}),oldArea=$('study-area').value;
-    fillSelect('reference',[['__map__','Current map area'],...areas.map(l=>[l.id,l.cfg.name])],reference||'__map__');
+    fillSelect('reference',[['__area__','Saved study area'],...areas.map(l=>[l.id,l.cfg.name])],reference||'__area__');
     fillSelect('study-area',areas.map(l=>[l.id,l.cfg.name]),oldArea||areas.find(l=>l.data?.provenance?.role==='user-drawing')?.id);
     if((old&&old!==$('layer').value)||($('scope').value==='study-area'&&oldArea&&!layers.has(oldArea))){clearSnapshot();autoPending=tab==='stats'&&dialog.open;}
     updateScope();if(!snapshot)populateFields();updateFreshness();maybeAuto();
   }
+  let scopeReview=0;
   function updateScope(){
     if(!dialog||busy)return;
-    const l=layer(),c=A().capabilities(l),tiles=c.kind==='tile-preview',previous=$('scope').value||preferences.scope||'view';
-    $('purpose').innerHTML=root.PortalLayerPurpose?.analysisMarkup(l)||'';$('source-note').textContent=sourceNote(l,c);$('tile-preview').hidden=!tiles;$('original-data').hidden=!(tiles||!l||!c.supported);$('return-map').hidden=!(lastError||c.kind!=='on-demand'&&l?.cfg.type==='viewport'&&!l.loaded);
-    const choices=tiles?[['tile-preview','Map display samples']]:c.wholeLayer?[['view','Current map area'],['layer','Whole dataset'],['selection','Selected feature']]:[['view','Current map area'],['layer',c.kind==='on-demand'?'Available records in this map area':'Loaded neighborhood'],['selection','Selected feature']];
-    if(!tiles&&A().isBuildingLayer(l)&&$('study-area').options.length)choices.push(['study-area','Drawn or saved study area']);
-    fillSelect('scope',choices,previous);
-    $('study-wrap').hidden=$('scope').value!=='study-area';$('study-note').hidden=$('scope').value!=='study-area';
-    $('capture').disabled=!available();$('scope').disabled=!c.supported;
-    $('original-data').textContent=tiles?'Open original building data':l?'Add building footprints':'Add data';
-    updateButtons();
+    const l=layer(),D=root.PortalDataWorkspace,previous=$('scope').value;
+    $('purpose').innerHTML=root.PortalLayerPurpose?.analysisMarkup(l)||'';$('source-note').textContent=sourceNote(l);$('tile-preview').hidden=true;$('original-data').hidden=false;$('original-data').textContent='Manage data & scope';$('return-map').hidden=!lastError;
+    fillSelect('scope',[['layer','All workset records'],['selection','Selected workset records'],['area','Workset records in saved study area']],['layer','selection','area'].includes(previous)?previous:(D.defaultMode(l)==='selection'?'selection':'layer'));
+    $('study-wrap').hidden=true;$('study-note').hidden=true;$('capture').disabled=!available();$('scope').disabled=!D.ready(l);updateButtons();
+    const revision=++scopeReview,review=$('input-review');if(!D.ready(l)){review.textContent='Create a fixed analysis workset in Data & scope first.';return;}
+    D.records(l,$('scope').value).then(items=>{if(revision===scopeReview)review.textContent=l.cfg.name+' · '+D.describe(l).format+'\n'+root.PortalI18n.t(D.recordLabel($('scope').value))+' · '+items.length.toLocaleString('en-US')+' '+root.PortalI18n.t('input records')+'\n'+root.PortalI18n.t(D.coverage(l));}).catch(e=>{if(revision===scopeReview)review.textContent=e.message;});
   }
   function updateButtons(){
     if(!dialog||busy)return;
@@ -176,9 +155,8 @@
     return rows.map(([key,value])=>'<div><dt>'+esc(key)+'</dt><dd>'+esc(value)+'</dd></div>').join('');
   }
   async function prepare(signal){
-    const l=layer();if(!l)throw Error('Add a dataset to the map first.');
-    if(A().capabilities(l).kind==='on-demand')message('Loading original buildings for this area…');
-    const start=inputBinding(),captured=await A().capture(l,{scope:$('scope').value,studyArea:studyLayer(),map:root.portal.map,selection:root.PortalLayers.selection,allowTilePreview:$('tile-optin').checked,signal,onProgress:progress});
+    const l=layer();if(!l)throw Error('Create a fixed analysis workset in Data & scope first.');
+    const start=inputBinding(),captured=await root.PortalDataWorkspace.capture(l,{mode:$('scope').value,signal});
     const own=currentJob(signal);if(binding!==start)clearProducts();own.snapshot=captured;own.binding=start;snapshot=captured;binding=start;renderSnapshot();return captured;
   }
   function metric(value,label,detail=''){return '<div class="analysis-metric"><strong>'+esc(value)+'</strong><span>'+esc(label)+'</span>'+(detail?'<small>'+esc(detail)+'</small>':'')+'</div>';}
@@ -265,7 +243,7 @@
   async function referenceSnapshot(def,signal){
     if(['clip','intersect','filter','aggregate'].includes(def.operation)){
       let reference;
-      if(def.reference==='__map__'){if(!def.mapBounds||def.mapBounds[0]>=def.mapBounds[2])throw Error('Choose a map area within one longitude range.');reference={id:'current-map-area',cfg:{type:'geojson',name:'Current map area'},data:root.turf.featureCollection([root.turf.bboxPolygon(def.mapBounds)])};}
+      if(def.reference==='__area__'){const r=root.PortalDataWorkspace.range();reference={id:'saved-area-reference',cfg:{type:'geojson',name:r.label},data:{type:'FeatureCollection',features:[r.mask],provenance:{range:r.meta,spatialEligible:true,autoHeight:false}},fields:[]};}
       else reference=root.PortalLayers.layers.get(def.reference);
       if(!reference)throw Error('Choose a study area first.');
       return A().capture(reference,{scope:'layer',respectFilters:true,signal,onProgress:progress});
@@ -316,7 +294,7 @@
     dialog.innerHTML=[
       '<header class="analysis-header"><h2 id="analysis-title" data-i18n>Statistics and analysis</h2><button type="button" class="analysis-close" data-analysis-close aria-label="Close" data-i18n-aria-label>×</button></header>',
       '<div class="analysis-tabs" role="tablist" aria-label="Data tools" data-i18n-aria-label><button type="button" role="tab" id="analysis-tab-stats" data-analysis-tab="stats" aria-controls="analysis-panel-stats" data-i18n>Statistics</button><button type="button" role="tab" id="analysis-tab-spatial" data-analysis-tab="spatial" aria-controls="analysis-panel-spatial" data-i18n>Spatial tools</button><button type="button" role="tab" id="analysis-tab-chart" data-analysis-tab="chart" aria-controls="analysis-panel-chart" data-i18n>Charts</button></div>',
-      '<div class="analysis-body"><section class="analysis-inputs"><div class="analysis-grid"><label data-i18n>Dataset<select id="analysis-layer"></select></label><label data-i18n>Area<select id="analysis-scope"></select></label><label id="analysis-study-wrap" hidden data-i18n>Study area<select id="analysis-study-area"></select></label></div><p id="analysis-study-note" class="analysis-note" hidden data-i18n>Whole buildings touching or overlapping this area are included. Outlines are kept intact.</p><div id="analysis-purpose"></div><p id="analysis-source-note" class="analysis-note" data-i18n-system></p><div class="analysis-input-actions"><button type="button" id="analysis-capture" class="analysis-text-button" data-i18n>Refresh data</button><button type="button" id="analysis-original-data" hidden data-i18n-system>Open original building data</button></div><details id="analysis-tile-preview" hidden><summary data-i18n>Preview displayed fields</summary><label id="analysis-tile-optin-wrap" class="analysis-optin"><input id="analysis-tile-optin" type="checkbox" data-i18n> Use map display samples. These can contain parts of the same building.</label></details></section>',
+      '<div class="analysis-body"><section class="analysis-inputs"><div class="analysis-grid"><label data-i18n>Dataset<select id="analysis-layer"></select></label><label data-i18n>Input records<select id="analysis-scope"></select></label><label id="analysis-study-wrap" hidden data-i18n>Study area<select id="analysis-study-area"></select></label></div><p id="analysis-study-note" class="analysis-note" hidden data-i18n>Whole buildings touching or overlapping this area are included. Outlines are kept intact.</p><div id="analysis-input-review" class="input-scope-review" aria-live="polite"></div><div id="analysis-purpose"></div><p id="analysis-source-note" class="analysis-note" data-i18n-system></p><div class="analysis-input-actions"><button type="button" id="analysis-capture" class="analysis-text-button" data-i18n>Prepare input snapshot</button><button type="button" id="analysis-original-data" hidden data-i18n-system>Open original building data</button></div><details id="analysis-tile-preview" hidden><summary data-i18n>Preview displayed fields</summary><label id="analysis-tile-optin-wrap" class="analysis-optin"><input id="analysis-tile-optin" type="checkbox" data-i18n> Use map display samples. These can contain parts of the same building.</label></details></section>',
       '<p id="analysis-message" class="analysis-message" role="status" aria-live="polite" hidden data-i18n-system></p><button type="button" id="analysis-cancel" data-analysis-cancel hidden data-i18n>Cancel</button><button type="button" id="analysis-return-map" class="analysis-text-button" hidden data-i18n>Return to map</button>',
       '<p id="analysis-changed" class="analysis-warning" hidden data-i18n-system></p>',
       '<section id="analysis-snapshot" class="analysis-snapshot" hidden><strong id="analysis-snapshot-name"></strong><p id="analysis-snapshot-scope" data-i18n-system></p><span id="analysis-snapshot-time" class="analysis-note"></span><p id="analysis-snapshot-limit" class="analysis-warning" hidden data-i18n>Some data was unavailable. Results cover the available features only.</p><details><summary data-i18n>Data source and area</summary><dl id="analysis-snapshot-provenance" class="analysis-source-facts"></dl><button type="button" id="analysis-snapshot-download" class="analysis-text-button" data-i18n>Download source details</button></details></section>',
@@ -327,13 +305,13 @@
     document.body.append(dialog);
     dialog.querySelector('[data-analysis-close]').onclick=()=>{controller?.abort();dialog.close();};
     dialog.addEventListener('cancel',()=>controller?.abort());$('cancel').onclick=()=>controller?.abort();$('return-map').onclick=()=>dialog.close();
-    dialog.querySelectorAll('[data-analysis-tab]').forEach(b=>{b.onclick=()=>{switchTab(b.dataset.analysisTab);if(tab==='stats'&&!snapshot){autoPending=true;maybeAuto();}};b.onkeydown=e=>{if(['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();const tabs=['stats','spatial','chart'],next=tabs[(tabs.indexOf(tab)+(e.key==='ArrowRight'?1:2))%3];$('tab-'+next).click();$('tab-'+next).focus();}};});
-    $('layer').onchange=()=>{clearSnapshot();updateScope();populateFields();autoPending=tab==='stats';maybeAuto();};
-    $('scope').onchange=()=>{clearSnapshot();updateScope();populateFields();remember();autoPending=tab==='stats';maybeAuto();};
-    $('study-area').onchange=()=>{clearSnapshot();populateFields();autoPending=tab==='stats';maybeAuto();};
+    dialog.querySelectorAll('[data-analysis-tab]').forEach(b=>{b.onclick=()=>{switchTab(b.dataset.analysisTab);if(tab==='stats'&&!snapshot){autoPending=false;}};b.onkeydown=e=>{if(['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();const tabs=['stats','spatial','chart'],next=tabs[(tabs.indexOf(tab)+(e.key==='ArrowRight'?1:2))%3];$('tab-'+next).click();$('tab-'+next).focus();}};});
+    $('layer').onchange=()=>{clearSnapshot();updateScope();populateFields();autoPending=false;};
+    $('scope').onchange=()=>{clearSnapshot();updateScope();populateFields();remember();autoPending=false;};
+    $('study-area').onchange=()=>{clearSnapshot();populateFields();autoPending=false;};
     $('tile-optin').onchange=()=>{clearSnapshot();updateScope();populateFields();};
     $('capture').onclick=()=>job(tab==='stats'?refreshStatistics:prepare);
-    $('original-data').onclick=()=>{const original=A().capabilities(layer()).attributePreview;dialog.close();if(original&&root.PortalLayerPurpose)root.PortalLayerPurpose.original(layer());else root.PortalLayers.open('catalog');};
+    $('original-data').onclick=()=>{dialog.close();root.PortalDataWorkspace.open({layer:layer()});};
     $('run-stats').onclick=()=>{const field=$('numeric-field').value;remember();job(async signal=>{await prepare(signal);await renderOverview(signal);await statistics(signal,field);});};
     $('run-groups').onclick=()=>{const field=$('group-field').value;remember();job(async signal=>{await prepare(signal);groups(field,signal);});};
     $('run-geometry').onclick=()=>job(async signal=>{await prepare(signal);await geometry(signal);});
@@ -346,7 +324,7 @@
     $('chart-png').onclick=()=>job(async signal=>{const image=await chartImage();currentJob(signal);save('building-chart.png',image.blob);});
     $('spatial-download').onclick=()=>lastResult&&save('analysis-result.geojson',JSON.stringify(lastResult),'application/geo+json');$('spatial-add').onclick=()=>job(addResult);
     dialog.addEventListener('click',e=>{if(e.target.closest('[data-analysis-add-result]'))job(addResult);if(e.target.closest('[data-analysis-download-result]'))$('spatial-download').click();});
-    document.addEventListener('portal-layers-changed',refreshLayers);['portal-style-changed','portal-selection-changed'].forEach(e=>document.addEventListener(e,()=>{updateFreshness();if(!snapshot)populateFields();}));
+    document.addEventListener('portal-layers-changed',refreshLayers);['portal-style-changed','portal-selection-changed','portal-bulk-selection-changed','portal-data-context-changed','portal-language-changed'].forEach(e=>document.addEventListener(e,()=>{updateScope();updateFreshness();if(!snapshot)populateFields();}));
     root.portal?.map.on('moveend',updateFreshness);
     if(['histogram','category','scatter','grouped'].includes(preferences.chartKind))$('chart-kind').value=preferences.chartKind;
     if(Object.prototype.hasOwnProperty.call(operationLabels,preferences.operation))$('operation').value=preferences.operation;
@@ -354,24 +332,21 @@
     switchTab(tab);refreshLayers();updateOperation();updateButtons();
   }
   function open(name='stats',options={}){
+    const requested=options.layerId?root.PortalLayers.layers.get(options.layerId):root.PortalLayers.active;if(!root.PortalDataWorkspace.ready(requested)){root.PortalDataWorkspace.open({layer:requested,intent:name});return activeJob;}
     ensure();refreshLayers();
     if(options.layerId&&root.PortalLayers.layers.has(options.layerId)){$('layer').value=options.layerId;clearSnapshot();}
     else if(root.PortalLayers.active?.id&&$('layer').value!==root.PortalLayers.active.id){$('layer').value=root.PortalLayers.active.id;clearSnapshot();}
     if(options.studyAreaId&&root.PortalLayers.layers.has(options.studyAreaId))$('study-area').value=options.studyAreaId;
-    updateScope();if(options.scope&&Array.from($('scope').options).some(o=>o.value===options.scope))$('scope').value=options.scope;updateScope();
+    updateScope();$('scope').value=root.PortalDataWorkspace.defaultMode(layer())==='selection'?'selection':'layer';if(options.scope&&Array.from($('scope').options).some(o=>o.value===options.scope))$('scope').value=options.scope;updateScope();
     populateFields();switchTab(name);if(!dialog.open)dialog.showModal();updateFreshness();
-    if(tab==='stats'&&options.auto!==false){autoPending=true;maybeAuto();}
+    if(tab==='stats'&&options.auto!==false){autoPending=false;}
     return activeJob;
   }
   async function openStudyArea(buildingLayerId,studyAreaId,options={}){
-    ensure();const building=root.PortalLayers.layers.get(buildingLayerId),area=root.PortalLayers.layers.get(studyAreaId);
-    if(!building||!A().isBuildingLayer(building))throw Error('Choose an original building footprint layer.');
-    if(!area)throw Error('Choose a study area first.');
-    if(dialog.open)dialog.close();const stopping=cancel({clear:true}),launchGeneration=generation;await stopping;
-    if(generation!==launchGeneration||root.PortalLayers.layers.get(buildingLayerId)!==building||root.PortalLayers.layers.get(studyAreaId)!==area)throw aborted();
-    open('stats',{layerId:buildingLayerId,scope:'study-area',studyAreaId,auto:false});
-    if($('scope').value!=='study-area')throw Error('Choose a complete polygon layer as your study area.');
-    return job(async signal=>{await refreshStatistics(signal);currentJob(signal);if(options.action==='download')dataDownload();});
+    const l=root.PortalLayers.layers.get(buildingLayerId),a=root.PortalLayers.layers.get(studyAreaId);if(!l||!a)throw Error('Choose a source and study area first.');
+    const mask=a.data.features.length===1?a.data.features[0]:root.turf.union(a.data),r=root.PortalGISRange.value(mask,a.cfg.name,{kind:'layer-mask',layer:a.cfg.name,crs:'EPSG:4326'});await root.PortalDataWorkspace.saveArea(r,a.cfg.name);
+    if(!root.PortalDataWorkspace.ready(l)){root.PortalDataWorkspace.open({layer:l,intent:options.action==='download'?'download':'stats'});return;}
+    return open('stats',{layerId:l.id,scope:'area',auto:false});
   }
   root.PortalAnalysis={open,openStudyArea,cancel,fieldLabel,whenReady:()=>activeJob,chartImage,pngWithMetadata,get busy(){return busy;},get error(){return lastError;},get overview(){return summary;},get snapshot(){return snapshot;},get result(){return lastResult;},get chart(){return lastChart;},get statistics(){return lastStats;}};
   document.addEventListener('portal-ready',ensure);if(root.portal?.ready)ensure();

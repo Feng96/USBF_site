@@ -30,7 +30,7 @@
   else if(event?.ctrlKey||event?.metaKey)set(l,[f],has(l,f)?'subtract':'add');else set(l,[f],'replace');anchor.set(l,f);
  }
  async function original(l,range){
-  const cap=root.PortalAnalysisData.capabilities(l);if(cap.kind==='on-demand'){
+  const cap=root.PortalAnalysisData.capabilities(l);if(cap.kind==='on-demand'||l.cfg.type==='viewport'){if(root.PortalDataWorkspace){root.PortalDataWorkspace.open({layer:l,range:range||undefined,intent:'selection'});throw Error('Save the study area and load an analysis workset before selecting original buildings.');}
    const snapshot=await root.PortalGISCore.capture(l,{range});if(!snapshot.features.length)throw Error('No original buildings were found in this area.');
    const d=root.PortalGISCore.result(snapshot.features,[snapshot],'selection-area',{range});return root.PortalGIS.add(d,l.cfg.name+' · selection area');
   }
@@ -44,16 +44,16 @@
  function notify(error){root.portal?.toast(error.message||String(error));}
  function start(next){
   cancel();if(!map)return;root.PortalDraw?.cancel();root.portal.setTool('explore');mode=next;
-  map.getCanvas().style.cursor='crosshair';map.doubleClickZoom.disable();if(next==='box') {map.dragPan.disable();map.boxZoom.disable();}
-  strip.hidden=false;strip.querySelector('[data-gis-finish]').hidden=next!=='polygon';strip.querySelector('[data-gis-selection-help]').textContent=next==='box'?'Drag a box to select whole buildings':next==='polygon'?'Click polygon corners, then Finish':'Click a building; Ctrl/Cmd toggles selection';
+  map.getCanvas().style.cursor='crosshair';map.doubleClickZoom.disable();if(next==='box'||next==='area-box') {map.dragPan.disable();map.boxZoom.disable();}
+  strip.hidden=false;strip.querySelector('[data-gis-finish]').hidden=!next.includes('polygon');strip.querySelector('[data-gis-selection-help]').textContent=next.includes('box')?'Drag a box to define the boundary':next.includes('polygon')?'Click polygon corners, then Finish':'Click a building; Ctrl/Cmd toggles selection';
   document.querySelectorAll('[data-gis-select]').forEach(b=>b.classList.toggle('active',b.dataset.gisSelect===mode));
  }
  function cancel(){mode='';origin=null;vertices=[];sketch();if(map){map.dragPan.enable();map.boxZoom.enable();map.doubleClickZoom.enable();map.getCanvas().style.cursor='';}if(overlay)overlay.hidden=true;if(strip)strip.hidden=true;document.querySelectorAll('[data-gis-select]').forEach(b=>b.classList.remove('active'));}
  function sketch(){const fs=vertices.map(p=>root.turf.point(p));if(vertices.length>1)fs.push(root.turf.lineString(vertices));map?.getSource('gis-selection-sketch')?.setData({type:'FeatureCollection',features:fs});}
- function finish(){if(vertices.length<3){notify('Add at least three polygon corners.');return;}const mask={type:'Feature',properties:{},geometry:{type:'Polygon',coordinates:[[...vertices,vertices[0]]]}};lastBox=mask;vertices=[];sketch();selectMask(mask).catch(notify);}
+ function finish(){if(vertices.length<3){notify('Add at least three polygon corners.');return;}const mask={type:'Feature',properties:{},geometry:{type:'Polygon',coordinates:[[...vertices,vertices[0]]]}};lastBox=mask;vertices=[];sketch();if(mode==='area-polygon'){cancel();root.PortalDataWorkspace.setDraft(root.PortalGISRange.value(mask,'Drawn polygon',{kind:'drawn-polygon',crs:'EPSG:4326'}));return;}selectMask(mask).catch(notify);}
  function click(e){
-  if(!mode)return false;if(mode==='box')return true;
-  if(mode==='polygon'){if(vertices.length>=500){notify('Use up to 500 selection vertices.');return true;}vertices.push([e.lngLat.lng,e.lngLat.lat]);sketch();strip.querySelector('[data-gis-selection-help]').textContent=vertices.length+' polygon corners';return true;}
+  if(!mode)return false;if(mode==='box'||mode==='area-box')return true;
+  if(mode==='polygon'||mode==='area-polygon'){if(vertices.length>=500){notify('Use up to 500 selection vertices.');return true;}vertices.push([e.lngLat.lng,e.lngLat.lat]);sketch();strip.querySelector('[data-gis-selection-help]').textContent=vertices.length+' polygon corners';return true;}
   if(busy)return true;busy=true;const l=active(),point=[e.lngLat.lng,e.lngLat.lat],event=e.originalEvent||{};
   (async()=>{if(!l)throw Error('Choose a layer first.');const local=await original(l,null),hits=root.PortalGISCore.filter(local.data.features,root.turf.bboxPolygon([point[0]-.000001,point[1]-.000001,point[0]+.000001,point[1]+.000001]));if(hits.length){const f=hits[0],op=event.ctrlKey||event.metaKey?(has(local,f)?'subtract':'add'):event.shiftKey?'add':operation;set(local,[f],op);if(has(local,f))root.PortalLayers.inspect(local,f);else root.PortalLayers.clearExternalSelection();}})().catch(notify).finally(()=>busy=false);return true;
  }
@@ -61,9 +61,9 @@
   map.addSource('gis-selection-sketch',{type:'geojson',data:empty()});map.addLayer({id:'gis-selection-sketch-line',type:'line',source:'gis-selection-sketch',filter:['==',['geometry-type'],'LineString'],paint:{'line-color':'#8b3db8','line-width':2,'line-dasharray':[2,2]}});map.addLayer({id:'gis-selection-sketch-points',type:'circle',source:'gis-selection-sketch',filter:['==',['geometry-type'],'Point'],paint:{'circle-radius':4,'circle-color':'#8b3db8'}});
   overlay=document.createElement('div');overlay.className='gis-selection-rectangle';overlay.hidden=true;map.getCanvasContainer().append(overlay);
   strip=document.createElement('div');strip.className='gis-selection-strip';strip.hidden=true;strip.innerHTML='<span data-gis-selection-help data-i18n-system></span><select data-gis-selection-mode><option value="replace" data-i18n>Replace selection</option><option value="add" data-i18n>Add to selection</option><option value="subtract" data-i18n>Remove from selection</option><option value="intersect" data-i18n>Keep common selection</option></select><button data-gis-finish data-i18n>Finish</button><button data-gis-stop data-i18n>Done selecting</button>';document.querySelector('.map-surface').append(strip);strip.querySelector('[data-gis-selection-mode]').onchange=e=>operation=e.target.value;strip.querySelector('[data-gis-stop]').onclick=cancel;strip.querySelector('[data-gis-finish]').onclick=finish;
-  map.on('mousedown',e=>{if(mode!=='box'||busy||e.originalEvent.button!==0)return;e.preventDefault();origin={x:e.point.x,y:e.point.y};overlay.hidden=false;Object.assign(overlay.style,{left:origin.x+'px',top:origin.y+'px',width:'0px',height:'0px'});});
+  map.on('mousedown',e=>{if(!['box','area-box'].includes(mode)||busy||e.originalEvent.button!==0)return;e.preventDefault();origin={x:e.point.x,y:e.point.y};overlay.hidden=false;Object.assign(overlay.style,{left:origin.x+'px',top:origin.y+'px',width:'0px',height:'0px'});});
   map.on('mousemove',e=>{if(!origin)return;Object.assign(overlay.style,{left:Math.min(origin.x,e.point.x)+'px',top:Math.min(origin.y,e.point.y)+'px',width:Math.abs(origin.x-e.point.x)+'px',height:Math.abs(origin.y-e.point.y)+'px'});});
-  map.on('mouseup',e=>{if(!origin)return;const a=origin;origin=null;overlay.hidden=true;if(Math.abs(a.x-e.point.x)<3||Math.abs(a.y-e.point.y)<3)return;const w=Math.min(a.x,e.point.x),s=Math.max(a.y,e.point.y),east=Math.max(a.x,e.point.x),n=Math.min(a.y,e.point.y),ring=[[w,s],[east,s],[east,n],[w,n],[w,s]].map(p=>{const ll=map.unproject(p);return [ll.lng,ll.lat];});lastBox=root.turf.polygon([ring]);const op=e.originalEvent?.ctrlKey?'subtract':e.originalEvent?.shiftKey?'add':operation;selectMask(lastBox,op).catch(notify);});
+  map.on('mouseup',e=>{if(!origin)return;const a=origin;origin=null;overlay.hidden=true;if(Math.abs(a.x-e.point.x)<3||Math.abs(a.y-e.point.y)<3)return;const w=Math.min(a.x,e.point.x),s=Math.max(a.y,e.point.y),east=Math.max(a.x,e.point.x),n=Math.min(a.y,e.point.y),ring=[[w,s],[east,s],[east,n],[w,n],[w,s]].map(p=>{const ll=map.unproject(p);return [ll.lng,ll.lat];});lastBox=root.turf.polygon([ring]);if(mode==='area-box'){cancel();root.PortalDataWorkspace.setDraft(root.PortalGISRange.value(lastBox,'Drawn box',{kind:'drawn-box',crs:'EPSG:4326'}));return;}const op=e.originalEvent?.ctrlKey?'subtract':e.originalEvent?.shiftKey?'add':operation;selectMask(lastBox,op).catch(notify);});
   document.addEventListener('portal-layers-changed',update);document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))cancel();});
   document.addEventListener('click',e=>{if(e.target.closest('[data-tool],[data-workspace-tool=draw],[data-open-models]'))cancel();if(e.target.closest('[data-action=clear-selection]'))clear();});
  }

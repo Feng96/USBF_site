@@ -15,6 +15,8 @@
  function describe(layer,{catalog=false}={}){
   const c=layer?.cfg||{},cap=root.PortalAnalysisData?.capabilities(layer)||{},fileFormat=format(layer);
   const demand=cap.kind==='on-demand'||catalog&&c.driver==='usbf';
+  if(root.PortalDataWorkspace?.isArea(layer))return {kind:'original',label:'Saved study area',format:fileFormat,note:'Saved boundary · not building records'};
+  if(c.type==='viewport'&&!demand)return {kind:!catalog&&(layer.viewLoading||layer.error||layer.loaded===false)?'pending':layer.viewLimited?'partial':'preview',label:!catalog&&(layer.viewLoading||layer.error||layer.loaded===false)?'Live cache loading or unavailable':layer.viewLimited?'Partial live cache':'Live source cache',format:fileFormat,note:'Display scope follows the map; create a fixed analysis workset before analysis.',action:'load',actionLabel:'Create analysis workset'};
   if(demand)return {kind:'preview',label:'Map preview',format:layer?.renderTiled||catalog?'PMTiles':fileFormat,note:'For building counts, areas and spatial tools, load original records for an area.',action:'load',actionLabel:'Load area & analyze'};
   if(cap.attributePreview||['pmtiles','vector'].includes(c.type)&&!['raster'].includes(c.sourceKind))return {kind:'preview',label:'Map preview',format:fileFormat,note:'Display outlines may be cut or simplified. Add original data before counting buildings or measuring areas.',action:'original',actionLabel:'Find original data'};
   if(catalog&&['viewport','geojson'].includes(c.type))return {kind:'ready',label:'Analysis data',format:fileFormat,note:c.type==='viewport'?'Original records load for the area you view.':'Tools use the records in the loaded file.'};
@@ -37,7 +39,7 @@
    if(cap.geometryAnalysis&&cap.kind!=='on-demand'&&['geojson','viewport'].includes(layer.cfg.type))actions+=button('table','View attribute table',layer.cfg.type==='viewport'&&(layer.viewLoading||!layer.loaded||layer.error));
    if(loading)actions+=button('cancel-data','Cancel loading');
   }
-  return '<div class="layer-purpose" data-purpose-kind="'+state.kind+'">'+badges(state)+'<p data-i18n>'+esc(state.note)+'</p>'+(actions?'<div class="layer-purpose-actions">'+actions+'</div>':'')+(message?'<p class="layer-analysis-message '+(message.error?'error':'')+'" role="status" data-i18n-system>'+esc(message.text)+'</p>':'')+'</div>';
+  return '<div class="layer-purpose" data-purpose-kind="'+state.kind+'">'+badges(state)+(root.PortalDataWorkspace?.layerFacts(layer)||'')+'<p data-i18n>'+esc(state.note)+'</p>'+(actions?'<div class="layer-purpose-actions">'+actions+'</div>':'')+(message?'<p class="layer-analysis-message '+(message.error?'error':'')+'" role="status" data-i18n-system>'+esc(message.text)+'</p>':'')+'</div>';
  }
  function analysisMarkup(layer){
   if(!layer)return '';
@@ -50,6 +52,7 @@
  }
  function act(layer,action){
   if(!layer||root.PortalLayers?.layers.get(layer.id)!==layer)return;
+  if(['data','load','original'].includes(action)&&root.PortalDataWorkspace){root.PortalDataWorkspace.open({layer});return;}
   if(action==='data'){root.PortalAnalysisLayers?.open(layer);return;}
   if(action==='cancel-data'){root.PortalAnalysisLayers?.cancel(layer);return;}
   if(action==='table'){root.PortalInventory?.openTable(layer.id,{scope:'loaded'});return;}

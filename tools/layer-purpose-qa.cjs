@@ -15,7 +15,7 @@ ok(P.describe({cfg:{type:'viewport',driver:'usbf'}},{catalog:true}).action==='lo
 ok(P.describe({cfg:{type:'vector'}}).kind==='preview'&&P.format({cfg:{type:'vector'}})==='MVT','Native vector tiles carry the same preview restriction as PMTiles');
 ok(P.describe({cfg:{type:'raster-pmtiles'}}).kind==='image','Raster PMTiles cannot acquire a vector analysis badge');
 const gov={cfg:{type:'viewport',driver:'nyc'},data:{features:[]},loaded:true};
-ok(P.format(gov)==='GeoJSON · API'&&P.describe(gov).kind==='ready','Government GeoJSON APIs are distinguished from GeoParquet readers');
+ok(P.format(gov)==='GeoJSON · API'&&P.describe(gov).kind==='preview','Government GeoJSON live caches are distinguished from fixed worksets and GeoParquet transport');
 ok(P.describe({...gov,viewLoading:true}).kind==='pending'&&P.describe({...gov,error:true}).kind==='pending','Unfinished and failed views never claim analysis data is ready');
 ok(P.describe({...gov,viewLimited:true}).kind==='partial','Incomplete government coverage remains visible after loading stops');
 ok(P.describe({...file,data:{features:[],provenance:{requestedView:[0,0,1,1]}}}).note.includes('saved area'),'Saved area snapshots describe their limited geographical scope');

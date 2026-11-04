@@ -108,9 +108,9 @@ The display and analysis paths have different contracts:
 | Input | Map display | Statistics and spatial analysis |
 |---|---|---|
 | Full imported vector | Browser GeoJSON tiles | Frozen complete source geometry, or whole features intersecting a chosen extent |
-| USBF with its analytical source | Versioned PMTiles with renderer tile caching | Explicit tools request original GeoParquet records for a fixed area or selected ID; scope, release, limits and rights are frozen |
-| GBA / government batch | Current neighborhood | Frozen actual loaded records, with bounds, timestamp, release, filters and any limit preserved |
-| PMTiles / MVT | Fast, clipped/simplified tiles | Explicit field preview only; fragment observations are not unique building totals; geometry analysis and original-data exports are blocked |
+| USBF with its analytical source | Versioned PMTiles with renderer tile caching | Data & scope explicitly loads originals for a saved boundary; analytical tools use the resulting fixed workset |
+| GBA / government batch | Current neighborhood | Live display cache only; prepare a fixed workset for a saved area before analysis |
+| PMTiles / MVT | Fast, clipped/simplified tiles | Display and attribute inspection only; analytical inputs and original-data exports require a fixed full-geometry workset |
 | Raster tiles / raster image preview | Georeferenced display | Excluded from vector analysis; GeoTIFF details expose clearly labelled preview sample summaries rather than claiming full-resolution pixel statistics |
 
 `PortalAnalysisData.capture()` makes a deep-frozen independent source snapshot.
@@ -140,14 +140,14 @@ separately when the source publication advances before a new display archive.
 1. Choose **Add data** → Catalog, From URL or Local File. Declare the source CRS
    when the file does not embed it. CSV requires valid x/y columns; images need
    bounds or a world file. ZIPs need matching `.prj` files or a declared CRS.
-2. Select a layer and open **Tools → Statistics**. The current area is summarized
-   automatically. Choose the full loaded layer or one selected feature when
-   needed. Change the area or source, then **Refresh data** for new statistics.
-3. For a clip or zone summary, use the current map area or add/draw a complete
-   polygon layer as a study area. The chosen source is frozen when each operation
-   starts. Overlapping
-   clip masks are unioned; intersection overlays and zone summaries explicitly
-   describe how overlapping zones contribute.
+2. Open **Data & scope**. Choose a connection and save a named study area. A
+   current-view boundary is sampled when saved; later map movement does not change
+   it. Explicitly load original records to create a fixed analysis workset, or
+   choose an imported original vector layer.
+3. Select **All workset records**, **Selected workset records**, or **Workset
+   records in saved study area**. Review the exact input count, format and coverage.
+   Statistics, charts, processing, LoD1 and data downloads use this same contract.
+   An operation's mask/reference boundary remains separate from its input subset.
 4. Use **Create map** for images and **Download** for vector data/original files.
    PNG and metadata are complementary: the metadata records source dates,
    styles, limits, camera and local model placements.
@@ -479,7 +479,7 @@ to interface translation.
 the analytical guards. A GeoJSON file exported from tiles remains a preview when
 its provenance identifies display fragments. A cached USBF selection never turns
 the PMTiles display into a complete analytical dataset. USBF offers **Load area &
-analyze**, which opens the existing original-data analysis workflow; browsing and
+analyze**, which now opens the shared **Data & scope** preparation panel; browsing and
 showing labels do not fetch GeoParquet. Its analysis panel explicitly identifies
 GeoParquet original records while the map continues to use PMTiles. External
 preview-only sources lead to source details, verified provider links and Add Data.
@@ -491,7 +491,7 @@ real synthetic PMTiles/Parquet parsing, explicit loading, Chinese and phone layo
 
 ### Load original analysis layers and inspect attributes
 
-Each preview layer offers **Load analyzable data**. USBF can read the current
+Each preview layer offers **Load analyzable data**, opening **Data & scope**. USBF reads a saved study
 area's original GeoParquet through its existing bounded reader and add a separate
 GeoJSON analysis layer. Original geometry, attributes, licenses, file checksums,
 requested area and partial-source provenance are retained. The new layer stays
@@ -532,8 +532,8 @@ The top ribbon separates **Data**, **Map**, **Selection**, **Processing**,
 Chinese translates controls and system messages while preserving dataset names,
 original fields, values, formats and technical names.
 
-**Load analyzable data / Load another range** and the processing dialog share an
-area selector: current map view; a U.S. state or county; bounding-box coordinates;
+**Data & scope** provides the shared saved-area selector (the processing dialog
+uses the same geometry controls for a separate operation boundary): current map view; a U.S. state or county; bounding-box coordinates;
 an input polygon or boundary GeoJSON; another layer's extent; a loaded polygon
 mask; or the last map selection boundary. State/county names and full boundaries
 come from the U.S. Census Bureau TIGERweb State_County service (state layer 0,
@@ -567,8 +567,8 @@ duplicate source IDs. Click, drag a box, draw a polygon, select by attribute, or
 select by location. Choose replace/add/remove/common selection; Shift adds and
 Ctrl/Cmd toggles click selection. Attribute-table Ctrl/Cmd-click toggles rows and
 Shift-click selects a range in the currently filtered/sorted table. Select all,
-invert, clear and zoom-to-selection are available. A tiled USBF selection first
-loads separate original records for the chosen area; tile fragments never become
+invert, clear and zoom-to-selection are available. A tiled USBF selection now opens explicit study-area/workset preparation; it never
+silently downloads originals. Tile fragments never become
 analytical building records. Up to 20,000 original records can be selected.
 Selections are per-layer session state; output layers and their provenance are
 saved in Projects. Replacing a viewport's source data invalidates its old selection.
@@ -611,3 +611,83 @@ record-identity selection, map drag selection, full-outline extraction, merge,
 selected exports and Project restore. Range checks exercise real Census and DC
 endpoints as well as real synthetic PMTiles/GeoParquet decoding. Existing
 analysis-layer/attribute-table workflows remain regression checks.
+
+
+### Explicit data and scope contract (v1.8)
+
+This workflow supersedes implicit current-view loading in the earlier analysis,
+download and model dialogs. It separates four things that must not be conflated:
+
+| Object | Meaning | Changes with map movement? |
+|---|---|---|
+| Display connection | PMTiles/MVT or a live API/GeoParquet display cache | Yes, the visible/cache extent can change |
+| Saved study area | Named immutable boundary, working-input CRS and provenance | No |
+| Fixed analysis workset | Actual loaded full-source/derived vector records and their loading boundary | No |
+| Tool input snapshot | All, selected, or saved-area-filtered records from a chosen workset | No; a later selection/area change requires fresh preparation |
+
+The persistent context bar and **Data & scope** panel show these objects
+separately. Contents shows fixed record counts, original transport/file format,
+loaded GeoJSON format, actual loading area and coverage. An imported GeoParquet,
+Shapefile or CSV may be represented as GeoJSON in browser memory; these are two
+format facts, not interchangeable capability claims. Tiles can contain
+attributes, but tile attributes do not establish original-geometry fidelity or
+unique-building completeness.
+
+**Prepare data explicitly:** choose a source, preview/save a study area, then
+load a fixed workset. Reuse the exact same saved polygon across USBF, GBA and
+DC/NYC adapters. Supported boundaries include a sampled map view, official Census
+state/county, typed bounding box/polygon in the working CRS, GeoJSON boundary,
+layer extent, polygon mask, selected-record extent, and hand-drawn box/polygon.
+Multiple saved areas are normal GeoJSON boundary layers with `workspaceArea`
+provenance; they restore with Projects. No source connection or processing tool
+silently substitutes a new camera extent for a saved boundary.
+
+**Choose processing records explicitly:** statistics, charts, processing,
+workset attribute-table subsets, LoD1 and Composer data exports all use
+`PortalDataWorkspace.capture(layer, {mode, signal})`. The allowed modes are all
+fixed workset records, the exact bulk selection, or full records intersecting the
+active saved study area. Existing selections are offered as a visible default
+with their actual count; an empty selection never falls back to all records.
+Duplicate IDs remain separate source rows. Display visibility, styling and map
+filters do not filter analytical input; choose the record subset explicitly.
+The original-data loading path also ignores display-only source/minimum-area
+filters while honoring an adapter's intrinsic dataset definition.
+
+`provenance.inputContract` identifies the workset, original/loaded formats, input
+mode, exact record count, selected original row indexes when applicable, loading
+area, processing area and partial status. Snapshots deep-copy original values.
+Outputs retain contracts in their lineage, and statistics/charts/data exports
+retain them directly. Partial sources stay partial after selecting a smaller
+subset. Imported files without a verified geographic-coverage claim are described
+as loaded records, rather than claiming every building in their bounding box.
+A completed request is explicitly distinguished from provider coverage.
+
+The operation mask is a different parameter from the input record scope. For
+example, **all 800 loaded records** can be the input to Clip against a saved
+county; **20 selected records** can be buffered without loading anything else.
+Extract keeps entire intersecting records, while Clip changes geometry. Sources
+remain intact and every generated layer records its lineage.
+
+**Compose a visual map separately:** choose the current visual frame, frame a
+saved area, or frame a workset's extent. Map output draws visible display and
+analysis layers; it does not fetch/select analytical records. Its metadata marks
+this as a visual frame and retains layer format, role, scope and coverage. Data
+export uses the fixed-workset input contract instead of visual map filters.
+
+Loading retains the 20,000-record / 500,000-vertex / 64-cell / 96-MiB budgets;
+spatial overlays typically allow 1,500 input records. A saved state boundary is
+not a promise of a complete state dataset. Cancellation prevents a late workset
+from being added. Large complete regional jobs still require regional original
+files or a server-side processing service.
+
+Design references: [QGIS Processing inputs and selections](https://documentation.qgis.org/3.44/en/docs/user_manual/processing/toolbox.html),
+[ArcGIS processing extent](https://doc.esri.com/en/arcgis-pro/latest/tool-reference/environment-settings/output-extent.html).
+The portal makes selections and counts explicit for users without GIS experience;
+it does not copy desktop defaults that would hide which records are processed.
+
+Current acceptance entry points are `tools/data-scope-qa.cjs`,
+`tools/data-scope-workflow-checks.cjs`, `tools/data-scope-adapters-checks.cjs`, and
+`tools/data-scope-public-checks.cjs`. Historical browser cases that expect
+per-tool implicit current-view loading are superseded by these scope cases.
+The GIS regression, raw geometry, attributes, projection, source quality and
+Project unit checks remain applicable.
