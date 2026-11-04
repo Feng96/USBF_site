@@ -22,7 +22,21 @@ def _hash(path):
 def _entry_owned(entry):
     path = Path(entry["path"])
     if entry.get("kind") == "symlink":
-        return path.is_symlink() and str(path.readlink()) == entry.get("target")
+        if not path.is_symlink() or not isinstance(entry.get("target"), str):
+            return False
+        try:
+            actual, expected = path.readlink(), Path(entry["target"])
+            if not actual.is_absolute():
+                actual = path.parent / actual
+            if not expected.is_absolute():
+                expected = path.parent / expected
+            # Windows readlink can add an extended-length prefix, while macOS
+            # can canonicalize /var to /private/var. Compare the target identity
+            # rather than its spelling; removal still unlinks only this allowed
+            # launch entry, never its target directory.
+            return actual.resolve() == expected.resolve() or actual.samefile(expected)
+        except (OSError, ValueError):
+            return False
     return not path.is_symlink() and path.is_file() and _hash(path) == entry.get("sha256")
 
 

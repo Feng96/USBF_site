@@ -81,6 +81,20 @@ class ProjectPackagesTests(unittest.TestCase):
         restored = import_package(self.b, {"path": "Files/map.usbf.zip"})
         self.assertEqual(restored["jobs"][0]["jobId"], restored["jobs"][1]["jobId"])
 
+    def test_zero_record_complete_dependency_round_trips_without_fake_features(self):
+        scope = {"crs": "EPSG:4326", "geometry": {"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]]}}
+        empty = wait(self.a, self.a.create_job({"operation": "load", "inputs": [{"kind": "file", "path": self.job["result"]["path"]}], "scope": scope}))
+        ref = {"version": 1, "workspaceId": self.a.workspace_id, "jobId": empty["id"], "path": empty["result"]["path"], "format": "GeoParquet", "recordCount": 0, "sha256": empty["result"]["sha256"]}
+        self.project["layers"][0]["meta"]["nativeSource"] = ref
+        self.project["layers"][0]["data"] = self.a.preview(empty["id"])
+        package, file = self.package()
+        restored = import_package(self.b, {"path": "Files/map.usbf.zip"})
+        job = wait(self.b, {"id": restored["jobs"][0]["jobId"]})
+        self.assertEqual(job["result"]["rows"], 0)
+        self.assertEqual(self.b.preview(job["id"])["features"], [])
+        self.assertEqual(self.b.result_map(job["id"])["recordCount"], 0)
+        self.assertEqual(self.b.result_query(job["id"], {})["rows"], [])
+
     def test_changed_dependency_fails_before_any_adoption(self):
         _, file = self.package()
         def change(entries):

@@ -19,6 +19,7 @@ from pathlib import Path
 
 from .runtime import ident, sqlstr
 from .validation import bounds, json_exact, scope_geometry
+from .geometry_metadata import preserve_empty_geoparquet
 
 GEOM = "__usbf_geometry"
 MAX_PAGE_BYTES = 16 * 1024 * 1024
@@ -386,6 +387,7 @@ class ResultsMixin:
                     temporary = Path(str(target) + ".writing")
                     try:
                         c.execute("COPY (" + query + ") TO " + sqlstr(temporary) + " (FORMAT PARQUET,COMPRESSION ZSTD)")
+                        preserve_empty_geoparquet(c, temporary, GEOM)
                         os.replace(temporary, target)
                     finally:
                         temporary.unlink(missing_ok=True)
@@ -476,6 +478,7 @@ class ResultsMixin:
                 try:
                     if format == "parquet":
                         c.execute("COPY (SELECT " + ",".join([*fields, "f." + ident(GEOM)]) + " FROM native_result.features f WHERE " + where + " ORDER BY " + row + ") TO " + sqlstr(temporary) + " (FORMAT PARQUET,COMPRESSION ZSTD)")
+                        preserve_empty_geoparquet(c, temporary, GEOM)
                     else:
                         projection = [row, *fields, "ST_AsGeoJSON(f." + ident(GEOM) + ")"]
                         c.execute("SELECT " + ",".join(projection) + " FROM native_result.features f WHERE " + where + " ORDER BY " + row)

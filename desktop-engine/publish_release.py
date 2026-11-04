@@ -11,7 +11,7 @@ repo = os.environ['GITHUB_REPOSITORY']
 if repo != 'Feng96/USBF_site':
     raise RuntimeError('Release publication is restricted to the USBF repository.')
 token = os.environ['GITHUB_TOKEN']
-tag = os.environ.get('USBF_ENGINE_RELEASE_TAG', 'engine-v0.2.0-preview.1-r3')
+tag = os.environ.get('USBF_ENGINE_RELEASE_TAG', 'engine-v0.2.0-preview.1-r4')
 root = Path(os.environ['USBF_RELEASE_ASSETS'])
 base = 'https://api.github.com/repos/' + repo
 

@@ -268,6 +268,36 @@ class CompleteResultTests(unittest.TestCase):
         self.assertEqual(generic["min"], -999)
         self.assertEqual(self.engine.result_feature(job["id"], 0)["properties"]["height"], -999)
 
+    def test_empty_complete_result_has_index_and_table_without_preview_rows(self):
+        self.fixture(count=1)
+        scope = {"crs": "EPSG:4326", "geometry": {"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]]}}
+        empty = wait(self.engine, self.engine.create_job({"operation": "load", "inputs": [{"kind": "file", "path": self.job["result"]["path"]}], "scope": scope}))
+        self.assertEqual(empty["result"]["rows"], 0)
+        self.assertTrue(empty["coverage"]["requestComplete"])
+        self.assertEqual(self.engine.preview(empty["id"])["features"], [])
+        self.assertEqual(self.engine.result_map(empty["id"])["recordCount"], 0)
+        self.assertIsNone(self.engine.result_map(empty["id"])["bounds"])
+        page = self.engine.result_query(empty["id"], {})
+        self.assertEqual(page["total"], 0)
+        self.assertEqual(page["rows"], [])
+        self.assertEqual(self.engine.result_tile(empty["id"], 0, 0, 0), b"")
+        summary = self.engine.result_summary(empty["id"], {"field": "source_row"})
+        self.assertEqual(summary["records"], 0)
+        self.assertEqual(summary["valid"], 0)
+        self.assertIsNone(summary["mean"])
+        self.assertEqual(json.loads(self.engine.result_export(empty["id"], "geojson").read_text())["features"], [])
+        self.assertEqual(list(csv.DictReader(io.StringIO(self.engine.result_export(empty["id"], "csv").read_text()))), [])
+        exported = self.engine.result_export(empty["id"], "parquet")
+        with self.engine.runtime.connection() as connection:
+            metadata = json.loads(connection.execute("SELECT value FROM parquet_kv_metadata(?) WHERE key='geo'", [str(exported)]).fetchone()[0])
+            self.assertEqual(metadata["primary_column"], "__usbf_geometry")
+            self.assertEqual(metadata["columns"]["__usbf_geometry"]["geometry_types"], [])
+            self.assertEqual(metadata["columns"]["__usbf_geometry"]["crs"]["id"], {"authority": "EPSG", "code": 4326})
+            self.assertEqual(connection.execute("SELECT count(*) FROM read_parquet(?)", [str(exported)]).fetchone()[0], 0)
+            self.assertTrue(str(connection.execute("DESCRIBE SELECT * FROM read_parquet(?)", [str(exported)]).fetchall()[-1][1]).startswith("GEOMETRY"))
+        measured = wait(self.engine, self.engine.create_job({"operation": "measure", "inputs": [{"kind": "file", "path": empty["result"]["path"]}]}))
+        self.assertEqual(measured["result"]["rows"], 0)
+
     def test_source_field_names_do_not_conflict_with_internal_helpers(self):
         data = {"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"file_row_number": 99, "__usbf_row": "source", "__usbf_map_geometry": 17, "__usbf_feature_json": "raw", "native_json": "kept"}, "geometry": {"type": "Point", "coordinates": [-77, 39]}}]}
         job = wait(self.engine, self.engine.create_job({"operation": "load", "inputs": [{"kind": "geojson", "data": data}]}))

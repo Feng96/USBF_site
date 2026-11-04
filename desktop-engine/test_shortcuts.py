@@ -78,6 +78,54 @@ class ShortcutTests(unittest.TestCase):
         remove_shortcuts(self.workspace, platform='darwin', user_directory=self.user)
         self.assertFalse(alias.is_symlink())
 
+    def app_alias(self):
+        payload = self.root / 'USBFEngine.app'
+        executable = payload / 'Contents' / 'MacOS' / 'USBFEngine'
+        executable.parent.mkdir(parents=True)
+        executable.write_text('fixture')
+        receipt = install(payload, executable, self.workspace, {'version': '0.2.0', 'revision': 'alias'})
+        try:
+            install_shortcuts(self.workspace, receipt, platform='darwin', user_directory=self.user)
+        except OSError:
+            self.skipTest('Symbolic links unavailable')
+        alias = next((self.user / 'Applications').glob('*.app'))
+        return alias, alias.resolve()
+
+    def test_equivalent_relative_symlink_target_is_removed_without_touching_app(self):
+        alias, target = self.app_alias()
+        alias.unlink()
+        alias.symlink_to(os.path.relpath(target, alias.parent), target_is_directory=True)
+        removed = remove_shortcuts(self.workspace, platform='darwin', user_directory=self.user)
+        self.assertIn(str(alias), removed['removed'])
+        self.assertFalse(alias.is_symlink())
+        self.assertTrue((target / 'Contents' / 'MacOS' / 'USBFEngine').is_file())
+
+    def test_changed_symlink_target_and_other_application_are_kept(self):
+        alias, target = self.app_alias()
+        other = self.root / 'Other application.app'
+        other.mkdir()
+        (other / 'user-file').write_text('Keep this application')
+        alias.unlink()
+        alias.symlink_to(other, target_is_directory=True)
+        removed = remove_shortcuts(self.workspace, platform='darwin', user_directory=self.user)
+        self.assertEqual(removed['changedEntriesKept'], 1)
+        self.assertTrue(alias.is_symlink())
+        self.assertEqual((other / 'user-file').read_text(), 'Keep this application')
+        self.assertTrue(target.is_dir())
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows extended-length target paths')
+    def test_windows_extended_length_target_has_same_owned_identity(self):
+        alias, target = self.app_alias()
+        alias.unlink()
+        spelling = str(target)
+        if not spelling.startswith('\\\\?\\'):
+            spelling = '\\\\?\\' + spelling
+        alias.symlink_to(spelling, target_is_directory=True)
+        removed = remove_shortcuts(self.workspace, platform='darwin', user_directory=self.user)
+        self.assertIn(str(alias), removed['removed'])
+        self.assertFalse(alias.is_symlink())
+        self.assertTrue(target.is_dir())
+
     def test_forged_receipt_cannot_remove_an_unrelated_file(self):
         install_shortcuts(self.workspace, self.receipt, platform='linux', user_directory=self.user)
         unrelated = self.root / 'user-result.txt'

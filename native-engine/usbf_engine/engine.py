@@ -27,6 +27,7 @@ import psutil
 from .runtime import Runtime, ident, sqlstr
 from .results import ResultsMixin
 from .maintenance import EngineMaintenance
+from .geometry_metadata import preserve_empty_geoparquet
 from .security import https_context
 from .validation import (FOLDERS, FORMATS, OPERATIONS, MAX_SPEC_BYTES, bounds, clone, digest_json,
                          intersects, json_exact, normalize_spec, public_url,
@@ -635,6 +636,7 @@ class Engine(ResultsMixin):
         temporary = Path(str(destination) + ".writing")
         try:
             connection.execute("COPY (" + selected + ") TO " + sqlstr(temporary) + " (FORMAT PARQUET, COMPRESSION ZSTD)")
+            preserve_empty_geoparquet(connection, temporary, GEOM)
             self._check(job["id"])
             count = connection.execute("SELECT count(*) FROM read_parquet(" + sqlstr(temporary) + ")").fetchone()[0]
             os.replace(temporary, destination)
@@ -756,6 +758,7 @@ class Engine(ResultsMixin):
         temporary = directory / "result.writing.parquet"
         temporary.unlink(missing_ok=True)
         connection.execute("COPY (" + query + ") TO " + sqlstr(temporary) + " (FORMAT PARQUET, COMPRESSION ZSTD)")
+        preserve_empty_geoparquet(connection, temporary, GEOM)
         self._check(job["id"])
         rows = connection.execute("SELECT count(*) FROM read_parquet(" + sqlstr(temporary) + ")").fetchone()[0]
         if rows != job["progress"]["actualRows"]:
