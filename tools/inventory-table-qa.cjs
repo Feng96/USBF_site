@@ -67,4 +67,12 @@ ok(csvRow[csvHeader.indexOf('__map_partial')]==='true'&&csvRow[csvHeader.indexOf
 T.collect(large,many.slice(0,5),f=>f);
 ok(!T.metadata(large).limited&&!T.metadata(large).tableLimited,'A later uncapped view clears the table-only partial marker');
 ok(T.metadata(local).limited&&!T.metadata(local).tableLimited,'An original source limit remains true independently of another layer’s table cap');
+
+
+const loadedLarge=layer(Array.from({length:50001},(_,i)=>point({id:i},'duplicate')));
+const loaded=T.loadedRecords(loadedLarge);ok(loaded.length===50000&&loaded[0]===loadedLarge.data.features[0]&&loaded.at(-1)===loadedLarge.data.features[49999],'All-loaded tables preserve source order and duplicate-ID records up to their independent 50,000-row limit');
+ok(T.metadata(loadedLarge).tableLimited,'A loaded-table overflow retains its explicit partial flag');
+ok(T.supportsLoaded(ordinary)&&!T.supportsLoaded(layer([],{type:'pmtiles'})),'All-loaded mode is restricted to original vector data rather than tile fragments');
+const previewFile=layer([]);previewFile.data.provenance={spatialEligible:false,geometryQuality:'clipped-or-simplified-tile-fragments'};ok(!T.supportsLoaded(previewFile),'A reimported tile preview cannot acquire all-original-record scope');
+
 console.log(JSON.stringify({passed:true,checks:checks.length}));

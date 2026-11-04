@@ -488,3 +488,39 @@ Display URLs are labelled as display sources rather than original downloads.
 Validation: `tools/layer-purpose-qa.cjs` and
 `tools/layer-purpose-workflow-checks.cjs` cover original/partial/tiled inputs,
 real synthetic PMTiles/Parquet parsing, explicit loading, Chinese and phone layout.
+
+### Load original analysis layers and inspect attributes
+
+Each preview layer offers **Load analyzable data**. USBF can read the current
+area's original GeoParquet through its existing bounded reader and add a separate
+GeoJSON analysis layer. Original geometry, attributes, licenses, file checksums,
+requested area and partial-source provenance are retained. The new layer stays
+fixed when the map moves and saves/restores as project data. It opens an attribute
+table; the PMTiles preview remains a separate display connection. Loading can be
+cancelled without adding a late layer.
+
+The loading dialog also links to supported file/URL imports and the existing GBA,
+DC and NYC original-data connections. Those alternatives are explicitly separate
+datasets with their own coverage and licenses. Previews without a verified
+original-data connection offer provider links and regional-file import rather
+than pretending to convert display fragments back into original records.
+
+Original vector layers expose **View attribute table** directly in Layers.
+Opening it selects that layer and defaults to **All loaded records**, including
+records outside the view or in a hidden layer. **Current map view** retains the
+existing rendered-view behavior. All-loaded tables ignore map display filters;
+their metadata and exports say so. Sorting, searching, selectable original fields,
+exact row selection, CSV export and pagination work in either mode. Raw zero,
+false, null, long identifiers and duplicate source IDs retain their values.
+
+Loaded tables are bounded at 50,000 original rows; map-view tables retain their
+20,000-row limit. Table limits and partial API/source scope remain distinct and
+explicit. Neither table mode loads an entire remote dataset. Tile exports cannot
+acquire the all-original-record scope. `analysis-layers.js` owns explicit loading;
+`PortalInventory.openTable(layerID, {scope:'loaded'|'view'})` opens a specific
+original vector layer without toggling an already open table closed.
+
+Validation: `tools/analysis-layers-workflow-checks.cjs` and the inventory table
+unit/browser acceptance cover true Parquet/PMTiles fixtures, independent area
+layers, project restoration, hidden/offscreen rows, exports, cancellation and
+Chinese/mobile controls.

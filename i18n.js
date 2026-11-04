@@ -12,6 +12,7 @@
   // Interpolated values are copied verbatim, including field names, places and model names.
   const patterns = [
     [/^Revision (\d+)$/, m => '修订 ' + m[1]],
+    [/^([\d,]+) loaded records( in the first ([\d,]+))?$/, m => m[1] + ' 条已加载记录' + (m[3] ? '（前 ' + m[3] + ' 条内）' : '')],
     [/^Loading buildings… ([\d,]+)( \/ ([\d,]+))?$/, m => '正在加载建筑… ' + m[1] + (m[3] ? ' / ' + m[3] : '')],
     [/^([\d,]+) buildings · partial coverage · zoom in$/, m => m[1] + ' 栋建筑 · 尚未完整加载 · 请放大'],
     [/^([\d,]+) buildings loaded nearby$/, m => '周边已加载 ' + m[1] + ' 栋建筑'],

@@ -28,8 +28,15 @@
  }
  function badges(state){return '<div class="layer-purpose-badges"><span class="layer-purpose-badge purpose-'+state.kind+'" data-i18n>'+esc(state.label)+'</span><span class="layer-format">'+esc(state.format)+'</span></div>';}
  function markup(layer,options={}){
-  const state=describe(layer,options),id=layer?.id;
-  return '<div class="layer-purpose" data-purpose-kind="'+state.kind+'">'+badges(state)+'<p data-i18n>'+esc(state.note)+'</p>'+(id&&state.action&&options.actions!==false?'<button type="button" class="layer-purpose-action" data-purpose-action="'+state.action+'" data-purpose-layer="'+esc(id)+'" data-i18n>'+esc(state.actionLabel)+'</button>':'')+'</div>';
+  const state=describe(layer,options),id=layer?.id,cap=root.PortalAnalysisData?.capabilities(layer)||{},loading=root.PortalAnalysisLayers?.isLoading(layer),message=root.PortalAnalysisLayers?.message(layer);
+  const button=(action,label,disabled=false)=>'<button type="button" class="layer-purpose-action" data-purpose-action="'+action+'" data-purpose-layer="'+esc(id)+'" '+(disabled?'disabled':'')+' data-i18n>'+esc(label)+'</button>';
+  let actions='';
+  if(id&&options.actions!==false){
+   if(state.action)actions=button('data','Load analyzable data',loading)+button(state.action,state.actionLabel,loading);
+   if(cap.geometryAnalysis&&cap.kind!=='on-demand'&&['geojson','viewport'].includes(layer.cfg.type))actions+=button('table','View attribute table',layer.cfg.type==='viewport'&&(layer.viewLoading||!layer.loaded||layer.error));
+   if(loading)actions+=button('cancel-data','Cancel loading');
+  }
+  return '<div class="layer-purpose" data-purpose-kind="'+state.kind+'">'+badges(state)+'<p data-i18n>'+esc(state.note)+'</p>'+(actions?'<div class="layer-purpose-actions">'+actions+'</div>':'')+(message?'<p class="layer-analysis-message '+(message.error?'error':'')+'" role="status" data-i18n-system>'+esc(message.text)+'</p>':'')+'</div>';
  }
  function analysisMarkup(layer){
   if(!layer)return '';
@@ -42,6 +49,9 @@
  }
  function act(layer,action){
   if(!layer||root.PortalLayers?.layers.get(layer.id)!==layer)return;
+  if(action==='data'){root.PortalAnalysisLayers?.open(layer);return;}
+  if(action==='cancel-data'){root.PortalAnalysisLayers?.cancel(layer);return;}
+  if(action==='table'){root.PortalInventory?.openTable(layer.id,{scope:'loaded'});return;}
   if(action==='load'&&root.PortalAnalysisData?.capabilities(layer).kind==='on-demand'){
    root.PortalLayers.selectLayer(layer.id);root.PortalAnalysis.open('stats',{layerId:layer.id,scope:'view'});
   }else if(action==='original')original(layer);

@@ -65,4 +65,27 @@ The map stays a preview. These tools load original records for the chosen area a
 Open display source ↗|打开显示数据来源 ↗
 Get original vector records from the provider, then add that file or URL for analysis.|从数据提供方获取原始矢量记录，再添加该文件或 URL 进行分析。
 Add original data|添加原始数据
+Load analyzable data|加载可分析数据
+View attribute table|查看属性表
+Cancel loading|取消加载
+Load analyzable building data|加载可分析建筑数据
+Original records from this dataset|此数据集的原始记录
+Load the current area as a separate GeoJSON layer. Source geometry, attributes, licenses and coverage limits are retained.|将当前区域加载为独立 GeoJSON 图层，保留原始几何、属性、许可和覆盖范围限制。
+Load original data for this area|加载此区域的原始数据
+This preview has no automatic original-data connection. Use the provider’s original records or import a regional extract.|此预览尚无自动原始数据接口，请使用提供方的原始记录或导入区域数据。
+Open your own data|打开自己的数据
+Use a regional extract or a small file. Large national files need a bounded data service.|请使用区域数据或小文件；大型全国数据需要按区域查询的数据服务。
+Choose a file|选择文件
+Connect a data URL|连接数据 URL
+Other building datasets|其他建筑数据集
+These are separate datasets, not the original records behind the selected preview. Check their coverage and licenses.|这些是独立的数据集，并非所选预览对应的原始记录。请确认其覆盖范围和许可。
+Original records for the captured area. This layer stays fixed when the map moves.|已获取区域的原始记录，移动地图不会改变此图层。
+Loading original records for this area…|正在加载此区域的原始记录…
+Analysis layer added for the captured area.|已为所选区域添加分析图层。
+LOADED RECORDS|已加载记录
+All loaded records|全部已加载记录
+All loaded records · map visibility filters are not applied|全部已加载记录 · 不受地图显示筛选限制
+Partial source · only loaded records are available|数据源未完整加载 · 仅显示已有记录
+First 50,000 loaded records · search and export use this subset|前 50,000 条已加载记录 · 搜索与导出仅覆盖此部分
+No matching records. Change the table scope, search or filters.|没有匹配记录，请调整表格范围、搜索或筛选条件。
 `.trim().split('\n').map(row => { const i = row.indexOf('|'); return [row.slice(0, i), row.slice(i + 1)]; })));
