@@ -6,6 +6,7 @@ import json
 import os
 import platform
 import queue
+import re
 import secrets
 import shutil
 import sqlite3
@@ -13,6 +14,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import urlparse
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,6 +24,7 @@ import duckdb
 import psutil
 
 from .runtime import Runtime, ident, sqlstr
+from .security import https_context
 from .validation import (FOLDERS, FORMATS, OPERATIONS, MAX_SPEC_BYTES, bounds, clone, digest_json,
                          intersects, json_exact, normalize_spec, public_url,
                          safe_name, scope_geometry, workspace_path)
@@ -29,6 +32,8 @@ from .validation import (FOLDERS, FORMATS, OPERATIONS, MAX_SPEC_BYTES, bounds, c
 VERSION = "0.1.0"
 GEOM = "__usbf_geometry"
 TERMINAL = {"completed", "partial", "failed", "cancelled", "interrupted"}
+PREVIEW_MAX_BYTES = 8 * 1024 * 1024
+TABLE_MAX_BYTES = 16 * 1024 * 1024
 
 
 def now():
@@ -297,7 +302,7 @@ class Engine:
 
     def _read_manifest(self, source):
         url = public_url(source["manifestUrl"])
-        opener = urllib.request.build_opener(CheckedRedirect())
+        opener = urllib.request.build_opener(CheckedRedirect(), urllib.request.HTTPSHandler(context=https_context()))
         with opener.open(urllib.request.Request(url, headers={"User-Agent": "USBF-Local-Engine/0.1"}), timeout=30) as response:
             raw = response.read(16 * 1024 * 1024 + 1)
         if len(raw) > 16 * 1024 * 1024:
@@ -343,7 +348,8 @@ class Engine:
                 fmt = source.get("format", url.split("?", 1)[0].rsplit(".", 1)[-1]).lower()
                 if fmt not in FORMATS:
                     raise ValueError("Choose a native vector source file format.")
-                if any(host in url for host in ("data.cityofnewyork.us", "/FeatureServer/", "/MapServer/")):
+                parsed_url = urlparse(url)
+                if parsed_url.hostname.lower() == "data.cityofnewyork.us" or re.search(r"/(?:FeatureServer|MapServer)(?:/|$)", parsed_url.path, re.I):
                     raise ValueError("Use the browser provider adapter for paginated API sources.")
                 parts.append({"id": str(number), "kind": "url", "url": url, "format": fmt, "name": source.get("name", url.rsplit("/", 1)[-1]),
                               "bytes": source.get("bytes"), "rows": source.get("rows"), "sha256": source.get("sha256"), "crs": source.get("crs", "EPSG:4326"), "crsExplicit": "crs" in source})
@@ -380,13 +386,17 @@ class Engine:
                 if part.get(key) is not None and (not isinstance(part[key], int) or isinstance(part[key], bool) or part[key] < 0):
                     raise ValueError("The source counts or sizes are invalid.")
             crs = part.get("crs")
-            if not isinstance(crs, str) or len(crs) > 100 or not __import__("re").fullmatch(r"EPSG:\d{4,6}", crs):
+            if not isinstance(crs, str) or len(crs) > 100 or not re.fullmatch(r"EPSG:\d{4,6}", crs):
                 raise ValueError("Native source CRS must be an explicit EPSG identifier.")
         known_bytes = sum(p.get("bytes") or 0 for p in parts)
         unknown = sum(p.get("bytes") is None for p in parts)
+        unknown_rows = sum(p.get("rows") is None for p in parts)
+        known_rows = sum(p.get("rows") or 0 for p in parts)
         free = shutil.disk_usage(self.workspace).free
         return {"schema": 1, "parts": parts, "partCount": len(parts), "estimatedBytes": known_bytes,
-                "estimatedRows": sum(p.get("rows") or 0 for p in parts), "unknownSizeParts": unknown,
+                "estimatedRows": known_rows, "knownSourceBytes": known_bytes, "knownSourceRows": known_rows,
+                "unknownSizeParts": unknown, "unknownRowParts": unknown_rows,
+                "estimatedBytesComplete": unknown == 0, "estimatedRowsComplete": unknown_rows == 0,
                 "estimateKind": "Whole source-file upper bounds; exact in-range rows are known after reading.",
                 "diskFreeBytes": free, "minimumDiskBytes": known_bytes * 3,
                 "fitsDiskEstimate": unknown == 0 and known_bytes * 3 < free,
@@ -456,7 +466,7 @@ class Engine:
 
     def _download(self, part, destination, job_id):
         public_url(part["url"])
-        opener = urllib.request.build_opener(CheckedRedirect())
+        opener = urllib.request.build_opener(CheckedRedirect(), urllib.request.HTTPSHandler(context=https_context()))
         request = urllib.request.Request(part["url"], headers={"User-Agent": "USBF-Local-Engine/0.1"})
         with opener.open(request, timeout=20) as response, destination.open("wb") as output:
             self.active_response = response
@@ -560,6 +570,15 @@ class Engine:
             query = self._inline_query(source, connection)
         else:
             query = "SELECT * FROM ST_Read(" + sqlstr(source) + ")"
+            layer_metadata = connection.execute("SELECT layers FROM ST_Read_Meta(?)", [str(source)]).fetchone()[0]
+            if len(layer_metadata) != 1:
+                raise ValueError("Choose a single-layer native source file.")
+            json_fields = [field["name"] for field in layer_metadata[0].get("fields", []) if field.get("subtype") == "JSON"]
+            if json_fields:
+                # GDAL exposes rich GeoJSON values as String/JSON. Preserve the
+                # logical JSON type in Parquet and decode it in browser pages.
+                replacements = ",".join(ident(name) + "::JSON AS " + ident(name) for name in json_fields)
+                query = "SELECT * REPLACE (" + replacements + ") FROM (" + query + ")"
         description = connection.execute("DESCRIBE (" + query + ")").fetchall()
         if part.get("rows") is not None:
             source_count = connection.execute("SELECT count(*) FROM (" + query + ")").fetchone()[0]
@@ -841,35 +860,108 @@ class Engine:
             raise ValueError("Choose parquet or metadata; GeoJSON is available as a bounded preview.")
         return workspace_path(self.workspace, job["result"]["path" if format == "parquet" else "metadataPath"], roots=("Results",))
 
-    def table(self, job_id, *, offset=0, limit=100):
-        limit = max(1, min(int(limit), 1000))
-        offset = max(0, int(offset))
+    @contextmanager
+    def _page_rows(self, job_id, *, offset, limit, row_byte_limit):
+        """Fetch one bounded row at a time; large values remain inside DuckDB.
+
+        The SQL-side size guard prevents huge individual strings/geometries from
+        being transferred into Python merely to discover that they exceed the
+        browser budget. DuckDB retains its configured native memory limit.
+        """
         path = self.result_path(job_id)
         with self.runtime.connection() as c:
             c.execute("SET threads=1")
             description = c.execute("DESCRIBE SELECT * FROM read_parquet(" + sqlstr(path) + ")").fetchall()
             columns = [{"name": r[0], "type": r[1]} for r in description if r[0] != GEOM]
-            projection = ",".join(ident(v["name"]) for v in columns)
-            values = c.execute("SELECT " + (projection + "," if projection else "") + "ST_AsGeoJSON(" + ident(GEOM) + ") FROM read_parquet(" + sqlstr(path) + ") LIMIT ? OFFSET ?", [limit, offset]).fetchall()
-        rows = [{"id": f"{job_id}:{offset+i}", "properties": json_exact({field["name"]: json.loads(value) if field["type"] == "JSON" and value is not None else value for field, value in zip(columns, row[:-1])}),
-                 "geometry": json.loads(row[-1]) if row[-1] else None} for i, row in enumerate(values)]
-        return {"columns": columns, "rows": rows, "total": self.get_job(job_id)["result"]["rows"], "offset": offset, "limit": limit,
-                "numericEncoding": "Decimals and integers outside JavaScript safe range are decimal strings; original Parquet types are unchanged."}
+            names = {str(r[0]).lower() for r in description}
+            def alias(stem):
+                while stem.lower() in names: stem += "_"
+                names.add(stem.lower())
+                return ident(stem)
+            geo_alias, size_alias = alias("__usbf_preview_json"), alias("__usbf_preview_bytes")
+            packed = "to_json(struct_pack(" + ",".join(ident(field["name"]) + ":=" + ident(field["name"]) for field in columns) + "))" if columns else "'{}'"
+            limited = "SELECT * FROM read_parquet(" + sqlstr(path) + ") LIMIT ? OFFSET ?"
+            serialized = "SELECT *,ST_AsGeoJSON(" + ident(GEOM) + ") AS " + geo_alias + " FROM (" + limited + ")"
+            measured = "SELECT *,octet_length(encode(CAST(" + packed + " AS VARCHAR)))+coalesce(octet_length(encode(" + geo_alias + ")),4)+512 AS " + size_alias + " FROM (" + serialized + ")"
+            guard = size_alias + "<=" + str(int(row_byte_limit))
+            fields = ["CASE WHEN " + guard + " THEN " + ident(field["name"]) + " ELSE NULL END" for field in columns]
+            fields.extend(["CASE WHEN " + guard + " THEN " + geo_alias + " ELSE NULL END", size_alias])
+            c.execute("SELECT " + ",".join(fields) + " FROM (" + measured + ")", [limit, offset])
+            def stream():
+                index = offset
+                while True:
+                    row = c.fetchone()
+                    if row is None: break
+                    position = index
+                    index += 1
+                    if row[-1] > row_byte_limit:
+                        yield None, position
+                        continue
+                    properties = json_exact({field["name"]: json.loads(value) if field["type"] == "JSON" and value is not None else value for field, value in zip(columns, row[:-2])})
+                    yield {"id": f"{job_id}:{position}", "properties": properties, "geometry": json.loads(row[-2]) if row[-2] else None}, position
+            yield columns, stream()
+
+    def table(self, job_id, *, offset=0, limit=100):
+        limit = max(1, min(int(limit), 1000))
+        offset = max(0, int(offset))
+        rows = []
+        with self._page_rows(job_id, offset=offset, limit=limit, row_byte_limit=TABLE_MAX_BYTES) as (columns, stream):
+            result = {"columns": columns, "rows": rows, "total": self.get_job(job_id)["result"]["rows"], "offset": offset, "limit": limit,
+                      "maximumBytes": TABLE_MAX_BYTES,
+                      "numericEncoding": "Decimals and integers outside JavaScript safe range are decimal strings; original Parquet types are unchanged."}
+            used = len(json.dumps(result, ensure_ascii=False).encode()) + 4096
+            if used > TABLE_MAX_BYTES:
+                raise ValueError("This native table schema exceeds the 16 MiB page budget. Download the full GeoParquet file to inspect its original fields.")
+            for row, position in stream:
+                if row is None:
+                    raise ValueError("Native table row " + str(position) + " exceeds the 16 MiB page budget. Choose another or smaller page, or download the full GeoParquet file. Original values were kept.")
+                used += len(json.dumps(row, ensure_ascii=False, allow_nan=False).encode()) + 2
+                if used > TABLE_MAX_BYTES:
+                    raise ValueError("This native table page exceeds 16 MiB. Request a smaller page or download the full GeoParquet file. No attribute values were truncated.")
+                rows.append(row)
+        return result
 
     def preview(self, job_id, limit=2000):
         limit = max(1, min(int(limit), 2000))
-        # Table pages are deliberately bounded too; compose at most two pages.
-        first = self.table(job_id, offset=0, limit=min(limit, 1000))
-        rows = first["rows"]
-        if limit > 1000:
-            rows.extend(self.table(job_id, offset=1000, limit=limit-1000)["rows"])
         job = self.get_job(job_id)
-        return {"type": "FeatureCollection", "name": job["name"] + " · native preview",
-                "features": [{"type": "Feature", **r} for r in rows],
-                "provenance": {"role": "native-result-preview", "jobId": job_id, "nativeSource": job["result"]["path"],
-                               "displayOnly": True, "limited": first["total"] > len(rows), "recordCount": first["total"], "previewCount": len(rows),
-                               "scope": job["scope"], "release": job["release"], "coverage": job["coverage"],
-                               "numericEncoding": first["numericEncoding"]}}
+        self.result_path(job_id)
+        scope = job["scope"]
+        summary = {"label": str(scope.get("label") or "")[:256], "crs": "EPSG:4326", "bounds": bounds(scope_geometry(scope))} if scope else None
+        release = job["release"]
+        metadata_limited = len(json.dumps(release, ensure_ascii=False).encode()) > 65536
+        if metadata_limited:
+            release = {key: str(release.get(key))[:4096] for key in ("releaseId", "manifestSha256", "policy", "sourceId") if isinstance(release, dict) and release.get(key) is not None}
+        output = {"type": "FeatureCollection", "name": job["name"] + " · native preview", "features": [],
+                  "provenance": {"role": "native-result-preview", "jobId": job_id, "nativeSource": job["result"]["path"],
+                                 "displayOnly": True, "limited": True, "recordCount": job["result"]["rows"], "previewCount": 0,
+                                 "maximumFeatures": limit, "maximumBytes": PREVIEW_MAX_BYTES,
+                                 "omittedOversizedFeatures": 0, "omittedForByteBudget": 0, "scannedFeatures": 0,
+                                 "scope": summary, "release": release, "metadataLimited": metadata_limited,
+                                 "fullMetadataPath": job["result"]["metadataPath"], "coverage": job["coverage"],
+                                 "numericEncoding": "Decimals and integers outside JavaScript safe range are decimal strings; original Parquet types are unchanged."}}
+        used = len(json.dumps(output, ensure_ascii=False).encode()) + 4096
+        with self._page_rows(job_id, offset=0, limit=limit, row_byte_limit=PREVIEW_MAX_BYTES) as (_, stream):
+            for row, _ in stream:
+                output["provenance"]["scannedFeatures"] += 1
+                if row is None:
+                    output["provenance"]["omittedOversizedFeatures"] += 1
+                    continue
+                feature = {"type": "Feature", **row}
+                size = len(json.dumps(feature, ensure_ascii=False, allow_nan=False).encode()) + 2
+                if size > PREVIEW_MAX_BYTES:
+                    output["provenance"]["omittedOversizedFeatures"] += 1
+                    continue
+                if size + used > PREVIEW_MAX_BYTES:
+                    output["provenance"]["omittedForByteBudget"] += 1
+                    continue
+                output["features"].append(feature)
+                used += size
+        meta = output["provenance"]
+        meta["previewCount"] = len(output["features"])
+        meta["limited"] = job["result"]["rows"] > len(output["features"])
+        if meta["omittedOversizedFeatures"] or meta["omittedForByteBudget"]:
+            meta["warning"] = "Display sample limited to 8 MiB. Oversized features were omitted without changing their geometry or attributes. Use the full native result for analysis."
+        return output
 
     def close(self, revoke=True):
         self.stop.set()

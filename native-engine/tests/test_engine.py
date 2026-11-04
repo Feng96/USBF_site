@@ -8,6 +8,7 @@ import time
 import unittest
 import urllib.error
 import urllib.request
+from unittest import mock
 from pathlib import Path
 import sys
 
@@ -235,6 +236,18 @@ class NativeEngineTests(unittest.TestCase):
         for key, value in props.items():
             self.assertEqual(actual[key], str(value) if key == "id" else value, key)
 
+    def test_gdal_path_preserves_json_subtyped_attribute_values(self):
+        properties = {"nested": {"original": "value", "missing": None}, "array": [{"id": 7}], "flag": False}
+        data = {"type": "FeatureCollection", "features": [{"type": "Feature", "properties": properties, "geometry": {"type": "Point", "coordinates": [-77, 39]}}]}
+        (self.root / "Files" / "driver.geojson").write_text(json.dumps(data), encoding="utf-8")
+        # Exercise the actual streaming GDAL path with a small fixture. Large
+        # source files use this same path without loading their JSON in Python.
+        with mock.patch("usbf_engine.engine.MAX_SPEC_BYTES", 1):
+            task = wait(self.engine, self.engine.create_job({"operation": "load", "inputs": [{"kind": "file", "path": "Files/driver.geojson"}]}))
+        self.assertEqual(task["status"], "completed", task["error"])
+        actual = self.engine.preview(task["id"])["features"][0]["properties"]
+        for key, value in properties.items(): self.assertEqual(actual[key], value)
+
     def test_measure_collision_safe_geodesic_area_and_boundary_length(self):
         data = {"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"_usbf_area_m2": 17, "_usbf_length_m": 23}, "geometry": {"type": "Polygon", "coordinates": [[[-77,39],[-76.999,39],[-76.999,39.001],[-77,39.001],[-77,39]]]}}]}
         task = wait(self.engine, self.engine.create_job({"operation": "measure", "inputs": [{"kind": "inline", "data": data}]}))
@@ -285,6 +298,67 @@ class NativeEngineTests(unittest.TestCase):
             with self.assertRaises(ValueError): workspace_path(self.root, "Files/escape/outside.parquet", exists=False)
         for url in ("http://data.source.coop/a.parquet", "https://127.0.0.1/a.parquet", "https://u:password@data.source.coop/a.parquet", "https://unknown.invalid/a.parquet"):
             with self.assertRaises(ValueError): public_url(url, resolve=False)
+
+    def test_paginated_api_url_is_never_treated_as_a_complete_source_file(self):
+        with mock.patch("usbf_engine.engine.public_url", side_effect=lambda value: public_url(value, resolve=False)):
+            for url in ("https://services.arcgis.com/test/featureserver?f=geojson", "https://maps2.dcgis.dc.gov/MapServer/0/query?f=geojson", "https://DATA.CITYOFNEWYORK.US/resource/test.geojson"):
+                with self.assertRaisesRegex(ValueError, "paginated"):
+                    self.engine.plan({"operation": "load", "inputs": [{"kind": "url", "url": url, "format": "geojson"}]})
+
+    def test_unknown_plan_counts_are_explicitly_incomplete(self):
+        self.parquet()
+        plan = self.engine.plan(self.spec())
+        self.assertEqual(plan["unknownRowParts"], 1)
+        self.assertFalse(plan["estimatedRowsComplete"])
+        self.assertTrue(plan["estimatedBytesComplete"])
+
+    def test_preview_omits_oversized_attributes_and_table_rejects_them(self):
+        source = self.root / "Files" / "large-attributes.parquet"
+        size = 17 * 1024 * 1024
+        with self.engine.runtime.connection() as c:
+            c.execute("COPY (SELECT i AS id,CASE WHEN i=0 THEN repeat('x',?) ELSE 'kept' END AS payload,ST_Point(-77+i*.001,39) AS geometry FROM range(2) t(i)) TO " + sqlstr(source) + " (FORMAT PARQUET,COMPRESSION ZSTD)", [size])
+        task = wait(self.engine, self.engine.create_job({"operation": "load", "inputs": [{"kind": "file", "path": "Files/large-attributes.parquet", "crs": "EPSG:4326"}]}))
+        self.assertEqual(task["status"], "completed", task["error"])
+        preview = self.engine.preview(task["id"])
+        self.assertEqual(len(preview["features"]), 1)
+        self.assertEqual(preview["features"][0]["properties"]["payload"], "kept")
+        self.assertEqual(preview["provenance"]["omittedOversizedFeatures"], 1)
+        self.assertTrue(preview["provenance"]["limited"])
+        self.assertIn("omitted", preview["provenance"]["warning"])
+        self.assertLess(len(json.dumps(preview, ensure_ascii=False).encode()), 8*1024*1024)
+        with self.assertRaisesRegex(ValueError, "16 MiB"):
+            self.engine.table(task["id"], offset=0, limit=1)
+        self.assertEqual(self.engine.table(task["id"], offset=1, limit=1)["rows"][0]["properties"]["payload"], "kept")
+        with self.engine.runtime.connection() as c:
+            self.assertEqual(c.execute("SELECT length(payload) FROM read_parquet(?) WHERE id=0", [str(self.engine.result_path(task["id"]))]).fetchone()[0], size)
+
+    def test_preview_omits_complex_geometry_without_changing_native_result(self):
+        source = self.root / "Files" / "complex.parquet"
+        with self.engine.runtime.connection() as c:
+            c.execute("COPY (SELECT 0 AS id,ST_MakePolygon(ST_MakeLine(list_append(list(ST_Point(-77+.01*cos(i*2*pi()/300000),39+.01*sin(i*2*pi()/300000))),ST_Point(-76.99,39)))) AS geometry FROM range(300000) t(i) UNION ALL SELECT 1,ST_Point(-77,39)) TO " + sqlstr(source) + " (FORMAT PARQUET,COMPRESSION ZSTD)")
+        task = wait(self.engine, self.engine.create_job({"operation": "load", "inputs": [{"kind": "file", "path": "Files/complex.parquet", "crs": "EPSG:4326"}]}))
+        self.assertEqual(task["status"], "completed", task["error"])
+        preview = self.engine.preview(task["id"])
+        self.assertEqual([feature["properties"]["id"] for feature in preview["features"]], [1])
+        self.assertEqual(preview["provenance"]["omittedOversizedFeatures"], 1)
+        self.assertLess(len(json.dumps(preview, ensure_ascii=False).encode()), 8*1024*1024)
+        with self.engine.runtime.connection() as c:
+            self.assertEqual(c.execute('SELECT ST_NPoints("__usbf_geometry") FROM read_parquet(?) WHERE id=0', [str(self.engine.result_path(task["id"]))]).fetchone()[0], 300001)
+
+    def test_aggregate_preview_and_table_byte_budgets_are_explicit(self):
+        source = self.root / "Files" / "aggregate.parquet"
+        with self.engine.runtime.connection() as c:
+            c.execute("COPY (SELECT i AS id,repeat('x',5*1024*1024) AS payload,ST_Point(-77,39) AS geometry FROM range(4) t(i)) TO " + sqlstr(source) + " (FORMAT PARQUET,COMPRESSION ZSTD)")
+        task = wait(self.engine, self.engine.create_job({"operation": "load", "inputs": [{"kind": "file", "path": "Files/aggregate.parquet", "crs": "EPSG:4326"}]}))
+        self.assertEqual(task["status"], "completed", task["error"])
+        preview = self.engine.preview(task["id"])
+        self.assertEqual(len(preview["features"]), 1)
+        self.assertEqual(preview["provenance"]["omittedForByteBudget"], 3)
+        self.assertLess(len(json.dumps(preview, ensure_ascii=False).encode()), 8*1024*1024)
+        with self.assertRaisesRegex(ValueError, "smaller page"):
+            self.engine.table(task["id"], limit=4)
+        page = self.engine.table(task["id"], limit=1)
+        self.assertEqual(len(page["rows"][0]["properties"]["payload"]), 5*1024*1024)
 
     def test_pairing_code_single_use_unpair_and_status(self):
         code = self.engine.pairing_code()

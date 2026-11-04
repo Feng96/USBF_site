@@ -25,7 +25,9 @@ from DuckDB's HTTPS CDN into the workspace cache; `--no-extension-install`
 disables this fallback. An existing system GDAL, Python or DuckDB installation
 is never used by a packaged build.
 
-The implementation pins DuckDB 2.0.0 and psutil 7.2.1. Runtime status reports the
+The implementation pins DuckDB 2.0.0, psutil 7.2.1 and certifi 2026.10.23. Public
+HTTPS uses the bundled CA certificates with hostname and certificate checks;
+it does not rely on a host Python certificate installation. Runtime status reports the
 versions actually loaded, including Spatial and PROJ. GDAL is provided by
 DuckDB Spatial; the service does not claim a separately installed GDAL version.
 See [DuckDB 2.0 release](https://github.com/duckdb/duckdb/releases/tag/v2.0.0),
@@ -85,8 +87,8 @@ local-network permission remains subject to browser policy.
 | `GET /v1/jobs/{id}` | Full durable task including source parts, exact scope and input contract |
 | `POST /v1/jobs/{id}/cancel` | Cooperative network/hash/SQL cancellation; no partial output publication |
 | `POST /v1/jobs/{id}/resume` | Retry missing parts after failed, partial, cancelled or interrupted task |
-| `GET /v1/jobs/{id}/table?offset=0&limit=100` | At most 1,000 rows per page and original field types |
-| `GET /v1/jobs/{id}/preview?limit=2000` | At most 2,000 features, explicitly marked as a display preview |
+| `GET /v1/jobs/{id}/table?offset=0&limit=100` | At most 1,000 rows and 16 MiB per page; oversized pages are rejected |
+| `GET /v1/jobs/{id}/preview?limit=2000` | At most 2,000 scanned features and 8 MiB, explicitly marked as a display sample |
 | `GET /v1/jobs/{id}/download?format=parquet` | Stream complete local GeoParquet |
 | `GET /v1/jobs/{id}/download?format=metadata` | Stream reproducibility receipt |
 | `GET /v1/jobs/{id}/download?format=geojson` | Whole GeoJSON only if the entire result fits the 2,000-feature budget |
@@ -181,6 +183,13 @@ encoding notice. Browser preview features are always marked `displayOnly` and
 `limited` when incomplete. Native operations chain the complete local result
 file; they must never analyze only that preview. The initial preview is a
 bounded sample, not a dynamically tiled representation of a huge result.
+Rows are fetched and serialized incrementally. SQL-side size checks keep
+oversized individual values out of the browser transport. Preview features that
+exceed its byte budget are omitted whole, with explicit omission counts and a
+warning; geometry and attributes are never shortened to make them fit. Table
+pages exceeding 16 MiB fail clearly and suggest a smaller page or complete
+GeoParquet download. Preview scope contains only a label, CRS and bounds; its
+receipt and full job retain the exact boundary and release metadata.
 
 ## Tests
 

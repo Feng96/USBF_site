@@ -10,6 +10,7 @@ import urllib.request
 from pathlib import Path
 
 import duckdb
+from .security import https_context as tls_context
 
 _extension_lock = threading.Lock()
 
@@ -67,7 +68,7 @@ class Runtime:
                             compressed = Path(str(destination) + ".gz.writing")
                             temporary = Path(str(destination) + ".writing")
                             try:
-                                with urllib.request.urlopen(request, timeout=60) as response, compressed.open("wb") as output:
+                                with urllib.request.urlopen(request, timeout=60, context=tls_context()) as response, compressed.open("wb") as output:
                                     total = 0
                                     while True:
                                         block = response.read(1024 * 1024)

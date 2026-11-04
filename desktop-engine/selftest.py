@@ -43,6 +43,14 @@ def run(workspace: Path, report: Path) -> int:
         checks.append(name)
 
     try:
+        from usbf_engine.runtime import tls_context
+        public_manifest = urllib.request.Request(
+            'https://data.source.coop/opengeos/us-buildings/USBF_v1/manifest.json',
+            headers={'User-Agent': 'USBF-Engine-acceptance/0.1'})
+        with urllib.request.urlopen(public_manifest, context=tls_context(), timeout=60) as remote:
+            publication = json.loads(remote.read(4 * 1024 * 1024))
+        ok(publication.get('count', 0) > 0 and publication.get('buildings', 0) > 0,
+           'The bundled certificate store verifies the real public USBF HTTPS source')
         ok(request('GET', '/v1/health', authenticated=False)['apiVersion'] == 1,
            'The packaged runtime serves the real loopback API')
         try:

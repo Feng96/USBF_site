@@ -152,12 +152,15 @@ def shutdown(engine, server) -> None:
 
 
 def run_headless(args) -> int:
+    if sys.stdout is None or getattr(sys.stdout, 'closed', False):
+        raise RuntimeError('This windowed build cannot display a local headless pairing code. Open its desktop interface, or use a console build for --headless.')
     engine, server = backend(args.workspace, args.port, args.allow_origin)
     stopped = threading.Event()
     for item in (signal.SIGINT, signal.SIGTERM):
         signal.signal(item, lambda *_: stopped.set())
     print(json.dumps({'service': 'USBF local engine', 'port': server.server_address[1],
-                      'version': build_info()['version']}), flush=True)
+                      'version': build_info()['version'], 'pairingCode': engine.pairing_code(),
+                      'expiresInSeconds': 180}), flush=True)
     try:
         stopped.wait()
     finally:
@@ -368,5 +371,41 @@ def main(argv=None) -> int:
     return run_headless(args) if args.headless else run_gui(args)
 
 
+def command_entrypoint(argv=None) -> int:
+    """Return failures to installer automation without a windowed error modal."""
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    try:
+        return main(arguments)
+    except Exception as error:
+        report = None
+        for index, item in enumerate(arguments):
+            if item == '--report' and index + 1 < len(arguments):
+                report = Path(arguments[index + 1])
+            elif item.startswith('--report='):
+                report = Path(item.split('=', 1)[1])
+        message = str(error)[:2048]
+        if report is not None:
+            try:
+                previous = json.loads(report.read_text(encoding='utf-8')) if report.is_file() else {}
+                if not isinstance(previous, dict): previous = {}
+                previous.update(passed=False, errorType=type(error).__name__, commandError=message)
+                previous.setdefault('error', message)
+                report.parent.mkdir(parents=True, exist_ok=True)
+                report.write_text(json.dumps(previous, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+            except (OSError, ValueError):
+                pass
+        if sys.stderr is not None:
+            print(type(error).__name__ + ': ' + message, file=sys.stderr)
+        automation = {'--install', '--self-test', '--headless', '--uninstall', '--gui-smoke', '--version', '--no-start'}
+        if not any(item.split('=', 1)[0] in automation for item in arguments):
+            try:
+                from tkinter import messagebox
+                language = arguments[arguments.index('--language') + 1] if '--language' in arguments else 'en'
+                messagebox.showerror(translate(language, 'start_error'), message)
+            except Exception:
+                pass
+        return 1
+
+
 if __name__ == '__main__':
-    raise SystemExit(main())
+    raise SystemExit(command_entrypoint())

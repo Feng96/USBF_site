@@ -1,7 +1,7 @@
 # USBF Engine preview distribution
 
 The engine includes an isolated CPython runtime, DuckDB and its officially signed
-Spatial extension, psutil, Tcl/Tk, and a PyInstaller bootloader. It does not borrow
+Spatial extension, psutil, certifi, Tcl/Tk, and a PyInstaller bootloader. It does not borrow
 an existing user Python, GDAL or DuckDB environment. Native spatial IO is provided
 by the GDAL components in DuckDB Spatial, not a separate GDAL command-line install.
 
@@ -12,6 +12,7 @@ Package metadata and license files are retained by the build. Upstream projects:
 - DuckDB Spatial (including its third-party dependencies): https://github.com/duckdb/duckdb-spatial
 - GDAL: https://gdal.org/en/stable/license.html
 - psutil: https://github.com/giampaolo/psutil/blob/master/LICENSE
+- certifi (Mozilla CA bundle): https://github.com/certifi/python-certifi/blob/master/LICENSE
 - Tcl/Tk: https://www.tcl.tk/software/tcltk/license.html
 - PyInstaller distribution exception: https://pyinstaller.org/en/stable/license.html
 

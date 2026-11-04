@@ -24,7 +24,9 @@ def main():
     args.work.mkdir(parents=True, exist_ok=True)
     asset = args.assets / build['asset']
     if platform.system() == 'Windows':
-        command = [str(asset), '/WORKSPACE=' + str(workspace)]
+        # NSIS parses quotes around the option VALUE. list2cmdline would quote
+        # the entire /WORKSPACE=... argument, hiding the option from GetOptions.
+        command = '"' + str(asset) + '" /WORKSPACE="' + str(workspace) + '"'
     elif platform.system() == 'Linux':
         command = ['sh', str(asset), '--workspace', str(workspace), '--no-start']
     else:
@@ -43,8 +45,11 @@ def main():
     assert receipt['installed'] is True
     installed = workspace / receipt['executable']
     report = args.work / 'runtime-selftest.json'
+    tls_environment = {**os.environ,
+                       'SSL_CERT_FILE': str(args.work / 'missing-host-cert.pem'),
+                       'SSL_CERT_DIR': str(args.work / 'missing-host-certificates')}
     subprocess.run([str(installed), '--self-test', '--workspace', str(workspace),
-                    '--report', str(report)], check=True, timeout=180)
+                    '--report', str(report)], check=True, timeout=180, env=tls_environment)
     result = json.loads(report.read_text(encoding='utf-8'))
     assert result['passed'], result
     markers = []
