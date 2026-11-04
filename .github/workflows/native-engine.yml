@@ -41,7 +41,7 @@ jobs:
       - name: Test real native computations and recovery
         shell: bash
         env:
-          USBF_ENGINE_TEST_DIR: ${{ runner.temp }}/engine-unit-tests
+          USBF_ENGINE_TEST_DIR: ${{ runner.temp }}
           USBF_SPATIAL_EXTENSION: ${{ runner.temp }}/engine-build/spatial.duckdb_extension
           PYTHONPATH: native-engine
         run: python -m unittest discover -s native-engine/tests -v

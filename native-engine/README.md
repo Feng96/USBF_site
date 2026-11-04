@@ -117,7 +117,7 @@ does not revoke other paired tabs; the local shutdown action revokes all.
 ```
 
 Supported operations are `load`, `extract-box`, `extract-mask`, `merge`,
-`measure` (collision-safe geodesic area field), and projected `buffer`.
+`measure` (collision-safe geodesic area and boundary/line length fields), and projected `buffer`.
 Extraction retains whole intersecting source polygons. There is no implicit
 clipping. All boundaries and output geometry use EPSG:4326 longitude/latitude.
 Source CRS is read from GeoParquet/GDAL metadata, or must be explicitly supplied
@@ -176,7 +176,7 @@ files; desktop settings can supply different startup values. The queue admits
 at most 64 active tasks, up to 64 input descriptors and 100,000 selected parts.
 
 Original Parquet numeric values/types remain intact. JSON table/preview values
-outside JavaScript's safe integer range are decimal strings with an explicit
+outside JavaScript's safe integer range, plus exact Decimal values, are strings with an explicit
 encoding notice. Browser preview features are always marked `displayOnly` and
 `limited` when incomplete. Native operations chain the complete local result
 file; they must never analyze only that preview. The initial preview is a

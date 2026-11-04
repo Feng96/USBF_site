@@ -368,7 +368,7 @@ class Engine:
                         raise ValueError("Pinned native manifest parts need SHA256 checksums.")
                     parts.append({"id": f"{number}.{index}", "kind": "url", "url": url, "format": "geoparquet", "name": tile.get("path", url.rsplit("/", 1)[-1]),
                                   "bytes": tile.get("bytes"), "rows": tile.get("rows"), "sha256": checksum.lower(), "crs": source.get("crs", "EPSG:4326"), "crsExplicit": True,
-                                  "sourceRelease": {k: source.get(k) for k in ("releaseId", "manifestSha256", "updated", "licenses") if source.get(k) is not None}})
+                                  "sourceRelease": {k: source.get(k) for k in ("releaseId", "manifestSha256", "manifestUrl", "releaseRef", "updated", "licenses", "rights") if source.get(k) is not None}})
             else:
                 raise ValueError("Choose a workspace file, fixed workset or pinned source manifest.")
         if not parts:
@@ -556,7 +556,7 @@ class Engine:
         self._check(job["id"])
         if part["format"] in {"parquet", "geoparquet"}:
             query = "SELECT * FROM read_parquet(" + sqlstr(source) + ")"
-        elif part["format"] in {"json", "geojson"} and source.stat().st_size <= MAX_SPEC_BYTES:
+        elif part["format"] in {"json", "geojson"} and (part["kind"] == "frozen" or source.stat().st_size <= MAX_SPEC_BYTES):
             query = self._inline_query(source, connection)
         else:
             query = "SELECT * FROM ST_Read(" + sqlstr(source) + ")"
