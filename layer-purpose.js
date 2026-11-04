@@ -1,0 +1,51 @@
+/* Explain capabilities before formats. Never infer complete geometry from a
+   GeoJSON extension or turn a display tile into an analytical source. */
+(function(root){
+ 'use strict';
+ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ function format(layer){
+  const c=layer?.cfg||{};
+  if(layer?.renderTiled)return 'PMTiles';
+  if(c.raster?.format)return c.raster.format;
+  if(c.type==='raster'&&c.service==='wms')return 'WMS';
+  if(c.type==='viewport')return ['gba','usbf'].includes(c.driver)?'GeoParquet':'GeoJSON · API';
+  const names={pmtiles:'PMTiles',vector:'MVT',geojson:'GeoJSON',csv:'CSV',shapefile:'Shapefile',kml:'KML',geoparquet:'GeoParquet',geotiff:'GeoTIFF',image:'Image',raster:'Raster tiles','raster-pmtiles':'PMTiles'};
+  return names[c.sourceFormat]||names[c.type]||'Data';
+ }
+ function describe(layer,{catalog=false}={}){
+  const c=layer?.cfg||{},cap=root.PortalAnalysisData?.capabilities(layer)||{},fileFormat=format(layer);
+  const demand=cap.kind==='on-demand'||catalog&&c.driver==='usbf';
+  if(demand)return {kind:'preview',label:'Map preview',format:layer?.renderTiled||catalog?'PMTiles':fileFormat,note:'For building counts, areas and spatial tools, load original records for an area.',action:'load',actionLabel:'Load area & analyze'};
+  if(cap.attributePreview||['pmtiles','vector'].includes(c.type)&&!['raster'].includes(c.sourceKind))return {kind:'preview',label:'Map preview',format:fileFormat,note:'Display outlines may be cut or simplified. Add original data before counting buildings or measuring areas.',action:'original',actionLabel:'Find original data'};
+  if(catalog&&['viewport','geojson'].includes(c.type))return {kind:'ready',label:'Analysis data',format:fileFormat,note:c.type==='viewport'?'Original records load for the area you view.':'Tools use the records in the loaded file.'};
+  if(cap.geometryAnalysis){
+   if(c.type==='viewport'&&(layer.viewLoading||!layer.loaded||layer.error))return {kind:'pending',label:layer.error?'Coverage incomplete':'Loading analysis data',format:fileFormat,note:'Wait for this area to finish loading before analysis.'};
+   const p=layer.data?.provenance||c.provenance;
+   if(layer.viewLimited||p?.limited)return {kind:'partial',label:'Partial analysis data',format:fileFormat,note:'Only loaded records are included. Results do not describe the whole area.'};
+   return {kind:'ready',label:'Analysis data',format:fileFormat,note:c.type==='viewport'?'Analysis uses only the loaded neighborhood.':p?.requestedView||p?.loadedView?'Analysis uses only the saved area.':'Analysis uses the records in this layer.'};
+  }
+  return {kind:'image',label:'Image preview',format:fileFormat,note:'This image supplies a visual reference, not building records for these tools.'};
+ }
+ function badges(state){return '<div class="layer-purpose-badges"><span class="layer-purpose-badge purpose-'+state.kind+'" data-i18n>'+esc(state.label)+'</span><span class="layer-format">'+esc(state.format)+'</span></div>';}
+ function markup(layer,options={}){
+  const state=describe(layer,options),id=layer?.id;
+  return '<div class="layer-purpose" data-purpose-kind="'+state.kind+'">'+badges(state)+'<p data-i18n>'+esc(state.note)+'</p>'+(id&&state.action&&options.actions!==false?'<button type="button" class="layer-purpose-action" data-purpose-action="'+state.action+'" data-purpose-layer="'+esc(id)+'" data-i18n>'+esc(state.actionLabel)+'</button>':'')+'</div>';
+ }
+ function analysisMarkup(layer){
+  if(!layer)return '';
+  if(root.PortalAnalysisData?.capabilities(layer).kind==='on-demand')return '<div class="analysis-purpose-box">'+badges({kind:'original',label:'Analysis uses original records',format:'GeoParquet'})+'<p data-i18n>The map stays a preview. These tools load original records for the chosen area and record any coverage limits.</p></div>';
+  return '<div class="analysis-purpose-box">'+markup(layer,{actions:false})+'</div>';
+ }
+ function original(layer){
+  if(root.PortalImport?.details)root.PortalImport.details(layer);
+  else root.PortalLayers?.open('catalog');
+ }
+ function act(layer,action){
+  if(!layer||root.PortalLayers?.layers.get(layer.id)!==layer)return;
+  if(action==='load'&&root.PortalAnalysisData?.capabilities(layer).kind==='on-demand'){
+   root.PortalLayers.selectLayer(layer.id);root.PortalAnalysis.open('stats',{layerId:layer.id,scope:'view'});
+  }else if(action==='original')original(layer);
+ }
+ if(root.document)document.addEventListener('click',event=>{const b=event.target.closest('[data-purpose-action]');if(b)act(root.PortalLayers?.layers.get(b.dataset.purposeLayer),b.dataset.purposeAction);});
+ root.PortalLayerPurpose={describe,format,markup,analysisMarkup,act,original};
+})(globalThis);

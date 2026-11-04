@@ -44,4 +44,25 @@ This GBA view exceeds the download limit. Zoom in and retry.|此 GBA 视野超�
 The source changed or a page arrived incomplete. Retry this view.|数据源已变化或某一页未完整返回，请重试此视野。
 The source changed or duplicate pages arrived. Retry this view.|数据源已变化或返回了重复页，请重试此视野。
 Loading cancelled. Retry this view.|加载已取消，请重试此视野。
+Map preview|地图预览
+Analysis data|可分析数据
+Partial analysis data|仅部分分析数据
+Loading analysis data|正在加载分析数据
+Analysis uses original records|分析使用原始记录
+For building counts, areas and spatial tools, load original records for an area.|统计建筑数量、测量面积或进行空间分析前，请加载所选区域的原始记录。
+Display outlines may be cut or simplified. Add original data before counting buildings or measuring areas.|显示轮廓可能被裁切或简化，统计建筑数量或测量面积前请添加原始数据。
+Load area & analyze|加载此区域并分析
+Find original data|查找原始数据
+Original records load for the area you view.|按当前查看区域加载原始记录。
+Tools use the records in the loaded file.|工具使用已加载文件中的记录。
+Wait for this area to finish loading before analysis.|请等待此区域加载完成后再进行分析。
+Only loaded records are included. Results do not describe the whole area.|仅包含已加载的记录，结果不代表整个区域。
+Analysis uses only the loaded neighborhood.|分析范围仅限已加载的街区。
+Analysis uses only the saved area.|分析范围仅限已保存的区域。
+Analysis uses the records in this layer.|分析使用此图层中的记录。
+This image supplies a visual reference, not building records for these tools.|此影像用于地图参考，不提供这些工具所需的建筑记录。
+The map stays a preview. These tools load original records for the chosen area and record any coverage limits.|地图继续显示预览；分析工具会加载所选区域的原始记录，并注明覆盖范围限制。
+Open display source ↗|打开显示数据来源 ↗
+Get original vector records from the provider, then add that file or URL for analysis.|从数据提供方获取原始矢量记录，再添加该文件或 URL 进行分析。
+Add original data|添加原始数据
 `.trim().split('\n').map(row => { const i = row.indexOf('|'); return [row.slice(0, i), row.slice(i + 1)]; })));

@@ -1,0 +1,24 @@
+/* The production capability classifier must not equate file formats with quality. */
+const fs=require('fs'),path=require('path'),vm=require('vm'),assert=require('assert');
+const ctx={console,URL,setTimeout,clearTimeout,document:{addEventListener(){}}};ctx.window=ctx;ctx.globalThis=ctx;vm.createContext(ctx);
+for(const f of ['analysis-data.js','layer-purpose.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'..',f),'utf8'),ctx);
+const P=ctx.PortalLayerPurpose,checks=[],ok=(v,m)=>{assert(v,m);checks.push(m);console.log('PASS',m);};
+const file={id:'file',cfg:{type:'geojson'},data:{features:[]}};
+ok(P.describe(file).kind==='ready'&&P.format(file)==='GeoJSON','Original loaded GeoJSON is described as usable analysis data');
+const fragments={...file,data:{features:[],provenance:{spatialEligible:false,geometryQuality:'clipped-or-simplified-tile-fragments'}}};
+ok(P.describe(fragments).kind==='preview'&&P.format(fragments)==='GeoJSON','GeoJSON descended from display fragments remains a preview');
+ok(P.describe({...file,data:{features:[],provenance:{limited:true}}}).kind==='partial','Partial saved data cannot acquire a complete-data badge');
+const usbf={id:'usbf',cfg:{type:'viewport',driver:'usbf',analysisMode:'on-demand'},renderTiled:true,ensureData(){},analysisState:{cached:true,bounds:[0,0,1,1]}};
+ok(P.describe(usbf).kind==='preview'&&P.describe(usbf).format==='PMTiles'&&P.describe(usbf).action==='load','A cached original selection never relabels the PMTiles map as complete analysis data');
+ok(P.analysisMarkup(usbf).includes('GeoParquet')&&P.analysisMarkup(usbf).includes('Analysis uses original records'),'Analysis identifies the original input independently from the map display format');
+ok(P.describe({cfg:{type:'viewport',driver:'usbf'}},{catalog:true}).action==='load','The catalog advertises USBF original-data availability before connection');
+ok(P.describe({cfg:{type:'vector'}}).kind==='preview'&&P.format({cfg:{type:'vector'}})==='MVT','Native vector tiles carry the same preview restriction as PMTiles');
+ok(P.describe({cfg:{type:'raster-pmtiles'}}).kind==='image','Raster PMTiles cannot acquire a vector analysis badge');
+const gov={cfg:{type:'viewport',driver:'nyc'},data:{features:[]},loaded:true};
+ok(P.format(gov)==='GeoJSON · API'&&P.describe(gov).kind==='ready','Government GeoJSON APIs are distinguished from GeoParquet readers');
+ok(P.describe({...gov,viewLoading:true}).kind==='pending'&&P.describe({...gov,error:true}).kind==='pending','Unfinished and failed views never claim analysis data is ready');
+ok(P.describe({...gov,viewLimited:true}).kind==='partial','Incomplete government coverage remains visible after loading stops');
+ok(P.describe({...file,data:{features:[],provenance:{requestedView:[0,0,1,1]}}}).note.includes('saved area'),'Saved area snapshots describe their limited geographical scope');
+ok(P.format({cfg:{type:'geojson',sourceFormat:'shapefile'}})==='Shapefile','A prepared file can retain its source format alongside its analysis capability');
+ok(!P.markup({...file,id:'<img src=x>'}).includes('<img'),'Layer identifiers cannot inject HTML into capability controls');
+console.log(JSON.stringify({passed:true,checks:checks.length}));

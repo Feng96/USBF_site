@@ -464,3 +464,27 @@ Validation: `tools/viewport-source-qa.cjs`, `tools/gba-viewport-qa.cjs`, and
 `tools/non-pmtiles-workflow-checks.cjs`. The real-provider browser workflow checks
 DC IDs, NYC totals, GBA beyond the previous cutoff, cache reuse and Microsoft at
 camera zooms 16–19.
+
+### Layer purpose before file format
+
+The layer list and Add Data cards show a persistent purpose badge alongside a
+separate format label. **Map preview** means display fragments; original records
+are required for counts, areas and spatial tools. **Analysis data** means the
+loaded vector records are eligible for tools. **Partial analysis data** explicitly
+limits results to the loaded subset. Loading/error states do not claim readiness.
+Images retain their reference-only role. Formats and raw data values stay opaque
+to interface translation.
+
+`layer-purpose.js` reads the same `PortalAnalysisData.capabilities()` contract as
+the analytical guards. A GeoJSON file exported from tiles remains a preview when
+its provenance identifies display fragments. A cached USBF selection never turns
+the PMTiles display into a complete analytical dataset. USBF offers **Load area &
+analyze**, which opens the existing original-data analysis workflow; browsing and
+showing labels do not fetch GeoParquet. Its analysis panel explicitly identifies
+GeoParquet original records while the map continues to use PMTiles. External
+preview-only sources lead to source details, verified provider links and Add Data.
+Display URLs are labelled as display sources rather than original downloads.
+
+Validation: `tools/layer-purpose-qa.cjs` and
+`tools/layer-purpose-workflow-checks.cjs` cover original/partial/tiled inputs,
+real synthetic PMTiles/Parquet parsing, explicit loading, Chinese and phone layout.
