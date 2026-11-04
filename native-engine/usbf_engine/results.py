@@ -24,6 +24,7 @@ GEOM = "__usbf_geometry"
 MAX_PAGE_BYTES = 16 * 1024 * 1024
 MAX_TILE_BYTES = 8 * 1024 * 1024
 DETAIL_MIN_ZOOM = 14
+DISPLAY_FIELDS = {"height_m", "height", "render_height", "area_m2", "area_in_meters", "bf_source", "source", "geom_source", "modified"}
 _locks_guard = threading.Lock()
 _locks = {}
 _queries = threading.BoundedSemaphore(2)
@@ -47,6 +48,11 @@ def _bounded(value, maximum=MAX_PAGE_BYTES):
 
 
 class ResultsMixin:
+    @staticmethod
+    def _display_fields(info):
+        return [column for column in info["columns"] if column["name"].lower() in DISPLAY_FIELDS
+                and (column["type"] in {"VARCHAR", "BOOLEAN"} or re.fullmatch(r"(?:U?TINYINT|U?SMALLINT|U?INTEGER|U?BIGINT|HUGEINT|UHUGEINT|FLOAT|DOUBLE|DECIMAL\([0-9]+,[0-9]+\))", str(column["type"])))]
+
     def _result_index(self, job_id):
         source = self.result_path(job_id)
         result = self.get_job(job_id)["result"]
@@ -120,6 +126,8 @@ class ResultsMixin:
         return {"mode": "native-tiles", "sourceLayer": "buildings", "clusterSourceLayer": "clusters",
                 "bounds": info["bounds"], "recordCount": info["recordCount"], "detailMinZoom": DETAIL_MIN_ZOOM,
                 "maximumZoom": 22, "selection": True, "spatialIndex": "DuckDB RTree",
+                "displayFields": [column["name"] for column in self._display_fields(info)],
+                "displayFieldPolicy": "Common styling scalars only; text over 128 characters and unsafe/nonfinite display numbers are omitted. Full feature attributes remain original.",
                 "displayRule": "All intersecting records contribute. Dense tiles aggregate adaptively; tiles generalize display geometry only."}
 
     def result_summary(self, job_id, value):
@@ -387,7 +395,7 @@ class ResultsMixin:
             self._selection_file(job_id, selection_id, cached_info)
         folder = self.workspace / "Cache" / "native-results" / job_id / "tiles"
         folder.mkdir(exist_ok=True)
-        key = hashlib.sha256((str(z) + "/" + str(x) + "/" + str(y) + "/" + (selection_id or "all")).encode()).hexdigest()
+        key = hashlib.sha256(("style-v2/" + str(z) + "/" + str(x) + "/" + str(y) + "/" + (selection_id or "all")).encode()).hexdigest()
         cached = folder / (key + ".pbf")
         if cached.is_file() and cached.stat().st_size <= MAX_TILE_BYTES:
             return cached.read_bytes()
@@ -413,8 +421,23 @@ class ResultsMixin:
                 # Materialize the RTree-pruned candidates before clipping. Without
                 # this boundary DuckDB can merge the clipping predicates into the
                 # spatial filter and replace the index scan with a full scan.
-                candidates = "SELECT " + row + " AS row_id," + selection + " AS selected," + geom + " AS map_geometry FROM native_result.features f WHERE " + where
-                query = "WITH candidates AS MATERIALIZED (" + candidates + ") SELECT ST_AsMVT(t,'buildings',4096,'geometry','row_id') FROM (SELECT row_id," + sqlstr(job_id + ":") + "||CAST(row_id AS VARCHAR) AS nativeId,selected,ST_AsMVTGeom(map_geometry,ST_Extent(" + envelope + "),4096,64,true) AS geometry FROM candidates) t WHERE geometry IS NOT NULL AND NOT ST_IsEmpty(geometry)"
+                display, display_names = [], []
+                for column in self._display_fields(info):
+                    name = ident(column["name"])
+                    field = "f." + name
+                    if column["type"] == "VARCHAR":
+                        expression = "CASE WHEN length(" + field + ")<=128 THEN " + field + " ELSE NULL END"
+                    elif column["type"] == "BOOLEAN":
+                        expression = field
+                    else:
+                        number = "TRY_CAST(" + field + " AS DOUBLE)"
+                        expression = "CASE WHEN isfinite(" + number + ") AND abs(" + number + ")<=9007199254740991 THEN " + number + " ELSE NULL END"
+                    display.append(expression + " AS " + name)
+                    display_names.append(name)
+                extras = ("," + ",".join(display)) if display else ""
+                candidates = "SELECT " + row + " AS row_id," + selection + " AS selected," + geom + " AS map_geometry" + extras + " FROM native_result.features f WHERE " + where
+                extras = ("," + ",".join(display_names)) if display_names else ""
+                query = "WITH candidates AS MATERIALIZED (" + candidates + ") SELECT ST_AsMVT(t,'buildings',4096,'geometry','row_id') FROM (SELECT row_id," + sqlstr(job_id + ":") + "||CAST(row_id AS VARCHAR) AS nativeId,selected" + extras + ",ST_AsMVTGeom(map_geometry,ST_Extent(" + envelope + "),4096,64,true) AS geometry FROM candidates) t WHERE geometry IS NOT NULL AND NOT ST_IsEmpty(geometry)"
                 tile = c.execute(query).fetchone()[0] or b""
                 if len(tile) <= MAX_TILE_BYTES:
                     return save(tile)

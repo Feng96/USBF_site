@@ -252,6 +252,11 @@ crossing several tiles contributes in each tile it intersects, so cluster counts
 must not be summed across neighboring tiles as a global total. `map.recordCount`
 and native summaries supply authoritative counts. Detail geometry is clipped
 and quantized for display; original GeoParquet remains the analytical input.
+Common height, area, source and `modified` scalar fields are also available for
+detail styling, listed by exact original name in `map.displayFields`. Display
+strings over 128 characters and unsafe/nonfinite numeric display values are
+omitted rather than shortened; individual inspection retains the original
+attributes. Aggregates show counts instead of per-building height/source styles.
 
 For example, `query` accepts:
 

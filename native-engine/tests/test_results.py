@@ -158,6 +158,24 @@ class CompleteResultTests(unittest.TestCase):
         x, y = xyz(-77.0, 39.005, 18)
         high = vector_tile(self.engine.result_tile(self.job_id, 18, x, y))
         self.assertTrue(any(feature["properties"].get("nativeId") == self.job_id + ":2500" for feature in high["buildings"]))
+        self.assertIn("height", info["displayFields"])
+        last = next(feature for feature in high["buildings"] if feature["properties"].get("nativeId") == self.job_id + ":2500")
+        self.assertEqual(last["properties"]["height"], 1250)
+
+    def test_style_fields_are_bounded_without_changing_original_attributes(self):
+        properties = {"height_m": 27.5, "bf_source": "OSM", "SOURCE": "x" * 129, "modified": True, "original_id": "9007199254740993123", "unrelated": "not included in tiles"}
+        data = {"type": "FeatureCollection", "features": [{"type": "Feature", "properties": properties, "geometry": {"type": "Point", "coordinates": [-77, 39]}}]}
+        job = wait(self.engine, self.engine.create_job({"operation": "load", "inputs": [{"kind": "geojson", "data": data}]}))
+        x, y = xyz(-77, 39, 18)
+        tile = vector_tile(self.engine.result_tile(job["id"], 18, x, y))
+        rendered = tile["buildings"][0]["properties"]
+        self.assertEqual(rendered["height_m"], 27.5)
+        self.assertEqual(rendered["bf_source"], "OSM")
+        self.assertTrue(rendered["modified"])
+        self.assertNotIn("SOURCE", rendered)
+        self.assertNotIn("original_id", rendered)
+        self.assertNotIn("unrelated", rendered)
+        self.assertEqual(self.engine.result_feature(job["id"], 0)["properties"], properties)
 
     def test_attribute_query_search_sort_and_selection_highlight(self):
         self.fixture()
