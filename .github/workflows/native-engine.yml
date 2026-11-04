@@ -1,0 +1,72 @@
+name: Native engine preview
+on:
+  push:
+    branches: [engine-release-20261104]
+    paths: ["native-engine/**", "desktop-engine/**", ".github/workflows/native-engine.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-22.04, target: linux-x64}
+          - {os: windows-2025, target: windows-x64}
+          - {os: macos-15, target: macos-arm64}
+          - {os: macos-15-intel, target: macos-x64}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    env:
+      PYTHONUTF8: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - name: Install Linux GUI test support
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb python3-tk
+      - name: Install Windows installer builder
+        if: runner.os == 'Windows'
+        run: choco install nsis --no-progress -y
+      - name: Install isolated build dependencies
+        run: python -m pip install -r native-engine/requirements.txt -r desktop-engine/requirements-build.txt
+      - name: Test safe installation lifecycle
+        run: python -m unittest discover -s desktop-engine -p "test_*.py" -v
+      - name: Build self-contained installer
+        run: python desktop-engine/build.py --work "${{ runner.temp }}/engine-build" --output "${{ runner.temp }}/engine-assets" --revision "${{ github.sha }}-${{ github.run_id }}"
+      - name: Test real native computations and recovery
+        shell: bash
+        env:
+          USBF_ENGINE_TEST_DIR: ${{ runner.temp }}/engine-unit-tests
+          USBF_SPATIAL_EXTENSION: ${{ runner.temp }}/engine-build/spatial.duckdb_extension
+          PYTHONPATH: native-engine
+        run: python -m unittest discover -s native-engine/tests -v
+      - name: Test actual installer, bundled runtime, UI and uninstall
+        run: python desktop-engine/ci_check.py --assets "${{ runner.temp }}/engine-assets" --work "${{ runner.temp }}/engine-acceptance"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: engine-${{ matrix.target }}
+          path: ${{ runner.temp }}/engine-assets/
+          retention-days: 7
+  publish:
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions: {contents: write}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: engine-*
+          path: ${{ runner.temp }}/release-assets
+      - name: Publish verified preview installers
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          USBF_RELEASE_ASSETS: ${{ runner.temp }}/release-assets
+        run: python desktop-engine/publish_release.py
