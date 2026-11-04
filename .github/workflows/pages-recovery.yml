@@ -26,7 +26,7 @@ jobs:
           token = os.environ['USBF_RECOVERY_TOKEN']
           base = 'https://api.github.com/repos/Feng96/USBF_site'
           targets = [
-              '/actions/runs/41889159768/cancel',
+              '/actions/runs/41889159768/force-cancel',
               '/pages/deployments/5242d2c83ff800820e277419aff881aa41649f27/cancel',
           ]
           failures = []
@@ -45,6 +45,20 @@ jobs:
                   # A missing target or rejected permission must remain a failure.
                   if error.code != 409:
                       failures.append(target)
+          for target in ['/actions/runs/41889159768',
+                         '/pages/deployments/5242d2c83ff800820e277419aff881aa41649f27']:
+              request = urllib.request.Request(
+                  base + target,
+                  headers={'Authorization': 'Bearer ' + token,
+                           'Accept': 'application/vnd.github+json',
+                           'X-GitHub-Api-Version': '2022-11-28'})
+              try:
+                  with urllib.request.urlopen(request, timeout=30) as response:
+                      state = json.load(response).get('status')
+                      print(target + ': status=' + str(state))
+              except urllib.error.HTTPError as error:
+                  print(target + ': HTTP ' + str(error.code))
+                  failures.append(target)
           if failures:
               raise SystemExit('Cancellation was rejected for: ' + ', '.join(failures))
           PY
