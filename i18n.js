@@ -11,6 +11,11 @@
 
   // Interpolated values are copied verbatim, including field names, places and model names.
   const patterns = [
+    [/^Loading area parts… (\d+) \/ (\d+)$/, m => '正在加载区域分块… ' + m[1] + ' / ' + m[2]],
+    [/^Reading input (\d+) \/ (\d+)$/, m => '正在读取输入 ' + m[1] + ' / ' + m[2]],
+    [/^([\d,]+) output records( · partial coverage)?$/, m => m[1] + ' 条输出记录' + (m[2] ? ' · 覆盖范围不完整' : '')],
+    [/^([\d,]+) matching records$/, m => m[1] + ' 条匹配记录'],
+    [/^(\d+) polygon corners$/, m => m[1] + ' 个多边形顶点'],
     [/^Revision (\d+)$/, m => '修订 ' + m[1]],
     [/^([\d,]+) loaded records( in the first ([\d,]+))?$/, m => m[1] + ' 条已加载记录' + (m[3] ? '（前 ' + m[3] + ' 条内）' : '')],
     [/^Loading buildings… ([\d,]+)( \/ ([\d,]+))?$/, m => '正在加载建筑… ' + m[1] + (m[3] ? ' / ' + m[3] : '')],

@@ -33,6 +33,7 @@
   let actions='';
   if(id&&options.actions!==false){
    if(state.action)actions=button('data','Load analyzable data',loading)+button(state.action,state.actionLabel,loading);
+   if(cap.geometryAnalysis&&cap.kind!=='on-demand'&&layer.cfg.type==='viewport')actions+=button('data','Load another range',loading);
    if(cap.geometryAnalysis&&cap.kind!=='on-demand'&&['geojson','viewport'].includes(layer.cfg.type))actions+=button('table','View attribute table',layer.cfg.type==='viewport'&&(layer.viewLoading||!layer.loaded||layer.error));
    if(loading)actions+=button('cancel-data','Cancel loading');
   }

@@ -524,3 +524,90 @@ Validation: `tools/analysis-layers-workflow-checks.cjs` and the inventory table
 unit/browser acceptance cover true Parquet/PMTiles fixtures, independent area
 layers, project restoration, hidden/offscreen rows, exports, cancellation and
 Chinese/mobile controls.
+
+### GIS workspace: ranges, bulk records and vector processing
+
+The top ribbon separates **Data**, **Map**, **Selection**, **Processing**,
+**Layers**, and **Project & output**. English remains the source interface;
+Chinese translates controls and system messages while preserving dataset names,
+original fields, values, formats and technical names.
+
+**Load analyzable data / Load another range** and the processing dialog share an
+area selector: current map view; a U.S. state or county; bounding-box coordinates;
+an input polygon or boundary GeoJSON; another layer's extent; a loaded polygon
+mask; or the last map selection boundary. State/county names and full boundaries
+come from the U.S. Census Bureau TIGERweb State_County service (state layer 0,
+county layer 1). These requests use public read-only endpoints. Administrative
+coverage does not imply that a building provider covers every state or territory.
+
+Manual box/polygon coordinates use the current **working CRS**, shown beside the
+inputs. A box's edges are densified before reprojection. Boundary-file coordinates
+also use that chosen CRS: select EPSG:4326 for ordinary longitude/latitude GeoJSON.
+Invalid/crossing small polygon boundaries are rejected. Extents of tiled previews
+use the published extent, rather than a recently cached original-data neighborhood.
+A polygon mask uses up to 100 loaded polygons, retaining its license and partial
+scope. Requested boundaries, CRS, administrative GEOID, retrieval source and
+original-data lineage survive output export and Project save/restore.
+
+Explicit area reads support USBF originals, GBA GeoParquet, and the DC/NYC original
+footprint APIs. They create an independent fixed GeoJSON analysis layer without
+changing the preview connection. Intersecting grid cells are read serially;
+empty cells are checked, cross-cell copies of source records are removed, and
+source publication/file provenance is retained. A browser request is bounded at
+20,000 output records, 500,000 vertices, 64 cells and a 96 MiB read budget (an
+individual source read can finish beyond the remaining byte budget). Provider
+limits/timeouts still apply. A state/county request that exceeds a budget is
+explicitly **partial**; selecting a state never promises a full state download.
+Use regional original files or future server-side jobs for larger complete jobs.
+Boundary input is limited to 12 MiB and 150,000 vertices. Table display limits
+remain independent of processing limits.
+
+**Selection** works on original source records, including distinct records with
+duplicate source IDs. Click, drag a box, draw a polygon, select by attribute, or
+select by location. Choose replace/add/remove/common selection; Shift adds and
+Ctrl/Cmd toggles click selection. Attribute-table Ctrl/Cmd-click toggles rows and
+Shift-click selects a range in the currently filtered/sorted table. Select all,
+invert, clear and zoom-to-selection are available. A tiled USBF selection first
+loads separate original records for the chosen area; tile fragments never become
+analytical building records. Up to 20,000 original records can be selected.
+Selections are per-layer session state; output layers and their provenance are
+saved in Projects. Replacing a viewport's source data invalidates its old selection.
+
+Selected records can open in a **selected-only attribute table**, export as CSV
+or GeoJSON, or become an independent layer. The complementary unselected records
+can also become a layer. Exports describe their actual bulk-selection/search
+scope and retain original attributes. Existing table search, field visibility,
+sorting and pagination remain available.
+
+**Processing** operates on all loaded, selected, or range-filtered originals:
+
+- **Extract by box / Extract by mask** keeps complete original geometries that
+  touch the boundary. **Clip** trims outlines; **Erase** subtracts a polygon mask.
+- **Merge** appends multiple layers, retains overlaps/duplicate records, and adds
+  a collision-safe source-layer field. **Dissolve** unions polygons, optionally
+  grouped by one original attribute, and records a source-record count.
+- Buffer, area/boundary-length fields, center points, multipart-to-singlepart,
+  and exact-geometry duplicate removal create new layers. Duplicate removal keeps
+  the first geometry's attributes; it does not combine later attribute values.
+- Geometry-changing results are marked derived and do not automatically reuse
+  source building-height values for 3D. Whole-outline extraction preserves source
+  building semantics and recorded height eligibility.
+
+Spatial overlay/buffer tools retain the existing 1,500-feature safety limit and
+per-geometry vertex limits; dissolve and erase also accept at most 1,500 records.
+Mask intersection/extraction supports the broader original-record budget.
+Processing is cancellable between work units. Inputs remain intact; each result
+is a new layer. These are browser vector tools, not an unbounded desktop-GIS or
+server processing service.
+
+**Layers** provides zoom, rename, duplicate, reorder, extent-to-polygon and removal
+of the most recent generated output. Independent image and local PMTiles copies require reopening
+the original file. Projects retain generated layers, exact requested ranges,
+working CRS, source rights, lineage and partial-coverage status.
+
+Validation: `tools/gis-core-qa.cjs`, `tools/gis-workflow-checks.cjs`, and
+`tools/gis-range-loading-checks.cjs` cover actual Turf/projection operations,
+record-identity selection, map drag selection, full-outline extraction, merge,
+selected exports and Project restore. Range checks exercise real Census and DC
+endpoints as well as real synthetic PMTiles/GeoParquet decoding. Existing
+analysis-layer/attribute-table workflows remain regression checks.

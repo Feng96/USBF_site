@@ -321,7 +321,7 @@
       else{map.getCanvas().style.cursor=tool==='identify'?'crosshair':'';hoverPopup.remove();}
     });
     map.on('mouseout',function(){hoverPopup.remove();});
-    map.on('click',function(e){if(window.PortalDraw?.active){PortalDraw.click(e);return;}if(tool==='measure'){hoverPopup.remove();addMeasure(e.lngLat);return;}var hits=map.queryRenderedFeatures(e.point,{layers:[view3d?'demo-extrusion':'demo-fill']});if(window.PortalModels?.identify(e))return;if(window.PortalLayers&&PortalLayers.identify(e))return;if(hits.length)selectFeature(hits[0].properties.building_id,false);});
+    map.on('click',function(e){if(window.PortalGISSelection?.click(e))return;if(window.PortalDraw?.active){PortalDraw.click(e);return;}if(tool==='measure'){hoverPopup.remove();addMeasure(e.lngLat);return;}var hits=map.queryRenderedFeatures(e.point,{layers:[view3d?'demo-extrusion':'demo-fill']});if(window.PortalModels?.identify(e))return;if(window.PortalLayers&&PortalLayers.identify(e))return;if(hits.length)selectFeature(hits[0].properties.building_id,false);});
     $('#feature-count').textContent=collection.features.length;renderTable();saveView();
     $('#zoom-label').textContent='Zoom '+map.getZoom().toFixed(1);
     window.portal={engine:'MapLibre GL JS',get map(){return map;},get data(){return collection;},get selected(){return selected;},get view3d(){return view3d;},selectFeature:selectFeature};
