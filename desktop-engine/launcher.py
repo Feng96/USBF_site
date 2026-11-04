@@ -16,6 +16,7 @@ import time
 import webbrowser
 
 from installation import install, payload_directory, uninstall, windows_deferred_uninstall
+from shortcuts import install_shortcuts, remove_shortcuts
 
 SITE = 'https://feng96.github.io/USBF_site/'
 
@@ -47,6 +48,23 @@ TEXT = {
     'uninstall_error': ('Uninstall could not finish', '卸载未能完成'),
     'status': ('Ready · local API port {port}\nVersion {version} · {cpus} logical CPUs', '已就绪 · 本地 API 端口 {port}\n版本 {version} · {cpus} 个逻辑 CPU'),
     'language': ('Interface language', '界面语言'),
+    'launcher_note': ('A workspace launcher and a per-user application-menu entry are installed.', '将创建工作区启动入口和当前用户的应用菜单入口。'),
+    'resources': ('Resources and cache…', '资源和缓存…'),
+    'diagnostics': ('Check engine health…', '检查引擎状态…'),
+    'resources_title': ('Local engine resources and cache', '本地引擎资源和缓存'),
+    'threads': ('CPU threads', 'CPU 线程数'),
+    'memory': ('Memory limit (MiB)', '内存限制 (MiB)'),
+    'cache_quota': ('Source-cache target (MiB)', '源数据缓存目标 (MiB)'),
+    'resource_note': ('Changes apply to new connections. Finish active tasks first.\nThe cache target is soft; unfinished-task checkpoints are always kept.', '设置用于后续连接，请先结束当前任务。\n缓存目标为软限制，未完成任务的检查点始终保留。'),
+    'save_settings': ('Save resource settings', '保存资源设置'),
+    'cleanup': ('Clean unused native cache…', '清理未使用的本地缓存…'),
+    'cleanup_title': ('Clean verified native caches?', '清理已验证的本地缓存？'),
+    'cleanup_confirm': ('Remove {files} disposable cache files ({mib:.1f} MiB)?\nProjects, results, user files and unfinished-task checkpoints stay.', '移除 {files} 个可清理的缓存文件（{mib:.1f} MiB）？\n保留项目、结果、用户文件和未完成任务的检查点。'),
+    'saved': ('Settings saved.', '设置已保存。'),
+    'cleaned': ('Removed {files} cache files ({mib:.1f} MiB).', '已移除 {files} 个缓存文件（{mib:.1f} MiB）。'),
+    'maintenance_error': ('Local maintenance could not finish', '本地维护未能完成'),
+    'healthy': ('All local health checks passed.', '本地健康检查全部通过。'),
+    'health_failed': ('Some checks need attention. Details are shown below.', '部分检查需要处理，详情如下。'),
 }
 
 
@@ -88,7 +106,7 @@ def resources() -> Path:
 def build_info() -> dict:
     path = resources() / 'engine-build.json'
     return json.loads(path.read_text(encoding='utf-8')) if path.is_file() else {
-        'version': '0.1.0-preview', 'revision': 'development', 'signed': False}
+        'version': '0.2.0-preview', 'revision': 'development', 'signed': False}
 
 
 def default_workspace() -> Path:
@@ -212,8 +230,8 @@ def setup_gui(args) -> int:
     args.language = args.language or 'en'
     root = tk.Tk()
     root.title(translate(args.language, 'install_title'))
-    root.geometry('620x450')
-    root.minsize(560, 430)
+    root.geometry('620x500')
+    root.minsize(560, 480)
     root.configure(bg='#f5f8f4')
     frame = ttk.Frame(root, padding=24)
     frame.pack(fill='both', expand=True)
@@ -234,11 +252,13 @@ def setup_gui(args) -> int:
     localize(ttk.Button(frame, command=lambda: selected.set(
         filedialog.askdirectory(initialdir=selected.get(), title=translate(args.language, 'choose')) or selected.get())), 'choose').pack(anchor='w')
     localize(ttk.Label(frame, justify='left', wraplength=550), 'setup_note').pack(anchor='w', pady=16)
+    localize(ttk.Label(frame, justify='left', wraplength=550), 'launcher_note').pack(anchor='w', pady=(0, 12))
 
     def perform():
         try:
             workspace = Path(selected.get()).expanduser().resolve()
             receipt = install(payload_directory(), Path(sys.executable), workspace, build_info())
+            install_shortcuts(workspace, receipt)
             save_language(workspace, args.language)
             command = [str(workspace / receipt['executable']), '--workspace', str(workspace), '--language', args.language]
             subprocess.Popen(command, close_fds=True)
@@ -256,8 +276,8 @@ def run_gui(args) -> int:
     from tkinter import messagebox, ttk
     root = tk.Tk()
     root.title(translate(args.language, 'engine'))
-    root.geometry('680x590')
-    root.minsize(590, 540)
+    root.geometry('680x680')
+    root.minsize(590, 620)
     actions = queue.Queue()
     try:
         engine, server = backend(args.workspace, args.port, args.allow_origin)
@@ -300,6 +320,67 @@ def run_gui(args) -> int:
     ttk.Label(frame, textvariable=status, wraplength=590, justify='left').pack(anchor='w', pady=10)
     localize(ttk.Label(frame, justify='left', wraplength=610), 'runtime_note').pack(anchor='w', pady=12)
 
+    def maintenance_error(error):
+        messagebox.showerror(translate(args.language, 'maintenance_error'), str(error), parent=root)
+
+    def diagnostics():
+        try:
+            report = engine.maintenance.diagnostics()
+            window = tk.Toplevel(root)
+            window.title(translate(args.language, 'diagnostics').rstrip('…'))
+            window.geometry('660x450')
+            ttk.Label(window, text=translate(args.language, 'healthy' if report['passed'] else 'health_failed'), padding=15).pack(anchor='w')
+            details = tk.Text(window, wrap='word', font=('TkFixedFont', 10))
+            details.pack(fill='both', expand=True, padx=15, pady=(0, 15))
+            details.insert('1.0', json.dumps(report, ensure_ascii=False, indent=2))
+            details.configure(state='disabled')
+        except Exception as error:
+            maintenance_error(error)
+
+    def cleanup():
+        try:
+            preview = engine.maintenance.cleanup({'dryRun': True, 'allUnused': True})
+            if messagebox.askyesno(translate(args.language, 'cleanup_title'), translate(args.language, 'cleanup_confirm',
+                files=preview['files'], mib=preview['bytes'] / (1024 * 1024)), parent=root):
+                result = engine.maintenance.cleanup({'dryRun': False, 'allUnused': True})
+                messagebox.showinfo(translate(args.language, 'resources_title'), translate(args.language, 'cleaned',
+                    files=result['files'], mib=result['bytes'] / (1024 * 1024)), parent=root)
+        except Exception as error:
+            maintenance_error(error)
+
+    def preferences():
+        try:
+            current = engine.maintenance.status()['settings']
+            window = tk.Toplevel(root)
+            window.title(translate(args.language, 'resources_title'))
+            window.geometry('570x380')
+            form = ttk.Frame(window, padding=20)
+            form.pack(fill='both', expand=True)
+            values = {}
+            for key, label, maximum in [('threads', 'threads', os.cpu_count() or 1), ('memoryMiB', 'memory', 1048576), ('cacheQuotaMiB', 'cache_quota', 1048576)]:
+                line = ttk.Frame(form)
+                line.pack(fill='x', pady=8)
+                ttk.Label(line, text=translate(args.language, label)).pack(side='left')
+                values[key] = tk.StringVar(value=str(current[key]))
+                ttk.Spinbox(line, textvariable=values[key], from_=0 if key == 'cacheQuotaMiB' else 1, to=maximum, width=13).pack(side='right')
+            ttk.Label(form, text=translate(args.language, 'resource_note'), wraplength=520, justify='left').pack(anchor='w', pady=12)
+            def save():
+                try:
+                    engine.maintenance.configure({key: int(value.get()) for key, value in values.items()})
+                    window.destroy()
+                    messagebox.showinfo(translate(args.language, 'resources_title'), translate(args.language, 'saved'), parent=root)
+                except Exception as error:
+                    maintenance_error(error)
+            ttk.Button(form, text=translate(args.language, 'save_settings'), command=save).pack(anchor='e', pady=8)
+            ttk.Button(form, text=translate(args.language, 'cleanup'), command=cleanup).pack(anchor='e')
+        except Exception as error:
+            maintenance_error(error)
+
+    tools = ttk.Frame(frame)
+    tools.pack(fill='x', pady=8)
+    localize(ttk.Button(tools, command=preferences), 'resources').pack(side='left')
+    localize(ttk.Button(tools, command=diagnostics), 'diagnostics').pack(side='left', padx=8)
+
     def stop():
         try:
             shutdown(engine, server)
@@ -312,6 +393,7 @@ def run_gui(args) -> int:
             return
         shutdown(engine, server)
         try:
+            remove_shortcuts(args.workspace)
             if os.name == 'nt':
                 windows_deferred_uninstall(args.workspace)
             else:
@@ -410,12 +492,14 @@ def main(argv=None) -> int:
         if not getattr(sys, 'frozen', False):
             raise RuntimeError('Use a built desktop package to install a runtime.')
         receipt = install(payload_directory(), Path(sys.executable), args.workspace, build_info())
+        install_shortcuts(args.workspace, receipt)
         save_language(args.workspace, args.language)
         if not args.no_start:
             subprocess.Popen([str(args.workspace / receipt['executable']), '--workspace', str(args.workspace), '--language', args.language], close_fds=True)
         return 0
     if args.uninstall:
         if args.yes:
+            remove_shortcuts(args.workspace)
             if os.name == 'nt' and getattr(sys, 'frozen', False):
                 windows_deferred_uninstall(args.workspace)
             else:

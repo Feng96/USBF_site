@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import platform
 import queue
@@ -24,12 +25,14 @@ import duckdb
 import psutil
 
 from .runtime import Runtime, ident, sqlstr
+from .results import ResultsMixin
+from .maintenance import EngineMaintenance
 from .security import https_context
 from .validation import (FOLDERS, FORMATS, OPERATIONS, MAX_SPEC_BYTES, bounds, clone, digest_json,
                          intersects, json_exact, normalize_spec, public_url,
                          safe_name, scope_geometry, workspace_path)
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 GEOM = "__usbf_geometry"
 TERMINAL = {"completed", "partial", "failed", "cancelled", "interrupted"}
 PREVIEW_MAX_BYTES = 8 * 1024 * 1024
@@ -56,7 +59,7 @@ class CheckedRedirect(urllib.request.HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
-class Engine:
+class Engine(ResultsMixin):
     def __init__(self, workspace, *, extension_path=None, threads=2, memory_limit="1GB",
                  allow_install=True, autostart=True, downloader=None):
         self.workspace = Path(workspace).expanduser().resolve()
@@ -121,6 +124,7 @@ class Engine:
                 if job["status"] in {"queued", "running", "cancelling"}:
                     job.update(status="interrupted", error="The engine stopped before this task finished.", updatedAt=now())
                     c.execute("UPDATE jobs SET document=? WHERE id=?", (json.dumps(job), row[0]))
+        self.maintenance = EngineMaintenance(self)
         self.worker = threading.Thread(target=self._worker, name="usbf-native-worker", daemon=True)
         if autostart:
             self.worker.start()
@@ -229,6 +233,8 @@ class Engine:
                              "memoryBytes": memory.total, "availableMemoryBytes": memory.available,
                              "diskFreeBytes": disk.free, "diskTotalBytes": disk.total},
                 "capabilities": {"operations": sorted(OPERATIONS), "resume": True, "table": True, "preview": True,
+                                 "resultMap": True, "resultQuery": True, "resultSelection": True, "resultExport": True,
+                                 "projectPackages": True, "maintenance": True, "resultSummary": True,
                                  "uninstallRequest": bool(self.uninstall_handler), "uninstall": False},
                 "activeJobs": self._active_count()}
 
@@ -325,6 +331,8 @@ class Engine:
         parts = []
         for number, original in enumerate(spec["inputs"]):
             source = clone(original)
+            if source.get("kind") == "native-selection":
+                source = self.selection_input(source)
             kind = source.get("kind")
             if kind == "file":
                 file = workspace_path(self.workspace, source.get("path"))
@@ -358,8 +366,17 @@ class Engine:
                     source = self._read_manifest(source)
                 if len(source["files"]) > 100000:
                     raise ValueError("This source manifest contains too many files.")
+                certified_bounds = source.get("geometryBoundsGuaranteed") is True
                 for index, tile in enumerate(source["files"]):
-                    tilebox = tile.get("bbox") or tile.get("tile_bbox")
+                    geometry_box = tile.get("geometry_bbox")
+                    has_geometry_box = (tile.get("geometry_bounds_complete") is True
+                                        and isinstance(geometry_box, list) and len(geometry_box) == 4
+                                        and all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) for v in geometry_box)
+                                        and -180 <= geometry_box[0] <= geometry_box[2] <= 180
+                                        and -90 <= geometry_box[1] <= geometry_box[3] <= 90)
+                    if certified_bounds and not has_geometry_box:
+                        raise ValueError("The certified source geometry index is incomplete or invalid.")
+                    tilebox = geometry_box if has_geometry_box else tile.get("bbox") or tile.get("tile_bbox")
                     if box and (not isinstance(tilebox, list) or len(tilebox) != 4):
                         raise ValueError("The manifest has no usable file bounds.")
                     if box and not intersects(tilebox, box):
@@ -374,6 +391,8 @@ class Engine:
                         raise ValueError("Pinned native manifest parts need SHA256 checksums.")
                     parts.append({"id": f"{number}.{index}", "kind": "url", "url": url, "format": "geoparquet", "name": tile.get("path", url.rsplit("/", 1)[-1]),
                                   "bytes": tile.get("bytes"), "rows": tile.get("rows"), "sha256": checksum.lower(), "crs": source.get("crs", "EPSG:4326"), "crsExplicit": True,
+                                  "sourceCandidateIndex": "full-geometry-bbox" if has_geometry_box else "published-file-bbox",
+                                  "geometryBoundsGuaranteed": certified_bounds,
                                   "sourceRelease": {k: source.get(k) for k in ("releaseId", "manifestSha256", "manifestUrl", "releaseRef", "updated", "licenses", "rights") if source.get(k) is not None}})
             else:
                 raise ValueError("Choose a workspace file, fixed workset or pinned source manifest.")
@@ -508,6 +527,9 @@ class Engine:
             if self._hash_file(path, job_id) != part.get("sha256"):
                 raise ValueError("The frozen browser input changed after task creation.")
             return path
+        cached = self.maintenance.source_hit(part, job_id)
+        if cached:
+            return cached
         destination = directory / (part["id"] + ".source." + part["format"])
         if destination.exists():
             if part.get("sha256") and self._hash_file(destination, job_id) == part["sha256"].lower():
@@ -527,7 +549,7 @@ class Engine:
         except Exception:
             temporary.unlink(missing_ok=True)
             raise
-        return destination
+        return self.maintenance.source_store(part, destination, job_id)
 
     def _source_crs(self, part, source, geometry, connection):
         if part["kind"] == "frozen":
@@ -689,7 +711,11 @@ class Engine:
         failed = [p for p in job["parts"] if p["status"] == "failed"]
         job["progress"] = {"completedParts": len(good), "plannedParts": len(job["parts"]), "failedParts": len(failed),
                            "actualRows": sum(p.get("rowsWritten", 0) for p in good)}
+        indexes = {p.get("sourceCandidateIndex", "full-input") for p in job["parts"]}
+        guaranteed = all(p.get("geometryBoundsGuaranteed", p.get("sourceCandidateIndex") is None) is True for p in job["parts"])
         job["coverage"] = {"requestComplete": len(good) == len(job["parts"]), "providerCoverage": "source-defined",
+                           "spatialRule": "whole-geometry-intersects-v1", "candidateIndex": next(iter(indexes)) if len(indexes) == 1 else "mixed",
+                           "geometryBoundsGuaranteed": True if guaranteed else None, "providerCompleteness": None,
                            "missingParts": [{"id": p["id"], "name": p["name"], "status": p["status"], "error": p.get("error")} for p in job["parts"] if p["status"] != "completed"]}
 
     def _finish(self, job, directory, connection):

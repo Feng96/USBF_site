@@ -67,6 +67,20 @@ def serve(engine, port=52763, origins=None):
                 raise ValueError("The native request was incomplete.")
             return json.loads(raw)
 
+        def _file(self, file, content_type):
+            self.send_response(200)
+            self._cors()
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Disposition", 'attachment; filename="' + file.name + '"')
+            self.send_header("Content-Length", str(file.stat().st_size))
+            self.end_headers()
+            with file.open("rb") as source:
+                while True:
+                    data = source.read(1024 * 1024)
+                    if not data:
+                        break
+                    self.wfile.write(data)
+
         def _token(self):
             authorization = self.headers.get("Authorization", "")
             token = authorization[7:] if authorization.startswith("Bearer ") else ""
@@ -109,6 +123,21 @@ def serve(engine, port=52763, origins=None):
                 self._token()
                 if path == "/v1/status" and method == "GET":
                     return self._json(200, engine.status())
+                if path == "/v1/maintenance" and method == "GET":
+                    return self._json(200, engine.maintenance.status())
+                if path == "/v1/maintenance/settings" and method == "POST":
+                    return self._json(200, engine.maintenance.configure(self._body()))
+                if path == "/v1/maintenance/cleanup" and method == "POST":
+                    return self._json(200, engine.maintenance.cleanup(self._body()))
+                if path == "/v1/diagnostics" and method == "GET":
+                    return self._json(200, engine.maintenance.diagnostics())
+                if path in {"/v1/projects/export", "/v1/projects/import", "/v1/projects/relink"} and method == "POST":
+                    from .project_dependencies import export_package, import_package, relink_dependency
+                    action = {"/v1/projects/export": export_package, "/v1/projects/import": import_package, "/v1/projects/relink": relink_dependency}[path]
+                    return self._json(200, action(engine, self._body()))
+                if path == "/v1/projects/package" and method == "GET":
+                    from .project_dependencies import package_path
+                    return self._file(package_path(engine, query.get("path", [""])[0]), "application/zip")
                 if path == "/v1/unpair" and method == "POST":
                     if int(self.headers.get("Content-Length", "0")): self._body()
                     return self._json(200, engine.unpair(self.headers.get("Authorization", "")[7:]))
@@ -126,6 +155,32 @@ def serve(engine, port=52763, origins=None):
                     return self._json(200, engine.plan(self._body()))
                 if path == "/v1/jobs":
                     return self._json(201, engine.create_job(self._body())) if method == "POST" else self._json(200, {"jobs": engine.jobs(summaries=True)})
+                match = re.fullmatch(r"/v1/jobs/([a-f0-9-]{36})/(map|query|selection|summary|export|features/([0-9]+)|tiles/([0-9]+)/([0-9]+)/([0-9]+)\.pbf)", path)
+                if match:
+                    job_id, action, row_id, z, x, y = match.groups()
+                    if action == "map" and method == "GET":
+                        return self._json(200, engine.result_map(job_id))
+                    if action == "query" and method == "POST":
+                        return self._json(200, engine.result_query(job_id, self._body()))
+                    if action == "selection" and method == "POST":
+                        return self._json(200, engine.result_selection(job_id, self._body()))
+                    if action == "summary" and method == "POST":
+                        return self._json(200, engine.result_summary(job_id, self._body()))
+                    if row_id is not None and method == "GET":
+                        return self._json(200, engine.result_feature(job_id, row_id))
+                    if z is not None and method == "GET":
+                        data = engine.result_tile(job_id, int(z), int(x), int(y), query.get("selectionId", [None])[0])
+                        self.send_response(200)
+                        self._cors()
+                        self.send_header("Content-Type", "application/vnd.mapbox-vector-tile")
+                        self.send_header("Content-Length", str(len(data)))
+                        self.end_headers()
+                        self.wfile.write(data)
+                        return
+                    if action == "export" and method == "GET":
+                        format = query.get("format", ["geojson"])[0]
+                        file = engine.result_export(job_id, format, query.get("selectionId", [None])[0])
+                        return self._file(file, {"geojson": "application/geo+json", "csv": "text/csv; charset=utf-8", "parquet": "application/vnd.apache.parquet"}[format])
                 match = re.fullmatch(r"/v1/jobs/([a-f0-9-]{36})(?:/(cancel|resume|preview|table|download))?", path)
                 if match:
                     job_id, action = match.groups()
