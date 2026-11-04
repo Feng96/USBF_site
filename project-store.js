@@ -3,13 +3,14 @@
   'use strict';
   const databaseName = 'usbf-project-library-v1';
   let opening;
-  const channel = typeof BroadcastChannel === 'function' ? new BroadcastChannel(databaseName) : null;
+  const channel = !root.PortalReadOnlyMode && typeof BroadcastChannel === 'function' ? new BroadcastChannel(databaseName) : null;
   function changed(detail, broadcast = true) {
     root.document?.dispatchEvent(new CustomEvent('portal-project-library-changed', { detail }));
     if (broadcast) channel?.postMessage(detail);
   }
   if (channel) channel.onmessage = event => changed(event.data, false);
   function open() {
+    if (root.PortalReadOnlyMode) return Promise.reject(Error('Project storage is unavailable in a read-only shared map.'));
     if (opening) return opening;
     opening = new Promise((resolve, reject) => {
       if (!root.indexedDB) { reject(Error('Project storage is unavailable. Export a project file to keep your work.')); return; }

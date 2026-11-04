@@ -1,6 +1,50 @@
 {
   "schema": 1,
-  "status": "unreleased",
-  "platforms": {},
-  "message": "No signed native engine installer has been published."
+  "status": "preview",
+  "version": "0.1.0-preview.1",
+  "revision": "d0e8989b45537e91bf547821651cf486921c5a6c",
+  "tag": "engine-v0.1.0-preview.1-r6",
+  "message": "Independent preview runtime. No publisher code signing or Apple notarization.",
+  "platforms": {
+    "linux-x64": {
+      "label": "Linux x64",
+      "url": "https://github.com/Feng96/USBF_site/releases/download/engine-v0.1.0-preview.1-r6/usbf-engine-0.1.0-preview.1-linux-x86_64.run",
+      "sha256": "8b526a3e77ed4cd2847bde398753d9a6eec9ccaad53fde82c93002391a10cdfc",
+      "bytes": 88815003,
+      "signed": false,
+      "signatureKind": "none",
+      "minimumOS": "Linux x64, glibc 2.35 or newer",
+      "testedChecks": 13
+    },
+    "macos-arm64": {
+      "label": "macOS Apple Silicon",
+      "url": "https://github.com/Feng96/USBF_site/releases/download/engine-v0.1.0-preview.1-r6/usbf-engine-0.1.0-preview.1-darwin-arm64.dmg",
+      "sha256": "642b9aa49db093efcbc5ef5fcb05c2a8aa5c40029d37bce90319afa97ef924a7",
+      "bytes": 62438200,
+      "signed": false,
+      "signatureKind": "ad-hoc",
+      "minimumOS": "macOS 15.8.2 or newer",
+      "testedChecks": 13
+    },
+    "macos-x64": {
+      "label": "macOS Intel",
+      "url": "https://github.com/Feng96/USBF_site/releases/download/engine-v0.1.0-preview.1-r6/usbf-engine-0.1.0-preview.1-darwin-x86_64.dmg",
+      "sha256": "ad6b278c34325b5ce8288f749f595729fadad4c5981ace2a894480e0cc5460e2",
+      "bytes": 66690266,
+      "signed": false,
+      "signatureKind": "ad-hoc",
+      "minimumOS": "macOS 15.7.9 or newer",
+      "testedChecks": 13
+    },
+    "windows-x64": {
+      "label": "Windows x64",
+      "url": "https://github.com/Feng96/USBF_site/releases/download/engine-v0.1.0-preview.1-r6/usbf-engine-0.1.0-preview.1-windows-x86_64.exe",
+      "sha256": "c1f5c39104be48570a459a1a51e23cbf5a15ea145a0991c9fe3d7aab6c3c61c6",
+      "bytes": 50575077,
+      "signed": false,
+      "signatureKind": "none",
+      "minimumOS": "Windows 10/11 x64; tested on Windows Server 2025",
+      "testedChecks": 13
+    }
+  }
 }

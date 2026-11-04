@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <script src="readonly-bootstrap.js?v=1.11-engine"></script>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#183c37">
   <meta name="description" content="US Buildings: an open GIS workspace for building footprints, heights and roof models. View U.S. buildings, compare data, analyze an area and download maps or data.">
@@ -26,62 +27,74 @@
   <script defer src="i18n-interface-zh.js?v=1.10-design"></script>
   <script defer src="i18n-composer-zh.js?v=1.10-design"></script>
   <script defer src="i18n-design-zh.js?v=1.10-design"></script>
-  <script defer src="i18n.js?v=1.10-design"></script>
+  <script defer src="i18n-tasks-zh.js?v=1.11-engine"></script>
+  <script defer src="i18n-sharing-zh.js?v=1.11-engine"></script>
+  <script defer src="i18n.js?v=1.11-engine"></script>
   <script defer src="sidebar.js?v=1.10-design"></script>
-  <script defer src="interface-controls.js?v=1.10-design"></script>
-  <script defer src="workspace-crs.js?v=1.9-local"></script>
+  <script defer src="interface-controls.js?v=1.11-engine"></script>
+  <script defer src="workspace-crs.js?v=1.11-engine"></script>
   <script defer src="basemaps.js?v=1.10-design"></script>
   <script defer src="data-adapter.js"></script>
-  <script defer src="usbf-source.js?v=1.6-pmtiles"></script>
+  <script defer src="release-registry.js?v=1.11-engine"></script>
+  <script defer src="usbf-source.js?v=1.11-engine"></script>
   <script defer src="public-sources.js?v=1.6.2-coverage"></script>
   <script defer src="map-legend.js?v=1.3"></script>
   <script defer src="source-features.js?v=1.3"></script>
-  <script defer src="data-manager.js?v=1.6.3-purpose"></script>
-  <script defer src="inventory.js?v=1.8-scope"></script>
+  <script defer src="data-manager.js?v=1.11-engine"></script>
+  <script defer src="inventory.js?v=1.11-engine"></script>
   <script defer src="data-import.js?v=1.6.3-purpose"></script>
   <script defer src="buildings-explorer.js?v=1.8-scope"></script>
-  <script defer src="analysis-data.js?v=1.6-pmtiles"></script>
-  <script defer src="layer-purpose.js?v=1.8-scope"></script>
-  <script defer src="analysis-layers.js?v=1.9-local"></script>
+  <script defer src="analysis-data.js?v=1.11-engine"></script>
+  <script defer src="layer-purpose.js?v=1.11-engine"></script>
+  <script defer src="local-engine-client.js?v=1.11-engine"></script>
+  <script defer src="task-center.js?v=1.11-engine"></script>
+  <script defer src="analysis-layers.js?v=1.11-engine"></script>
   <script defer src="gis-core.js?v=1.8-scope"></script>
-  <script defer src="gis-range.js?v=1.8-scope"></script>
+  <script defer src="gis-range.js?v=1.11-engine"></script>
   <script defer src="gis-selection.js?v=1.8-scope"></script>
-  <script defer src="gis-workspace.js?v=1.8-scope"></script>
-  <script defer src="data-workspace.js?v=1.10-design"></script>
-  <script defer src="analysis-ui.js?v=1.8-scope"></script>
+  <script defer src="gis-workspace.js?v=1.11-engine"></script>
+  <script defer src="data-workspace.js?v=1.11-engine"></script>
+  <script defer src="analysis-ui.js?v=1.11-engine"></script>
   <script defer src="map-composer.js?v=1.10-design"></script>
   <script defer src="workspace-tools.js?v=1.4-ui"></script>
-  <script defer src="map-project-core.js?v=1.10-design"></script>
-  <script defer src="project-store.js?v=1.5-projects"></script>
-  <script defer src="map-project.js?v=1.10-design"></script>
-  <script defer src="local-files.js?v=1.9-local"></script>
-  <script defer src="local-cache.js?v=1.9-local"></script>
-  <script defer src="project-workspace.js?v=1.10-design"></script>
-  <script defer src="device-settings.js?v=1.9-local"></script>
-  <script defer src="app.js?v=1.10-design"></script>
+  <script defer src="map-project-core.js?v=1.11-engine"></script>
+  <script defer src="map-share-core.js?v=1.11-engine"></script>
+  <script defer src="shared-map.js?v=1.11-engine"></script>
+  <script defer src="project-store.js?v=1.11-engine"></script>
+  <script defer src="map-project.js?v=1.11-engine"></script>
+  <script defer src="readonly-viewer.js?v=1.11-engine"></script>
+  <script defer src="local-files.js?v=1.11-engine"></script>
+  <script defer src="local-cache.js?v=1.11-engine"></script>
+  <script defer src="project-workspace.js?v=1.11-engine"></script>
+  <script defer src="map-share.js?v=1.11-engine"></script>
+  <script defer src="device-settings.js?v=1.11-engine"></script>
+  <script defer src="app.js?v=1.11-engine"></script>
   <script type="module" src="model-browser.js?v=1.5-projects"></script>
   <script type="module" src="local-models.js?v=1.5-projects"></script>
   <script type="module" src="lod1-ui.js?v=1.8-scope"></script>
   <link rel="stylesheet" href="workspace.css?v=1.4-ui">
   <link rel="stylesheet" href="gis.css?v=1.8-scope">
-  <link rel="stylesheet" href="data-workspace.css?v=1.8-scope">
-  <link rel="stylesheet" href="inventory.css?v=1.6.4-table">
+  <link rel="stylesheet" href="data-workspace.css?v=1.11-engine">
+  <link rel="stylesheet" href="inventory.css?v=1.11-engine">
   <link rel="stylesheet" href="map-legend.css?v=1.3">
   <link rel="stylesheet" href="data-import.css?v=1.3">
   <link rel="stylesheet" href="buildings-explorer.css?v=1.6-pmtiles">
   <link rel="stylesheet" href="analysis.css?v=1.3">
   <link rel="stylesheet" href="map-composer.css?v=1.10-design">
   <link rel="stylesheet" href="basemaps.css?v=1.10-design">
-  <link rel="stylesheet" href="interface-controls.css?v=1.10-design">
-  <link rel="stylesheet" href="map-project.css?v=1.9-local">
-  <link rel="stylesheet" href="device-settings.css?v=1.9-local">
+  <link rel="stylesheet" href="interface-controls.css?v=1.11-engine">
+  <link rel="stylesheet" href="map-project.css?v=1.11-engine">
+  <link rel="stylesheet" href="device-settings.css?v=1.11-engine">
+  <link rel="stylesheet" href="task-center.css?v=1.11-engine">
+  <link rel="stylesheet" href="map-share.css?v=1.11-engine">
+  <link rel="stylesheet" href="readonly-viewer.css?v=1.11-engine">
 </head>
 <body>
   <a class="skip-link" href="#map" data-i18n>Skip to map</a>
   <header class="app-header">
     <a class="brand" href="./" aria-label="US Buildings home" data-i18n-aria-label><span class="brand-mark"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 26V13l8-5v18M12 26V4l9 5v17M21 26V15l7-4v15M2 27h28"/></svg></span><strong>US Buildings</strong></a>
     <div class="workspace-document-control"><button class="workspace-document" id="workspace-document" data-project-open>Untitled project</button><span id="project-state-dot" class="project-state-dot" aria-hidden="true"></span><span class="sr-only" data-project-status data-i18n-system></span></div>
-    <div class="header-actions"><label class="language-control"><span class="sr-only" data-i18n>Language</span><select id="interface-language" aria-label="Language / 语言" data-i18n-aria-label><option value="en" lang="en">English</option><option value="zh-CN" lang="zh-CN">中文</option></select></label><button class="quiet-button" data-action="share" title="Copy this map view" data-i18n-title><span data-icon="share"></span><span data-i18n>Share</span></button><button class="quiet-button" data-workspace-tool="download"><span data-icon="download"></span><span data-i18n>Download</span></button><button class="quiet-button" data-device-settings aria-label="Files &amp; device" data-i18n-aria-label><span data-icon="folder"></span><span data-i18n>Files &amp; device</span></button><button class="icon-button" data-workspace-tool="settings" title="CRS and workspace settings" aria-label="Settings" data-i18n-title data-i18n-aria-label><span data-icon="settings"></span></button></div>
+    <div class="header-actions"><label class="language-control"><span class="sr-only" data-i18n>Language</span><select id="interface-language" aria-label="Language / 语言" data-i18n-aria-label><option value="en" lang="en">English</option><option value="zh-CN" lang="zh-CN">中文</option></select></label><button class="quiet-button" data-share-map title="Copy this map view" data-i18n-title><span data-icon="share"></span><span data-i18n>Share</span></button><button class="quiet-button" data-workspace-tool="download"><span data-icon="download"></span><span data-i18n>Download</span></button><button class="quiet-button" data-task-center aria-label="Task center" data-i18n-aria-label><span data-icon="list"></span><span data-i18n>Tasks</span></button><button class="quiet-button" data-device-settings aria-label="Files &amp; device" data-i18n-aria-label><span data-icon="folder"></span><span data-i18n>Files &amp; device</span></button><button class="icon-button" data-workspace-tool="settings" title="CRS and workspace settings" aria-label="Settings" data-i18n-title data-i18n-aria-label><span data-icon="settings"></span></button></div>
   </header>
   <div class="ribbon gis-ribbon" role="toolbar" aria-label="GIS workspace tools" data-i18n-aria-label>
     <div class="gis-tool-group"><span class="gis-group-caption" data-i18n>DATA</span><div class="gis-group-tools"><button class="add-data-primary" data-add-data><span data-icon="plus"></span><span data-i18n>Add data</span></button><button class="tool" data-data-workspace><span data-icon="download"></span><span data-i18n>Data &amp; scope</span></button><button class="tool" data-action="table" id="table-toggle" aria-controls="attribute-table" aria-expanded="false"><span data-icon="table"></span><span data-i18n>Attributes</span></button></div></div>

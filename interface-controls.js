@@ -34,9 +34,9 @@
  if(!root.document?.createElement)return;
  const $=s=>document.querySelector(s),t=s=>root.PortalI18n?.t(s)||s,esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  let state=defaults(),panel,scheduled=false,applying=false,observing=false;
- try{const saved=localStorage.getItem(key);if(saved)state=validate(JSON.parse(saved));}catch(_){}
+ try{const saved=root.PortalReadOnlyMode?null:localStorage.getItem(key);if(saved)state=validate(JSON.parse(saved));}catch(_){}
  const entry=id=>definitions.find(d=>d[0]===id),attribute=id=>'data-interface-'+id.replace(/[A-Z]/g,c=>'-'+c.toLowerCase());
- function persist(){try{localStorage.setItem(key,JSON.stringify(state));}catch(_){}}
+ function persist(){if(root.PortalReadOnlyMode)return;try{localStorage.setItem(key,JSON.stringify(state));}catch(_){}}
  function emit(){persist();document.dispatchEvent(new CustomEvent('portal-interface-changed',{detail:getState()}));document.dispatchEvent(new CustomEvent('portal-presentation-changed'));}
  function resize(){requestAnimationFrame(()=>root.portal?.map?.resize());}
  function isHidden(id){return state.panels[id]==='hide';}

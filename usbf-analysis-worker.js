@@ -1,5 +1,5 @@
 /* Original USBF records are read only for an explicit analytical request. */
-import './usbf-source.js?v=1.6-pmtiles';
+import './usbf-source.js?v=1.11-tasks';
 import {parquetMetadataAsync,parquetReadObjects} from './vendor/hyparquet-1.31.5/index.js';
 import {wkbToGeojson} from './vendor/hyparquet-1.31.5/wkb.js';
 import {decompress} from './vendor/fzstd-0.1.1.js';
@@ -24,10 +24,21 @@ self.onmessage=async event=>{
     if(!api.validBox(request.bounds)||!Array.isArray(request.tiles)||request.tiles.length>9)throw Error('Choose a smaller area to load original buildings.');
     const [w,s,east,n]=api.buffered(request.bounds),features=[],seen=new Set();let limited=false;
     for(let index=0;index<request.tiles.length;index++){
-      aborted(signal);const tile=request.tiles[index],url=api.tileURL(tile);let etag=null;
+      aborted(signal);const tile=request.tiles[index],url=api.tileURL(tile);let etag=null,verifiedBuffer=null;
+      if(request.verifyHashes){
+        if(bytes+tile.bytes>budget)throw Error('This pinned release needs a full checksum-verified shard read. Use the local engine for this area.');
+        const response=await fetch(url,{credentials:'omit',signal:AbortSignal.any([signal,AbortSignal.timeout(45000)])});
+        if(!response.ok)throw Error('A pinned original shard is unavailable (HTTP '+response.status+').');
+        const length=Number(response.headers.get('content-length'));if(length&&length!==tile.bytes){await response.body?.cancel();throw Error('A pinned original shard changed size. Its saved release cannot be reproduced.');}
+        const reader=response.body.getReader(),chunks=[];let lengthRead=0;for(;;){const part=await reader.read();if(part.done)break;lengthRead+=part.value.byteLength;if(lengthRead>tile.bytes){await reader.cancel();throw Error('A pinned original shard exceeded its saved byte count.');}chunks.push(part.value);}const joined=new Uint8Array(lengthRead);let cursor=0;for(const part of chunks){joined.set(part,cursor);cursor+=part.byteLength;}verifiedBuffer=joined.buffer;aborted(signal);if(verifiedBuffer.byteLength!==tile.bytes)throw Error('A pinned original shard arrived incomplete.');
+        const actual=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',verifiedBuffer)),n=>n.toString(16).padStart(2,'0')).join('');
+        if(actual!==tile.sha256){const error=Error('A pinned original shard no longer matches its saved SHA256. The old release is unavailable.');error.code='RELEASE_CHANGED';throw error;}
+        bytes+=verifiedBuffer.byteLength;networkBytes+=verifiedBuffer.byteLength;
+      }
       const file={byteLength:tile.bytes,async slice(start,end=tile.bytes){
         aborted(signal);
         if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start<0||end>tile.bytes||end<=start)throw Error('Invalid USBF byte range.');
+        if(verifiedBuffer)return verifiedBuffer.slice(start,end);
         bytes+=end-start;if(bytes>budget)throw Error('This area needs more than 32 MB of original data. Zoom in and retry.');
         const key=url+'|'+start+'|'+end;
         if(cache.has(key)){const result=cache.get(key);if(etag&&result.etag&&etag!==result.etag){const error=Error('Original data changed between cached ranges. Refresh the layer and retry.');error.code='RELEASE_CHANGED';throw error;}if(result.etag)etag=result.etag;cache.delete(key);cache.set(key,result);cacheHits++;return result.buffer;}

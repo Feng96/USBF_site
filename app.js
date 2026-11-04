@@ -11,6 +11,7 @@
     extent:'<path d="M3 8V3h5m8 0h5v5m0 8v5h-5M8 21H3v-5M8 8h8v8H8Z"/>',
     bookmark:'<path d="M6 3h12v18l-6-4-6 4Z"/>',map:'<path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2Zm6-2v16m6-14v16"/>',
     table:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M9 9v11"/>',
+    list:'<path d="m3 6 1 1 2-3M9 6h12M3 12h3m3 0h12M3 18h3m3 0h12"/>',
     share:'<circle cx="18" cy="5" r="3"/><circle cx="5" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8 11 7-4M8 13l7 4"/>',
     download:'<path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/>',plus:'<path d="M12 5v14M5 12h14"/>',minus:'<path d="M5 12h14"/>',
     info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.2"/>',close:'<path d="m6 6 12 12M6 18 18 6"/>',

@@ -1,9 +1,9 @@
 /* Optional disk snapshots. Renderer/worker memory caches remain separate. */
 (function(root){
 'use strict';const pref='usbf-cache-analysis-snapshots-v1';let enabled=false,lastError='',lastSaved=null;
-try{enabled=localStorage.getItem(pref)==='true';}catch(_){}
+try{enabled=!root.PortalReadOnlyMode&&localStorage.getItem(pref)==='true';}catch(_){}
 function emit(){document.dispatchEvent(new CustomEvent('portal-local-cache-changed'));}
-function setEnabled(value){enabled=!!value;try{localStorage.setItem(pref,String(enabled));}catch(_){}emit();}
+function setEnabled(value){if(root.PortalReadOnlyMode)return;enabled=!!value;try{localStorage.setItem(pref,String(enabled));}catch(_){}emit();}
 async function store(layer){
  if(!enabled)return null;await root.PortalLocalFiles.ready();if(!root.PortalLocalFiles.status().connected)return null;
  try{

@@ -705,7 +705,7 @@ Your chosen USBF workspace/
   Results/   explicitly saved data and PNG exports
   Files/     copies of files you add through the file manager
   Cache/     optional managed analysis snapshots
-  Engine/    reserved for the future isolated native runtime
+  Engine/    isolated native runtime, identity and task history
 ```
 
 **Project Save** retains the existing browser backup and, when a workspace is
@@ -748,12 +748,32 @@ for this workflow). The site cannot infer an absolute OS path or silently assign
 a folder without the browser's user-initiated picker.
 
 The device overview labels browser, native and cloud execution separately.
-`data/engine-releases.json` currently declares **unreleased**: no signed native
-installer, native computation service, or cloud backend is included. Installation,
-native connection and uninstall controls therefore remain disabled. `Engine/`
-only reserves the agreed location; the setup prototype is explicitly a design
-preview. The proposed future runtime uses an isolated environment instead of
-automatically borrowing an installed GDAL/DuckDB environment.
+The native preview now provides a real independent DuckDB Spatial runtime,
+paired loopback API, desktop installer and data-preserving uninstall. Available
+packages and their SHA256 values come from `data/engine-releases.json`; no
+unverified download links are invented. The desktop runtime keeps its own Python,
+DuckDB, Spatial/GDAL and certificate store under `Engine`, without changing
+existing GIS installations. Cloud hosting supplies source files; it does not
+provide a cloud computation service.
+
+Native tasks support scoped loading, extraction, merge, geodesic measurements and
+projected metre buffers. Tasks record planned/actual counts, source identities,
+failed parts and durable checkpoints. Cancellation, interrupted jobs and partial
+results stay distinct from successful completion. The browser file manager keeps
+`Cache/native-jobs` read-only so cache cleanup cannot destroy resumable work.
+A bounded display preview is labelled separately from its full GeoParquet result;
+native reprocessing uses the full file, and its paginated attribute table does
+not require loading the whole result into the browser. See
+[desktop setup](desktop-engine/README.md) and [API and limits](native-engine/README.md).
+
+New Project v2 files distinguish pinned USBF releases from an explicit latest
+policy and preserve verified native-file dependencies. Share creates readonly
+interactive links or portable HTML using the online renderer. The reader runs in
+an opaque sandbox, supports navigation/layers/attributes, and cannot access the
+author's Project library, engine credentials or connected files. Native files
+are represented by explicitly labelled bounded previews when shared. Cloud
+accounts, simultaneous editing and offline renderer bundles remain outside this
+release. See [implementation and acceptance](docs/engine-sharing-acceptance.md).
 
 Validation: `tools/local-files-qa.cjs` covers permission, persistence, project
 revisions, collisions, ownership and deletion boundaries. The browser workflow in

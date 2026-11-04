@@ -27,7 +27,7 @@ function harness({noDisplay=false}={}){
  h.layer={id:'footprints',cfg:clone(h.api.entry),visible:true,opacity:.75,color:'#287f76',fields:h.api.entry.fields.slice(),error:false};
  h.attach=async()=>{await h.api.prepare(h.layer);h.map.addSource(h.layer.id,{type:h.layer.renderTiled?'vector':'geojson'});h.layer.setData=data=>h.map.getSource(h.layer.id).setData(data);h.api.attach(h.layer,h.map,()=>{});return h.layer;};
  h.tick=async()=>{h.now+=300000;for(const timer of h.intervals.values())timer.fn();await flush();};h.foreground=async(ms=31000)=>{h.now+=ms;doc.visibilityState='visible';h.listeners.get('visibilitychange')?.();await flush();};
- h.canonical=()=>h.requests.filter(r=>new URL(r.url).pathname.endsWith('/USBF_v1/manifest.json'));h.displays=()=>h.requests.filter(r=>new URL(r.url).pathname.endsWith('/USBF_display/manifest.json'));h.doc=doc;return h;
+ h.context=context;h.canonical=()=>h.requests.filter(r=>new URL(r.url).pathname.endsWith('/USBF_v1/manifest.json'));h.displays=()=>h.requests.filter(r=>new URL(r.url).pathname.endsWith('/USBF_display/manifest.json'));h.doc=doc;return h;
 }
 (async()=>{
  const h=harness(),api=h.api,parsed=api.parseManifest(h.live);
@@ -81,6 +81,13 @@ function harness({noDisplay=false}={}){
  fl.visible=true;fallback.display=display('f');await fl.checkUpdates();
  ok(fl.releaseWarning.includes('add it again')&&!fl.renderTiled&&fallback.workers.length===0,'A newly published display offers a map reconnect without silently starting analytical work');
  fl.stop();ok(!fallback.map.getSource(fl.id+'-publication')&&!fallback.map.getLayer(fl.id+'-publication-grid')&&fallback.intervals.size===0&&!fallback.listeners.size,'Stopping coverage removes its publication source, grid, timer and listener');
+ const fixed=harness();let resolves=0;const pinnedRef={version:1,sourceId:'usbf-live',policy:'pinned',releaseId:'synthetic-pinned-qa',manifestSha256:'a'.repeat(64),displaySha256:'b'.repeat(64)};
+ fixed.context.PortalReleases={resolve:async()=>{resolves++;return {manifest:fixed.api.parseManifest(fixed.live),display:fixed.api.parseDisplay(fixed.display),ref:clone(pinnedRef)};}};fixed.layer.cfg.releaseRef=clone(pinnedRef);await fixed.attach();
+ const pinnedRequests=fixed.requests.length;await fixed.layer.checkUpdates();await fixed.tick();await fixed.foreground();
+ ok(resolves===1&&fixed.requests.length===pinnedRequests&&pinnedRequests===0,'Pinned map preparation uses its verified registry snapshot and never polls mutable latest endpoints');
+ const pinnedRaw=await fixed.layer.ensureData({bounds:[-77.075,38.91,-77.07,38.915]});ok(fixed.messages.some(m=>m.verifyHashes===true)&&pinnedRaw.release.releaseRef.releaseId===pinnedRef.releaseId,'Pinned browser jobs explicitly require checksum verification and preserve exact release lineage');fixed.layer.stop();
+ const changing=harness();await changing.attach();const box=[-77.075,38.91,-77.07,38.915];await changing.layer.ensureData({bounds:box});const originalJobs=changing.messages.filter(m=>m.id&&!m.type).length;changing.context.PortalReleases={resolve:async()=>({manifest:changing.api.parseManifest(changing.live),display:changing.api.parseDisplay(changing.display),ref:clone(pinnedRef)})};changing.layer.cfg.releaseRef=clone(pinnedRef);await changing.layer.ensureData({bounds:box});
+ ok(changing.messages.filter(m=>m.id&&!m.type).length===originalJobs+1&&changing.messages.at(-1).verifyHashes===true,'Switching from latest to pinned cannot reuse an earlier unverified analytical cache entry');changing.layer.stop();
  console.log(JSON.stringify({passed:true,checks:checks.length}));
  if(process.env.PORTAL_QA_OUTPUT){fs.mkdirSync(process.env.PORTAL_QA_OUTPUT,{recursive:true});fs.writeFileSync(path.join(process.env.PORTAL_QA_OUTPUT,'update-contract.json'),JSON.stringify({passed:true,checks},null,2));}
 })().catch(error=>{console.error(error);process.exitCode=1;});

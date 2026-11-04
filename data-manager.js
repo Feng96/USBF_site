@@ -38,7 +38,7 @@
     $('#catalog-resources').innerHTML=PortalPublicSources.resources.filter(matches).map(c=>'<article class="source-card source-resource"><div class="source-card-copy"><div class="source-card-label">'+text(c.scope)+'</div><h3>'+text(c.name)+'</h3><p>'+text(c.description)+'</p><a href="'+c.page+'" target="_blank" rel="noopener" data-i18n>Source &amp; downloads ↗</a></div><span class="resource-badge" data-i18n>Downloads</span></article>').join('');
     $('#sidebar-catalog').innerHTML=categories.map(category=>'<h3 class="catalog-category">'+text(category)+'</h3>'+catalog.filter(c=>group(c)===category).map(c=>'<button class="catalog-entry" data-catalog-add="'+c.id+'"><span class="catalog-swatch" style="background:'+c.color+'"></span><span><strong>'+text(c.name)+'</strong><small>'+text(c.scope)+'</small></span><span>＋</span></button>').join('')).join('');
   }
-  function releaseText(l){const release=l.renderTiled?l.displayRelease:l.release;return release?release.name+' · '+new Date(release.updated).toISOString().replace('T',' ').slice(0,16)+' UTC · checks every 5 min':'';}
+  function releaseText(l){const release=l.renderTiled?l.displayRelease:l.release;return release?release.name+' · '+new Date(release.updated).toISOString().replace('T',' ').slice(0,16)+' UTC · '+(window.PortalI18n?.t(l.cfg.releaseRef?.policy==='pinned'?'Pinned release':'Checks every 5 min')||''):'';}
   function refresh(){
     if(!map)return;syncOrder();
     if(!layers.has(active))active=(Array.from(layers.values()).find(l=>!isRaster(l))||layers.values().next().value)?.id||null;

@@ -332,7 +332,7 @@
     switchTab(tab);refreshLayers();updateOperation();updateButtons();
   }
   function open(name='stats',options={}){
-    const requested=options.layerId?root.PortalLayers.layers.get(options.layerId):root.PortalLayers.active;if(!root.PortalDataWorkspace.ready(requested)){root.PortalDataWorkspace.open({layer:requested,intent:name});return activeJob;}
+    const requested=options.layerId?root.PortalLayers.layers.get(options.layerId):root.PortalLayers.active;if(requested?.cfg.nativeSource){if(['chart','charts'].includes(name)){root.portal?.toast('Charts need a fixed browser workset. The bounded native preview is not the full analytical input.');return activeJob;}return root.PortalTasks.openProcessing(requested,'measure',{mode:options.scope||'all',name:requested.cfg.name+' · native measurements'}).catch(e=>root.portal?.toast(e.message));}if(!root.PortalDataWorkspace.ready(requested)){root.PortalDataWorkspace.open({layer:requested,intent:name});return activeJob;}
     ensure();refreshLayers();
     if(options.layerId&&root.PortalLayers.layers.has(options.layerId)){$('layer').value=options.layerId;clearSnapshot();}
     else if(root.PortalLayers.active?.id&&$('layer').value!==root.PortalLayers.active.id){$('layer').value=root.PortalLayers.active.id;clearSnapshot();}
@@ -345,6 +345,7 @@
   async function openStudyArea(buildingLayerId,studyAreaId,options={}){
     const l=root.PortalLayers.layers.get(buildingLayerId),a=root.PortalLayers.layers.get(studyAreaId);if(!l||!a)throw Error('Choose a source and study area first.');
     const mask=a.data.features.length===1?a.data.features[0]:root.turf.union(a.data),r=root.PortalGISRange.value(mask,a.cfg.name,{kind:'layer-mask',layer:a.cfg.name,crs:'EPSG:4326'});await root.PortalDataWorkspace.saveArea(r,a.cfg.name);
+    if(l.cfg.nativeSource)return root.PortalTasks.openProcessing(l,'measure',{mode:'area'});
     if(!root.PortalDataWorkspace.ready(l)){root.PortalDataWorkspace.open({layer:l,intent:options.action==='download'?'download':'stats'});return;}
     return open('stats',{layerId:l.id,scope:'area',auto:false});
   }

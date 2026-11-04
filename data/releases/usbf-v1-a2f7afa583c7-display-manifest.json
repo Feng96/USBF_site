@@ -1,0 +1,376 @@
+{
+  "schema_version": 1,
+  "type": "pmtiles",
+  "source_layer": "usbf",
+  "source_release": {
+    "name": "USBF_v1",
+    "updated": "2026-10-27T22:25:21.308964+00:00",
+    "buildings": 150261726,
+    "tiles": 3522
+  },
+  "fields": [
+    "usbf_id",
+    "id",
+    "source",
+    "height_m",
+    "cx",
+    "cy",
+    "modified",
+    "footprint_license",
+    "height_license",
+    "state"
+  ],
+  "bounds": [
+    -125,
+    24,
+    -66,
+    50
+  ],
+  "minzoom": 10,
+  "maxzoom": 15,
+  "source_manifest_sha256": "f496596a4a78e1dbbae1db41e76cac6e7524ceb4ee0b6cfa75b7b26d6ab3e8d1",
+  "display_only": true,
+  "geometry_policy": "Tiles may be clipped or simplified; low zoom density reduction. Original full polygons remain in GeoParquet.",
+  "benchmark": false,
+  "sha256": "1efa1809528d49af890fafe7db834cdc0bce09b3e7c6ff8970cf59ba58204c7f",
+  "bytes": 33960614346,
+  "input_buildings": 150261726,
+  "partial_display": false,
+  "tippecanoe": {
+    "producer_kind": "national-tile-merge-with-derived-readonly-repack",
+    "derived": true,
+    "validation_status": "accepted-readonly-repack",
+    "tile_merge_producer": {
+      "schema_version": 1,
+      "producer_kind": "derived-opt-in-sqlite-batch",
+      "derived": true,
+      "validation_status": "accepted-semantic-ab",
+      "base_commit": "68ab8dcc229f95b8b25877697d5e8d66783af503",
+      "original_archive_sha256": "719b6d7b98f6be8aef102c75960cf91f5cb8bdbb2516f442b5668dcf1e181265",
+      "patch_sha256": "10ebd90a913cda80a10fde8b242d3eb0259b7f143f55a6941c78ac0ca47f10df",
+      "opt_in_env": {
+        "TIPPECANOE_SQLITE_BATCH": "1"
+      },
+      "modified_sources": [
+        {
+          "name": "mbtiles.cpp",
+          "base_sha256": "52569237f2ccb1dab7a90583d5a4f9a30eb3f6822faf5227e35d0445a4bc9a10",
+          "derived_sha256": "5ea02a0b1e2a3df8735254a3f961bf95f674dee12cabbf6ad436cf37dfb0f9bd"
+        }
+      ],
+      "binaries_sha256": {
+        "tippecanoe": "0a341c33a0492246f91e17331da49435f72ecba137c8e56565773425613d4ce2",
+        "tippecanoe-decode": "435cca4ad3f7af36fe02c6088dc65574498c0fa4e803a7227e520acc61d047c4",
+        "tile-join": "64e9ce3933848303bc76aea257fc06bc019579bc7aeda47df5d0d2ccc2d383ec"
+      },
+      "validation": {
+        "status": "passed",
+        "addressed_tiles": 10269,
+        "byte_identical_pbf_tiles": 10269,
+        "semantically_equal_reordered_tiles": 0,
+        "scope": "Every tile; geometry command arrays, typed original attributes, IDs and layer metadata; ignores feature/dictionary ordering and gzip container bytes.",
+        "input_buildings": 1000000,
+        "source_samples": 32,
+        "maxzoom_strategy": {}
+      }
+    },
+    "repack": {
+      "source_sha256": "a1dd6b44133dfdf3520a95e8f4d62e5628491232750abb3eb6ff8458d6e87bb9",
+      "base_driver_source_sha256": "f3303f8053061e6b3dc651eaa30407d074ef3ddcca7d72f753e00820f08189b2",
+      "promotion_patch_sha256": "35073187df8791b4b911cbaaa9cb550734db3b73d064fb59695ac28b6a81fdf3",
+      "binary_sha256": "bbd4c0f96da005b8519a48603bc1dcfada23f59e0ade40027b9b8a1354ec9754",
+      "verifier_sha256": "47a1bd88f2e72fa0c690ddebb326d921fcb156821dd3b4bba48ed558d15d3447",
+      "base_verifier_sha256": "73e996aac61665fcbc15308c50f02f566570a42237e8a70a065b25a6e4136225",
+      "readonly_cache_KiB": 67108864,
+      "readonly_cache_patch_sha256": "343ba37056aecf73bcd70acc75e6c2e598647032f305143b3b2f46fb5ed23648",
+      "promotion": "atomic-no-overwrite-link-closed-stage-retained",
+      "validation": {
+        "checked_tiles": 5775467,
+        "tiles_by_zoom": {
+          "10": 9109,
+          "11": 34873,
+          "12": 128522,
+          "13": 435194,
+          "14": 1362307,
+          "15": 3805462
+        },
+        "coordinate_payload_sha256": "dfd5f3e58da9dd65a1d17842a8b54135cccd6d38fb744059f57d89b24a71a9b6"
+      },
+      "payload_change_tolerance": 0,
+      "metadata_exact_to_sealed_sqlite": true,
+      "official_calibration": {
+        "checked_tiles": 1527073,
+        "coordinate_payload_sha256": "cfe6f6da69e6f91f36caba6c29b6bfebcffd54537da61933b53f87773017b6db"
+      }
+    }
+  },
+  "source_parts": [
+    {
+      "sha256": "56a8700074845921e8c23274680a3f0785a1a7bfa34201bfa635069c7493de00",
+      "actual_parser_rows": 37565430,
+      "original_shards": [
+        "part-000.geojsonseq",
+        "part-004.geojsonseq",
+        "part-008.geojsonseq",
+        "part-012.geojsonseq"
+      ],
+      "producer": {
+        "project": "felt/tippecanoe",
+        "release": "2.79.0",
+        "commit": "68ab8dcc229f95b8b25877697d5e8d66783af503",
+        "source_url": "https://codeload.github.com/felt/tippecanoe/tar.gz/68ab8dcc229f95b8b25877697d5e8d66783af503",
+        "archive_sha256": "719b6d7b98f6be8aef102c75960cf91f5cb8bdbb2516f442b5668dcf1e181265",
+        "archive_bytes": 25917103
+      }
+    },
+    {
+      "sha256": "eb6f62207a83665d0714117472650d5500c854d7f4f059aae4ec17285f3470f5",
+      "actual_parser_rows": 37565432,
+      "original_shards": [
+        "part-001.geojsonseq",
+        "part-005.geojsonseq",
+        "part-009.geojsonseq",
+        "part-013.geojsonseq"
+      ],
+      "producer": {
+        "producer_kind": "stock-tile-producer-with-derived-readonly-repack",
+        "derived": true,
+        "validation_status": "accepted-readonly-repack",
+        "tile_producer": {
+          "project": "felt/tippecanoe",
+          "release": "2.79.0",
+          "commit": "68ab8dcc229f95b8b25877697d5e8d66783af503",
+          "source_url": "https://codeload.github.com/felt/tippecanoe/tar.gz/68ab8dcc229f95b8b25877697d5e8d66783af503",
+          "archive_sha256": "719b6d7b98f6be8aef102c75960cf91f5cb8bdbb2516f442b5668dcf1e181265"
+        },
+        "repack": {
+          "source_sha256": "f3303f8053061e6b3dc651eaa30407d074ef3ddcca7d72f753e00820f08189b2",
+          "binary_sha256": "656c70f36d8504ddd741797ff64d59bf77a32f1a4918693793177922c8464496",
+          "verifier_sha256": "73e996aac61665fcbc15308c50f02f566570a42237e8a70a065b25a6e4136225",
+          "validation": {
+            "checked_tiles": 1485247,
+            "tiles_by_zoom": {
+              "10": 4378,
+              "11": 12447,
+              "12": 38097,
+              "13": 118178,
+              "14": 353275,
+              "15": 958872
+            },
+            "coordinate_payload_sha256": "efe7a1fa975f531b717d83586d25c6507fb6dbb2ef67590956a728c75d39ea52"
+          },
+          "official_calibration": {
+            "checked_tiles": 1527073,
+            "coordinate_payload_sha256": "cfe6f6da69e6f91f36caba6c29b6bfebcffd54537da61933b53f87773017b6db"
+          },
+          "promotion": "atomic-no-replace-hardlink-stage-retained",
+          "payload_change_tolerance": 0,
+          "official_header_rounding_tolerance_degrees": 6e-07
+        }
+      }
+    },
+    {
+      "sha256": "101c35ea38bbce29d5d8d79ec250d28b216f83bcbe6c5f9b2339bf33f339ba23",
+      "actual_parser_rows": 37565433,
+      "original_shards": [
+        "part-003.geojsonseq",
+        "part-007.geojsonseq",
+        "part-011.geojsonseq",
+        "part-015.geojsonseq"
+      ],
+      "producer": {
+        "project": "felt/tippecanoe",
+        "release": "2.79.0",
+        "commit": "68ab8dcc229f95b8b25877697d5e8d66783af503",
+        "source_url": "https://codeload.github.com/felt/tippecanoe/tar.gz/68ab8dcc229f95b8b25877697d5e8d66783af503",
+        "archive_sha256": "719b6d7b98f6be8aef102c75960cf91f5cb8bdbb2516f442b5668dcf1e181265",
+        "archive_bytes": 25917103
+      }
+    },
+    {
+      "sha256": "275dbb94041493dbbbdbccb2242bb94c85d5c5b88db1fb414379f289b6682f45",
+      "actual_parser_rows": 9391358,
+      "original_shards": [
+        "part-002.geojsonseq"
+      ],
+      "producer": {
+        "schema_version": 1,
+        "producer_kind": "derived-opt-in-sqlite-batch",
+        "derived": true,
+        "validation_status": "accepted-semantic-ab",
+        "base_commit": "68ab8dcc229f95b8b25877697d5e8d66783af503",
+        "original_archive_sha256": "719b6d7b98f6be8aef102c75960cf91f5cb8bdbb2516f442b5668dcf1e181265",
+        "patch_sha256": "10ebd90a913cda80a10fde8b242d3eb0259b7f143f55a6941c78ac0ca47f10df",
+        "opt_in_env": {
+          "TIPPECANOE_SQLITE_BATCH": "1"
+        },
+        "modified_sources": [
+          {
+            "name": "mbtiles.cpp",
+            "base_sha256": "52569237f2ccb1dab7a90583d5a4f9a30eb3f6822faf5227e35d0445a4bc9a10",
+            "derived_sha256": "5ea02a0b1e2a3df8735254a3f961bf95f674dee12cabbf6ad436cf37dfb0f9bd"
+          }
+        ],
+        "binaries_sha256": {
+          "tippecanoe": "0a341c33a0492246f91e17331da49435f72ecba137c8e56565773425613d4ce2",
+          "tippecanoe-decode": "435cca4ad3f7af36fe02c6088dc65574498c0fa4e803a7227e520acc61d047c4",
+          "tile-join": "64e9ce3933848303bc76aea257fc06bc019579bc7aeda47df5d0d2ccc2d383ec"
+        },
+        "validation": {
+          "status": "passed",
+          "addressed_tiles": 10269,
+          "byte_identical_pbf_tiles": 10269,
+          "semantically_equal_reordered_tiles": 0,
+          "scope": "Every tile; geometry command arrays, typed original attributes, IDs and layer metadata; ignores feature/dictionary ordering and gzip container bytes.",
+          "input_buildings": 1000000,
+          "source_samples": 32,
+          "maxzoom_strategy": {}
+        }
+      }
+    },
+    {
+      "sha256": "432f61427450ad1c639ea2c9d83fce729cdf131561f1f7b1277d689158492c0e",
+      "actual_parser_rows": 9391358,
+      "original_shards": [
+        "part-006.geojsonseq"
+      ],
+      "producer": {
+        "schema_version": 1,
+        "producer_kind": "derived-opt-in-sqlite-batch",
+        "derived": true,
+        "validation_status": "accepted-semantic-ab",
+        "base_commit": "68ab8dcc229f95b8b25877697d5e8d66783af503",
+        "original_archive_sha256": "719b6d7b98f6be8aef102c75960cf91f5cb8bdbb2516f442b5668dcf1e181265",
+        "patch_sha256": "10ebd90a913cda80a10fde8b242d3eb0259b7f143f55a6941c78ac0ca47f10df",
+        "opt_in_env": {
+          "TIPPECANOE_SQLITE_BATCH": "1"
+        },
+        "modified_sources": [
+          {
+            "name": "mbtiles.cpp",
+            "base_sha256": "52569237f2ccb1dab7a90583d5a4f9a30eb3f6822faf5227e35d0445a4bc9a10",
+            "derived_sha256": "5ea02a0b1e2a3df8735254a3f961bf95f674dee12cabbf6ad436cf37dfb0f9bd"
+          }
+        ],
+        "binaries_sha256": {
+          "tippecanoe": "0a341c33a0492246f91e17331da49435f72ecba137c8e56565773425613d4ce2",
+          "tippecanoe-decode": "435cca4ad3f7af36fe02c6088dc65574498c0fa4e803a7227e520acc61d047c4",
+          "tile-join": "64e9ce3933848303bc76aea257fc06bc019579bc7aeda47df5d0d2ccc2d383ec"
+        },
+        "validation": {
+          "status": "passed",
+          "addressed_tiles": 10269,
+          "byte_identical_pbf_tiles": 10269,
+          "semantically_equal_reordered_tiles": 0,
+          "scope": "Every tile; geometry command arrays, typed original attributes, IDs and layer metadata; ignores feature/dictionary ordering and gzip container bytes.",
+          "input_buildings": 1000000,
+          "source_samples": 32,
+          "maxzoom_strategy": {}
+        }
+      }
+    },
+    {
+      "sha256": "5cabbe9d47094cc0c371b82f435faf472ea4179f3335bf630e4354f97ad068ac",
+      "actual_parser_rows": 9391358,
+      "original_shards": [
+        "part-010.geojsonseq"
+      ],
+      "producer": {
+        "schema_version": 1,
+        "producer_kind": "derived-opt-in-sqlite-batch",
+        "derived": true,
+        "validation_status": "accepted-semantic-ab",
+        "base_commit": "68ab8dcc229f95b8b25877697d5e8d66783af503",
+        "original_archive_sha256": "719b6d7b98f6be8aef102c75960cf91f5cb8bdbb2516f442b5668dcf1e181265",
+        "patch_sha256": "10ebd90a913cda80a10fde8b242d3eb0259b7f143f55a6941c78ac0ca47f10df",
+        "opt_in_env": {
+          "TIPPECANOE_SQLITE_BATCH": "1"
+        },
+        "modified_sources": [
+          {
+            "name": "mbtiles.cpp",
+            "base_sha256": "52569237f2ccb1dab7a90583d5a4f9a30eb3f6822faf5227e35d0445a4bc9a10",
+            "derived_sha256": "5ea02a0b1e2a3df8735254a3f961bf95f674dee12cabbf6ad436cf37dfb0f9bd"
+          }
+        ],
+        "binaries_sha256": {
+          "tippecanoe": "0a341c33a0492246f91e17331da49435f72ecba137c8e56565773425613d4ce2",
+          "tippecanoe-decode": "435cca4ad3f7af36fe02c6088dc65574498c0fa4e803a7227e520acc61d047c4",
+          "tile-join": "64e9ce3933848303bc76aea257fc06bc019579bc7aeda47df5d0d2ccc2d383ec"
+        },
+        "validation": {
+          "status": "passed",
+          "addressed_tiles": 10269,
+          "byte_identical_pbf_tiles": 10269,
+          "semantically_equal_reordered_tiles": 0,
+          "scope": "Every tile; geometry command arrays, typed original attributes, IDs and layer metadata; ignores feature/dictionary ordering and gzip container bytes.",
+          "input_buildings": 1000000,
+          "source_samples": 32,
+          "maxzoom_strategy": {}
+        }
+      }
+    },
+    {
+      "sha256": "3fa410eb2e417ff7fc4133cc7c6f80377e1415a7ca924d1340e483d5bdad3024",
+      "actual_parser_rows": 9391357,
+      "original_shards": [
+        "part-014.geojsonseq"
+      ],
+      "producer": {
+        "schema_version": 1,
+        "producer_kind": "derived-opt-in-sqlite-batch",
+        "derived": true,
+        "validation_status": "accepted-semantic-ab",
+        "base_commit": "68ab8dcc229f95b8b25877697d5e8d66783af503",
+        "original_archive_sha256": "719b6d7b98f6be8aef102c75960cf91f5cb8bdbb2516f442b5668dcf1e181265",
+        "patch_sha256": "10ebd90a913cda80a10fde8b242d3eb0259b7f143f55a6941c78ac0ca47f10df",
+        "opt_in_env": {
+          "TIPPECANOE_SQLITE_BATCH": "1"
+        },
+        "modified_sources": [
+          {
+            "name": "mbtiles.cpp",
+            "base_sha256": "52569237f2ccb1dab7a90583d5a4f9a30eb3f6822faf5227e35d0445a4bc9a10",
+            "derived_sha256": "5ea02a0b1e2a3df8735254a3f961bf95f674dee12cabbf6ad436cf37dfb0f9bd"
+          }
+        ],
+        "binaries_sha256": {
+          "tippecanoe": "0a341c33a0492246f91e17331da49435f72ecba137c8e56565773425613d4ce2",
+          "tippecanoe-decode": "435cca4ad3f7af36fe02c6088dc65574498c0fa4e803a7227e520acc61d047c4",
+          "tile-join": "64e9ce3933848303bc76aea257fc06bc019579bc7aeda47df5d0d2ccc2d383ec"
+        },
+        "validation": {
+          "status": "passed",
+          "addressed_tiles": 10269,
+          "byte_identical_pbf_tiles": 10269,
+          "semantically_equal_reordered_tiles": 0,
+          "scope": "Every tile; geometry command arrays, typed original attributes, IDs and layer metadata; ignores feature/dictionary ordering and gzip container bytes.",
+          "input_buildings": 1000000,
+          "source_samples": 32,
+          "maxzoom_strategy": {}
+        }
+      }
+    }
+  ],
+  "maxzoom_reduction": {
+    "dropped_by_rate": 0,
+    "dropped_by_gamma": 0,
+    "dropped_as_needed": 0,
+    "coalesced_as_needed": 0,
+    "tiny_polygons": 0,
+    "truncated_zooms": 0
+  },
+  "compressed_tiles": {
+    "maximum_bytes": 3864088,
+    "histogram": {
+      "<64KiB": 5690422,
+      "64-256KiB": 73840,
+      "256KiB-500000B": 8077,
+      "500000B-1MiB": 2616,
+      "1MiB-2500000B": 510,
+      "2500000B-10MiB": 2,
+      ">=10MiB": 0
+    }
+  },
+  "url": "https://data.source.coop/opengeos/us-buildings/USBF_display/releases/20261028T223450Z-1efa1809528d49af-eaad3f5061ec/buildings.pmtiles"
+}

@@ -5,6 +5,7 @@
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  function format(layer){
   const c=layer?.cfg||{};
+  if(c.nativeSource)return (c.nativeSource.format||'GeoParquet')+' · native';
   if(layer?.renderTiled)return 'PMTiles';
   if(c.raster?.format)return c.raster.format;
   if(c.type==='raster'&&c.service==='wms')return 'WMS';
@@ -15,6 +16,8 @@
  function describe(layer,{catalog=false}={}){
   const c=layer?.cfg||{},cap=root.PortalAnalysisData?.capabilities(layer)||{},fileFormat=format(layer);
   const demand=cap.kind==='on-demand'||catalog&&c.driver==='usbf';
+  if(c.nativeSource)return {kind:'native',label:'Native result · bounded map preview',format:fileFormat,note:'Complete records stay in the local Results file. The map shows a bounded preview; tables and processing use the full native result.'};
+  if(cap.kind==='native-preview')return {kind:'preview',label:'Bounded native preview',format:fileFormat,note:'This shared preview contains display records only. The full native result is a separate local dependency.'};
   if(root.PortalDataWorkspace?.isArea(layer))return {kind:'original',label:'Saved study area',format:fileFormat,note:'Saved boundary · not building records'};
   if(c.type==='viewport'&&!demand)return {kind:!catalog&&(layer.viewLoading||layer.error||layer.loaded===false)?'pending':layer.viewLimited?'partial':'preview',label:!catalog&&(layer.viewLoading||layer.error||layer.loaded===false)?'Live cache loading or unavailable':layer.viewLimited?'Partial live cache':'Live source cache',format:fileFormat,note:'Display scope follows the map; create a fixed analysis workset before analysis.',action:'load',actionLabel:'Create analysis workset'};
   if(demand)return {kind:'preview',label:'Map preview',format:layer?.renderTiled||catalog?'PMTiles':fileFormat,note:'For building counts, areas and spatial tools, load original records for an area.',action:'load',actionLabel:'Load area & analyze'};
@@ -34,6 +37,7 @@
   const button=(action,label,disabled=false)=>'<button type="button" class="layer-purpose-action" data-purpose-action="'+action+'" data-purpose-layer="'+esc(id)+'" '+(disabled?'disabled':'')+' data-i18n>'+esc(label)+'</button>';
   let actions='';
   if(id&&options.actions!==false){
+   if(layer.cfg.nativeSource)actions=button('native-table','View full result table')+button('native-process','Process full native result');
    if(state.action)actions=button('data','Load analyzable data',loading)+button(state.action,state.actionLabel,loading);
    if(cap.geometryAnalysis&&cap.kind!=='on-demand'&&layer.cfg.type==='viewport')actions+=button('data','Load another range',loading);
    if(cap.geometryAnalysis&&cap.kind!=='on-demand'&&['geojson','viewport'].includes(layer.cfg.type))actions+=button('table','View attribute table',layer.cfg.type==='viewport'&&(layer.viewLoading||!layer.loaded||layer.error));
@@ -53,6 +57,8 @@
  function act(layer,action){
   if(!layer||root.PortalLayers?.layers.get(layer.id)!==layer)return;
   if(['data','load','original'].includes(action)&&root.PortalDataWorkspace){root.PortalDataWorkspace.open({layer});return;}
+  if(action==='native-table'){root.PortalTasks.openNativeTable(layer).catch(e=>root.portal?.toast(e.message));return;}
+  if(action==='native-process'){root.PortalLayers.selectLayer(layer.id);root.PortalGIS.open('extract-mask');return;}
   if(action==='data'){root.PortalAnalysisLayers?.open(layer);return;}
   if(action==='cancel-data'){root.PortalAnalysisLayers?.cancel(layer);return;}
   if(action==='table'){root.PortalInventory?.openTable(layer.id,{scope:'loaded'});return;}

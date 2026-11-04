@@ -7,7 +7,7 @@
   const attributeNames = ['title', 'aria-label', 'placeholder'];
   const selector = '[data-i18n],[data-i18n-system],' + attributeNames.map(name => '[data-i18n-' + name + ']').join(',');
   let locale = 'en', observer;
-  try { const saved = localStorage.getItem(storageKey); if (supported.includes(saved)) locale = saved; } catch (_) {}
+  try { const saved = globalThis.PortalReadOnlyMode ? null : localStorage.getItem(storageKey); if (supported.includes(saved)) locale = saved; } catch (_) {}
 
   // Interpolated values are copied verbatim, including field names, places and model names.
   const patterns = [
@@ -98,7 +98,7 @@
   function setLocale(value) {
     if (!supported.includes(value)) return false;
     locale = value;
-    try { localStorage.setItem(storageKey, value); } catch (_) {}
+    try { if (!globalThis.PortalReadOnlyMode) localStorage.setItem(storageKey, value); } catch (_) {}
     update();
     document.dispatchEvent(new CustomEvent('portal-language-changed', { detail: { locale } }));
     return true;

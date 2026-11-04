@@ -3,6 +3,11 @@
 (function(root){
  'use strict';
  const FOLDERS=Object.freeze({Projects:'Projects',Results:'Results',Cache:'Cache',Files:'Files',Engine:'Engine'}),DB='usbf-local-workspace-v1',STORE='connection',CACHE=['Cache','browser-v1'],INDEX='usbf-cache-index.json',FORMAT='USBF browser cache',MAX_LIST=500,MAX_CACHE=256*1024*1024,MAX_PROJECT=80*1024*1024;
+ if(root.PortalReadOnlyMode){
+  const status=()=>({supported:false,connected:false,permission:'denied',rootName:null,folders:{...FOLDERS},persisted:false,readonly:true});
+  const unavailable=async()=>{throw Error('Local files are unavailable in a shared read-only map.');};
+  root.PortalLocalFiles={supported:false,status,ready:async()=>status(),...Object.fromEntries(['chooseRoot','reconnect','disconnect','list','getFile','saveProject','writeResult','importFile','mkdir','rename','deleteFile','writeCache','cacheInventory','clearCache'].map(key=>[key,unavailable]))};return;
+ }
  const ownerSecrets=new Map();
  let directory=null,permission='prompt',persisted=false,opening=null,initializing=null,queue=Promise.resolve();
  const supported=typeof root.showDirectoryPicker==='function';
@@ -10,7 +15,7 @@
  function changed(action){root.document?.dispatchEvent(new root.CustomEvent('portal-local-files-changed',{detail:{action,...status()}}));}
  function fail(text,code){const e=Error(text);if(code)e.code=code;return e;}
  function name(v){if(typeof v!=='string'||!v||v.length>200||v!==v.trim()||/[\\/:*?"<>|\x00-\x1f\x7f]/.test(v)||/[. ]$/.test(v)||v.startsWith('.')||['__proto__','prototype','constructor'].includes(v.toLowerCase())||/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(v))throw fail('Choose a valid file or folder name.');return v;}
- function path(value,{empty=false,write=false}={}){if(!Array.isArray(value)||(!empty&&!value.length)||value.length>24)throw fail('Choose a path inside the connected USBF folder.');const p=value.map(name);if(p.length&&!Object.hasOwn(FOLDERS,p[0]))throw fail('Choose a path inside a USBF workspace folder.');if(write&&p[0]==='Engine')throw fail('Engine files are managed by the native installer.');return p;}
+ function path(value,{empty=false,write=false}={}){if(!Array.isArray(value)||(!empty&&!value.length)||value.length>24)throw fail('Choose a path inside the connected USBF folder.');const p=value.map(name);if(p.length&&!Object.hasOwn(FOLDERS,p[0]))throw fail('Choose a path inside a USBF workspace folder.');if(write&&p[0]==='Engine')throw fail('Engine files are managed by the native installer.');if(write&&p[0]==='Cache'&&p[1]==='native-jobs')throw fail('Native task checkpoints are managed by the local engine.');return p;}
  function safeError(e){if(e?.name==='AbortError')return e;if(['NotAllowedError','SecurityError'].includes(e?.name)){permission='prompt';changed('permission');return fail('Folder access is unavailable. Reconnect and allow access to the USBF folder.','LOCAL_PERMISSION');}if(e?.name==='NotFoundError')return fail('This local file or folder no longer exists. Refresh the file list.','LOCAL_NOT_FOUND');if(e?.name==='QuotaExceededError')return fail('The selected disk has insufficient space. Choose another workspace folder.');return e;}
  function database(){if(opening)return opening;opening=new Promise((resolve,reject)=>{if(!root.indexedDB){reject(fail('This browser cannot remember the folder.'));return;}const r=root.indexedDB.open(DB,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE);r.onerror=()=>reject(r.error);r.onblocked=()=>reject(fail('Close other USBF tabs and reconnect the folder.'));r.onsuccess=()=>{const db=r.result;db.onversionchange=()=>{db.close();opening=null;};resolve(db);};}).catch(e=>{opening=null;throw e;});return opening;}
  async function connectionRecord(value,write=false,key='root'){const db=await database();return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,write?'readwrite':'readonly'),store=tx.objectStore(STORE),r=write?(value?store.put(value,key):store.delete(key)):store.get(key);tx.oncomplete=()=>resolve(r.result);tx.onerror=tx.onabort=()=>reject(tx.error||fail('The folder connection could not be remembered.'));});}

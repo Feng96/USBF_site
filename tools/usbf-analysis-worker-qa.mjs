@@ -21,25 +21,26 @@ const bootstrap=String.raw`
 import {parentPort,workerData} from 'node:worker_threads';
 import fs from 'node:fs';
 const bytes=fs.readFileSync(workerData.file),held=new Map();
-let etag='"qa-release-a"',holdNext=false,fetchSequence=0;
+let etag='"qa-release-a"',holdNext=false,fetchSequence=0,corrupt=false;
 globalThis.self=globalThis;
 globalThis.postMessage=message=>parentPort.postMessage(message);
 globalThis.fetch=async(raw,options={})=>{
   const url=String(raw),range=new Headers(options.headers).get('range');
   if(url!==workerData.expectedURL||options.credentials!=='omit')throw Error('Unexpected fixture network request.');
   const match=/^bytes=(\d+)-(\d+)$/.exec(range||'');
-  if(!match)throw Error('The real worker did not request an explicit HTTP byte range.');
-  const start=Number(match[1]),end=Number(match[2])+1;
+  if(range&&!match)throw Error('The real worker requested an invalid HTTP byte range.');
+  const start=match?Number(match[1]):0,end=match?Number(match[2])+1:bytes.byteLength;
   if(start<0||end>bytes.byteLength||end<=start)throw Error('Invalid fixture range.');
   if(options.signal?.aborted)throw new DOMException('Fixture request cancelled.','AbortError');
   const fetchId=++fetchSequence,tag=etag;
-  parentPort.postMessage({qa:'fetch',fetchId,start,end,etag:tag});
+  parentPort.postMessage({qa:'fetch',fetchId,start,end,etag:tag,full:!match});
   if(holdNext){
     holdNext=false;
     // Deliberately fulfill after cancellation to test the worker's own guard.
     await new Promise(resolve=>{held.set(fetchId,resolve);parentPort.postMessage({qa:'held',fetchId,start,end});});
   }
-  return new Response(bytes.subarray(start,end),{status:206,headers:{'content-type':'application/vnd.apache.parquet','content-range':'bytes '+start+'-'+(end-1)+'/'+bytes.byteLength,'content-length':String(end-start),etag:tag}});
+  const body=Buffer.from(bytes.subarray(start,end));if(corrupt&&body.length>8)body[8]^=1;
+  return new Response(body,{status:match?206:200,headers:{'content-type':'application/vnd.apache.parquet',...(match?{'content-range':'bytes '+start+'-'+(end-1)+'/'+bytes.byteLength}:{}),'content-length':String(end-start),etag:tag}});
 };
 await import(workerData.workerURL);
 parentPort.on('message',async message=>{
@@ -48,6 +49,7 @@ parentPort.on('message',async message=>{
       if(message.action==='hold-next')holdNext=true;
       else if(message.action==='release'){for(const resolve of held.values())resolve();held.clear();}
       else if(message.action==='etag')etag=message.value;
+      else if(message.action==='corrupt')corrupt=message.value;
       else if(message.action==='clear-cache')await self.onmessage({data:{type:'clear-cache'}});
       else throw Error('Unknown QA control.');
       parentPort.postMessage({qa:'ack',controlId:message.controlId});
@@ -90,6 +92,10 @@ try{
   ok(main.messages.some(m=>m.id==='original-near'&&m.progress?.done===1)&&main.messages.some(m=>m.qa==='fetch'&&m.end-m.start===tile.bytes),'Actual worker progress and full native footer-range fetching are observable without replacing the parser');
   const cached=await main.request('cached-near');same(cached.data.features,first.data.features,'A repeated explicit request returns the same complete original records');
   ok(cached.networkBytes===0&&cached.cacheHits>0,'Repeated original-data reads reuse cached real byte ranges without network transfer');
+  const pinned=await main.request('pinned-original',index.near.bounds,{verifyHashes:true});assert(!pinned.error,pinned.error);same(pinned.data.features,index.near.features,'A pinned read verifies the full real Parquet shard before decoding its original records');
+  ok(pinned.networkBytes===tile.bytes&&main.messages.some(m=>m.qa==='fetch'&&m.full),'A checksum-verified pinned browser read reports its actual full-shard transfer');
+  await main.control('corrupt',true);const hashChanged=await main.request('pinned-replaced-bytes',index.near.bounds,{verifyHashes:true});ok(hashChanged.code==='RELEASE_CHANGED'&&!hashChanged.data,'Changed pinned bytes fail SHA256 verification before they can replace a workset');await main.control('corrupt',false);
+  const tooLargePin=await main.request('pinned-needs-native',index.near.bounds,{verifyHashes:true,tiles:[{...tile,bytes:33*1024*1024}]});ok(tooLargePin.error?.includes('local engine')&&!tooLargePin.data,'A pinned shard beyond the browser budget explicitly requires the local engine');
   const selected=await main.request('selected-original',index.near.bounds,{featureId:'qa-courtyard'});same(selected.data.features,[courtyard],'Selecting a USBF ID returns only that complete original building and its courtyard rather than a display fragment');
   const missing=await main.request('missing-selection',index.near.bounds,{featureId:'not-a-real-qa-id'});ok(!missing.error&&missing.data.features.length===0,'An unknown selected identifier cannot fall back to unrelated original buildings');
 

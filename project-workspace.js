@@ -8,15 +8,20 @@
   let active = identity(), baseline = '', ready = false, dirty = false, busy = false, switching = false, timer, muted = 0, dialog, library = [], libraryGeneration = 0, confirmation;
   const objects = new WeakMap(); let objectSequence = 0;
   const objectID = value => { if (!objects.has(value)) objects.set(value, ++objectSequence); return objects.get(value); };
+  function releaseIdentity(layer) {
+    if(layer.cfg.driver!=='usbf'&&layer.cfg.id!=='usbf-live')return null;
+    const release=layer.renderTiled?layer.displayRelease:layer.release;
+    return release?{name:release.name,updated:release.updated,buildings:release.buildings,tiles:release.tiles,archiveSha256:layer.renderTiled?layer.usbfConnection?.display?.sha256||null:null}:null;
+  }
   function signature(name = active.name) {
     if (!root.portal?.ready) return '';
     const map = portal.map, center = map.getCenter(), round = value => Number(value.toFixed(7));
     return JSON.stringify({ name, camera: [center.lng, center.lat, map.getZoom(), map.getPitch(), map.getBearing()].map(round), basemap: portal.getBasemap(), customBasemap: root.PortalBasemaps?.current().config || null, basemapFile: root.PortalBasemaps?.current().file ? objectID(PortalBasemaps.current().file) : null, interface: root.PortalInterface?.getState() || null, view3d: portal.view3d, crs: PortalCRS.get(),
       active: PortalLayers.active?.id || null,
-      layers: Array.from(PortalLayers.layers.values(), l => ({ id: l.id, name: l.cfg.name, visible: l.visible, color: l.color, opacity: l.opacity, mode: l.colorMode, filter: l.sourceFilter || '', area: l.minArea || 0, height: l.heightField || null, data: l.cfg.type === 'geojson' ? objectID(l.data) : null, dataScope: l.cfg.type === 'geojson' ? [l.data?.provenance?.workspaceArea?.active||false,l.data?.provenance?.workspaceActiveWorkset||false] : null })),
+      layers: Array.from(PortalLayers.layers.values(), l => ({ id: l.id, name: l.cfg.name, visible: l.visible, color: l.color, opacity: l.opacity, mode: l.colorMode, filter: l.sourceFilter || '', area: l.minArea || 0, height: l.heightField || null, releaseRef:l.cfg.releaseRef||null,sourceRelease:releaseIdentity(l),data: l.cfg.type === 'geojson' ? objectID(l.data) : null, dataScope: l.cfg.type === 'geojson' ? [l.data?.provenance?.workspaceArea?.active||false,l.data?.provenance?.workspaceActiveWorkset||false] : null })),
       models: root.PortalLocalModels?.serializeModelEntries() || [],
       research: root.PortalModels?.enabled && PortalModels.current ? { id: PortalModels.current.id, method: PortalModels.method, edges: $('#model-edges').checked, roof: $('#model-roof-only').checked, visible: $('#model-visible').checked } : null,
-      legend: document.body.classList.contains('legend-visible'), layout: PortalComposer.projectOptions()
+      legend: document.body.classList.contains('legend-visible'), layout: PortalComposer.projectOptions(), dataPolicy: root.PortalProject?.getDataPolicy?.() || 'latest'
     });
   }
   function update() {
@@ -56,7 +61,7 @@
     return result;
   }
   async function saveCurrent(asCopy = false) {
-    if (busy || !ready) return false;
+    if (root.PortalReadOnlyMode || busy || !ready) return false;
     const next = asCopy ? identity((active.name + ' copy').slice(0, 120), { id: active.id, revision: active.revision }) : { ...active };
     const before = signature(next.name);
     setBusy(true); message('Saving project…');
@@ -74,7 +79,7 @@
     finally { setBusy(false); }
   }
   async function saveToFolder() {
-    if (busy || !ready) return false;
+    if (root.PortalReadOnlyMode || busy || !ready) return false;
     setBusy(true); message('Saving project file to Projects folder…');
     try { update(); const result = await capture(active, active.revision, dirty || active.revision === 0);
       const saved = await PortalLocalFiles.saveProject({ id: active.id, name: active.name, json: result.json, snapshot: true });
@@ -82,7 +87,7 @@
     } catch (error) { message(error.message, true); throw error; } finally { setBusy(false); }
   }
   async function exportCurrent() {
-    if (busy || !ready) return false;
+    if (root.PortalReadOnlyMode || busy || !ready) return false;
     setBusy(true); message('Preparing project file…');
     try { update(); const result = await capture(active, active.revision, dirty || active.revision === 0); saveFile(active.name, result.json); message('Project file downloaded. Send it to a teammate to open the same map.'); return result; }
     catch (error) { message(error.message, true); return false; }
@@ -112,12 +117,12 @@
       const result = await PortalProject.restore(prepared);
       active = next; baseline = signature();
       if ($('#project-name')) $('#project-name').value = active.name;
-      message('Project opened. Online sources reconnect to their latest publication.');
+      message(result.dependencies?.some(d=>!d.available)?'Project opened. Some native files are unavailable; saved previews remain display-only.':'Project opened. Pinned sources retain their saved release; latest sources reconnect explicitly.');
       return result;
     } finally { muted--; setBusy(false); }
   }
   async function openSaved(id) {
-    if (busy || switching || !ready) return false;
+    if (root.PortalReadOnlyMode || busy || switching || !ready) return false;
     switching = true; setBusy(true);
     try {
       // Validate every record and asset before asking to replace current work.
@@ -130,7 +135,7 @@
     finally { switching = false; if (busy) setBusy(false); }
   }
   async function openFile(file) {
-    if (busy || switching || !file || !ready) return false;
+    if (root.PortalReadOnlyMode || busy || switching || !file || !ready) return false;
     switching = true; setBusy(true);
     try {
       if (file.size > PortalProjectCore.limits.file) throw Error('Choose a saved map smaller than 80 MB.');
@@ -141,7 +146,7 @@
       await loadPrepared(prepared, identity(p.name, p.projectInfo ? { id: p.projectInfo.id, revision: p.projectInfo.revision } : undefined));
       // An imported file is a separate local project until explicitly saved.
       baseline = ''; update();
-      message('Project file opened as a separate copy. Save it to keep it in this browser.');
+      message(prepared.dependencies?.some(d=>!d.available)?'Project file opened as a separate copy. Some native files are unavailable; saved previews remain display-only.':'Project file opened as a separate copy. Save it to keep it in this browser.');
       return true;
     } catch (error) { message(error instanceof SyntaxError ? 'This file is not a valid USBF map. Choose a .usbf.json file.' : error.message, true); return false; }
     finally { switching = false; if (busy) setBusy(false); if ($('#project-file')) $('#project-file').value = ''; }
@@ -201,13 +206,14 @@
     dialog = document.createElement('dialog'); dialog.id = 'map-project-dialog'; dialog.className = 'workspace-dialog project-dialog'; dialog.setAttribute('aria-labelledby', 'map-project-title');
     dialog.innerHTML = `<div class="workspace-dialog-heading"><div><h2 id="map-project-title" data-i18n>Projects</h2><p class="project-subheading" data-project-status data-i18n-system></p></div><button type="button" data-close-project aria-label="Close saved maps" data-i18n-aria-label>×</button></div>
       <div class="workspace-dialog-body"><div class="project-current-heading"><h3 data-i18n>Current project</h3><span id="project-current-revision" data-i18n-system></span><button type="button" id="project-new" data-i18n>New project</button></div>
-      <form id="project-save-form" class="workspace-form"><label data-i18n>Project name<input id="project-name" maxlength="120" required></label><div class="project-actions"><button class="primary" id="project-save-button" type="submit" data-i18n>Save project</button><button type="button" id="project-save-copy" data-i18n>Save a copy</button><button type="button" id="project-export-button" data-i18n>Export for sharing</button></div></form>
+      <form id="project-save-form" class="workspace-form"><label data-i18n>Project name<input id="project-name" maxlength="120" required></label><label><span data-i18n>Online data policy</span><select id="project-data-policy"><option value="pinned" data-i18n>Pin archived data releases</option><option value="latest" data-i18n>Follow latest sources</option></select></label><div class="project-actions"><button class="primary" id="project-save-button" type="submit" data-i18n>Save project</button><button type="button" id="project-save-copy" data-i18n>Save a copy</button><button type="button" id="project-export-button" data-i18n>Export for sharing</button></div></form>
       <p class="project-note" data-i18n>Save keeps a browser backup and also writes to Projects when a workspace folder is connected.</p><p id="project-folder-note" class="project-note" data-i18n-system></p><div class="project-actions"><button type="button" id="project-save-folder" data-i18n>Save project file to folder</button><button type="button" data-device-settings data-device-tab="files" data-i18n>Manage local files</button></div><p class="project-note" data-i18n>Team cloud sync is not connected. Opening a shared file creates a separate project copy.</p>
-      <div class="project-open-label"><strong data-i18n>Open project file</strong><input id="project-file" type="file" hidden accept=".usbf.json,.json,application/json"><button type="button" id="project-file-picker" data-i18n>Choose a file</button></div><p class="project-note" data-i18n>Layers, styles, view, drawings, models and map layout are included. Online sources reconnect to their latest publication.</p>
+      <div class="project-open-label"><strong data-i18n>Open project file</strong><input id="project-file" type="file" hidden accept=".usbf.json,.json,application/json"><button type="button" id="project-file-picker" data-i18n>Choose a file</button></div><p class="project-note" data-i18n>Layers, styles, view, drawings, models and map layout are included. Supported sources use the saved pinned or latest policy. Native previews require their original workspace for full analysis.</p>
       <p id="project-message" role="status" aria-live="polite" data-i18n-system></p><hr><div class="project-library-heading"><h3 data-i18n>Saved projects in this browser</h3><button type="button" id="project-library-refresh" data-i18n>Refresh</button></div><div id="project-library-list" class="project-library-list"></div><hr>
       <div class="project-actions"><button type="button" id="project-clear-cache" data-i18n>Clear cache</button></div><p class="project-note" data-i18n>Clear cache keeps your current work and saved projects. New project starts with an empty map.</p></div>`;
     document.body.append(dialog);
     dialog.querySelector('[data-close-project]').onclick = () => dialog.close();
+    $('#project-data-policy').onchange=event=>PortalProject.setDataPolicy(event.target.value);
     $('#project-name').oninput = event => { active.name = event.target.value.trim().slice(0, 120) || 'Untitled project'; schedule(); };
     $('#project-save-form').onsubmit = event => { event.preventDefault(); saveCurrent(); };
     $('#project-save-copy').onclick = () => saveCurrent(true);
@@ -225,12 +231,12 @@
     });
     return dialog;
   }
-  function open() { if (!ready) return; ensureDialog();const folder=root.PortalLocalFiles?.status();$('#project-folder-note').textContent=folder?.connected?folder.rootName+'/Projects':'No workspace folder connected. Choose one in Files & device.';$('#project-save-folder').disabled=!folder?.connected; $('#project-name').value = active.name; update(); renderLibrary(); if (!dialog.open) dialog.showModal(); }
+  function open() { if (!ready) return; ensureDialog();const folder=root.PortalLocalFiles?.status();$('#project-folder-note').textContent=folder?.connected?folder.rootName+'/Projects':'No workspace folder connected. Choose one in Files & device.';$('#project-save-folder').disabled=!folder?.connected; $('#project-name').value = active.name;$('#project-data-policy').value=PortalProject.getDataPolicy(); update(); renderLibrary(); if (!dialog.open) dialog.showModal(); }
   function init() {
-    if (ready || !root.portal?.ready) return;
+    if (root.PortalReadOnlyMode || ready || !root.portal?.ready) return;
     ready = true; baseline = signature(); update();
     portal.map.on('moveend', schedule);
-    for (const name of ['portal-layers-changed', 'portal-style-changed', 'portal-models-changed', 'portal-crs-changed', 'portal-presentation-changed','portal-basemap-changed','portal-interface-changed']) document.addEventListener(name, schedule);
+    for (const name of ['portal-layers-changed', 'portal-style-changed', 'portal-models-changed', 'portal-crs-changed', 'portal-presentation-changed','portal-basemap-changed','portal-interface-changed','portal-release-changed']) document.addEventListener(name, schedule);
     document.addEventListener('click', event => { if (event.target.closest('[data-action=legend],.legend-title')) schedule(); if (event.target.closest('[data-clear-cache]')) { document.querySelectorAll('details.tools-menu[open]').forEach(el => { el.open = false; }); clearCache(); } });
     document.addEventListener('portal-project-library-changed', event => { if (dialog?.open) renderLibrary(); if (event.detail?.id === active.id && event.detail.revision > active.revision && !busy) message('This project changed in another tab. Reopen it or save a copy.', true); });
     window.addEventListener('beforeunload', event => { update(); if (dirty) { event.preventDefault(); event.returnValue = ''; } });

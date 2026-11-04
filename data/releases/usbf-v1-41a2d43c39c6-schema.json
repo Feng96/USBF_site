@@ -1,0 +1,392 @@
+{
+  "crs": "EPSG:4326",
+  "tile_degrees": 0.5,
+  "fields": [
+    {
+      "name": "source",
+      "type": "string",
+      "nullable": true,
+      "description": "Inherited upstream footprint source label; common labels include osm, ms and ours2."
+    },
+    {
+      "name": "id",
+      "type": "string",
+      "nullable": true,
+      "description": "Inherited upstream feature identifier, stored as a string."
+    },
+    {
+      "name": "gba_region",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "cx",
+      "type": "double",
+      "nullable": true,
+      "description": "Inherited ownership longitude in degrees."
+    },
+    {
+      "name": "cy",
+      "type": "double",
+      "nullable": true,
+      "description": "Inherited ownership latitude in degrees."
+    },
+    {
+      "name": "geometry",
+      "type": "binary",
+      "nullable": true,
+      "description": "USBF footprint geometry, WKB in EPSG:4326."
+    },
+    {
+      "name": "usbf_id",
+      "type": "string",
+      "nullable": true,
+      "description": "Identifier for the published feature. Its construction is recorded in source_identity_basis."
+    },
+    {
+      "name": "original_wkb_sha",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "owner",
+      "type": "string",
+      "nullable": true,
+      "description": "Original 0.02-degree ownership cell used to assign each feature to one publication tile."
+    },
+    {
+      "name": "state",
+      "type": "string",
+      "nullable": true,
+      "description": "Two-letter assigned U.S. state or District of Columbia code."
+    },
+    {
+      "name": "circle_search_policy",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "circle_search_status",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "circle_gate_policy",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "circle_reference_manifest_sha256",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "circle_gate_applied",
+      "type": "bool",
+      "nullable": true
+    },
+    {
+      "name": "circle_proposed_before_gate",
+      "type": "bool",
+      "nullable": true
+    },
+    {
+      "name": "circle_gate_status",
+      "type": "string",
+      "nullable": true,
+      "description": "Recorded external-reference confirmation outcome for a circular or elliptical candidate."
+    },
+    {
+      "name": "circle_gate_reason",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "circle_gate_osm_type",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "circle_gate_osm_id",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "product_rule_version",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "geometry_fallback",
+      "type": "bool",
+      "nullable": true,
+      "description": "Whether a rejected geometry candidate was replaced by the source footprint."
+    },
+    {
+      "name": "geometry_fallback_reason",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "engineering_policy",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "height_coverage_status",
+      "type": "string",
+      "nullable": true,
+      "description": "Processing nDSM coverage category: complete, partial or missing."
+    },
+    {
+      "name": "height_valid_fraction",
+      "type": "double",
+      "nullable": true,
+      "description": "Fraction of original-footprint sampling pixels covered by valid processing nDSM, from 0 to 1."
+    },
+    {
+      "name": "height_missing",
+      "type": "bool",
+      "nullable": true,
+      "description": "Whether no valid processing nDSM pixels were available in the original footprint."
+    },
+    {
+      "name": "height_incomplete",
+      "type": "bool",
+      "nullable": true,
+      "description": "Whether processing nDSM coverage of the original footprint was incomplete."
+    },
+    {
+      "name": "height_coverage_pixels",
+      "type": "int64",
+      "nullable": true
+    },
+    {
+      "name": "rgb_valid_fraction",
+      "type": "double",
+      "nullable": true
+    },
+    {
+      "name": "context_height_incomplete",
+      "type": "bool",
+      "nullable": true
+    },
+    {
+      "name": "context_min_height_fraction",
+      "type": "double",
+      "nullable": true
+    },
+    {
+      "name": "inference_input_mode",
+      "type": "string",
+      "nullable": true,
+      "description": "Image/elevation input mode used for the feature, such as rgb_height, rgb_partial_height or rgb_only."
+    },
+    {
+      "name": "height_coverage_basis",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "height_coverage_is_accuracy",
+      "type": "bool",
+      "nullable": true
+    },
+    {
+      "name": "height_coverage_patch_ids",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "original_geometry",
+      "type": "binary",
+      "nullable": true,
+      "description": "Original GBA footprint geometry, WKB in EPSG:4326, where recorded."
+    },
+    {
+      "name": "modified",
+      "type": "bool",
+      "nullable": true,
+      "description": "Whether the footprint coordinate representation differs from the original GBA footprint, where recorded."
+    },
+    {
+      "name": "processing_status",
+      "type": "string",
+      "nullable": true,
+      "description": "Recorded footprint-processing outcome."
+    },
+    {
+      "name": "instance_guard_reverted",
+      "type": "bool",
+      "nullable": true
+    },
+    {
+      "name": "possible_small_FP",
+      "type": "bool",
+      "nullable": true,
+      "description": "Potential small false-positive flag; flagged features remain in the dataset."
+    },
+    {
+      "name": "circle_proposed",
+      "type": "bool",
+      "nullable": true
+    },
+    {
+      "name": "hollow_proposed",
+      "type": "bool",
+      "nullable": true
+    },
+    {
+      "name": "decision",
+      "type": "string",
+      "nullable": true,
+      "description": "Recorded footprint-selection or editing decision."
+    },
+    {
+      "name": "science_version",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "height_source",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "input_frame_ids",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "shape_changed",
+      "type": "bool",
+      "nullable": true,
+      "description": "Adopted circular or elliptical replacement flag; ordinary boundary edits can have this set to false."
+    },
+    {
+      "name": "hollow_cut",
+      "type": "bool",
+      "nullable": true,
+      "description": "Whether an interior opening was added to the footprint."
+    },
+    {
+      "name": "added_area_m2",
+      "type": "double",
+      "nullable": true,
+      "description": "Area added relative to the original GBA footprint, square metres, computed in EPSG:5070."
+    },
+    {
+      "name": "removed_area_m2",
+      "type": "double",
+      "nullable": true,
+      "description": "Area removed relative to the original GBA footprint, square metres, computed in EPSG:5070."
+    },
+    {
+      "name": "modification_type",
+      "type": "string",
+      "nullable": true,
+      "description": "Recorded edit category: unchanged, addition, removal, addition_and_removal, courtyard_opening, circle_or_ellipse or coordinate_only."
+    },
+    {
+      "name": "release_version",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "release_status",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "update_date",
+      "type": "string",
+      "nullable": true,
+      "description": "Recorded feature snapshot date."
+    },
+    {
+      "name": "footprint_license",
+      "type": "string",
+      "nullable": true,
+      "description": "License identifier for the footprint component; see LICENSES.md."
+    },
+    {
+      "name": "height",
+      "type": "double",
+      "nullable": true,
+      "description": "Inherited GBA building height in metres; upstream nulls and missing-value sentinels are retained."
+    },
+    {
+      "name": "var",
+      "type": "double",
+      "nullable": true
+    },
+    {
+      "name": "region",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "is_gba_only",
+      "type": "bool",
+      "nullable": true
+    },
+    {
+      "name": "gba_area_m2",
+      "type": "double",
+      "nullable": true
+    },
+    {
+      "name": "removed_by_small_area",
+      "type": "bool",
+      "nullable": true
+    },
+    {
+      "name": "trimmed_keep",
+      "type": "bool",
+      "nullable": true
+    },
+    {
+      "name": "STUSPS",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "NAME",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "gba_var",
+      "type": "double",
+      "nullable": true,
+      "description": "Inherited GBA var attribute; interpretation follows the upstream definition."
+    },
+    {
+      "name": "height_license",
+      "type": "string",
+      "nullable": true,
+      "description": "License identifier for the inherited height component; see LICENSES.md."
+    },
+    {
+      "name": "source_generation",
+      "type": "string",
+      "nullable": true,
+      "description": "Source snapshot identifier associated with this feature."
+    },
+    {
+      "name": "source_identity_basis",
+      "type": "string",
+      "nullable": true,
+      "description": "How the published feature identifier was constructed."
+    }
+  ],
+  "geometry": "Current USBF footprint WKB",
+  "original_geometry": "Original GBA WKB when available; unknown for legacy records",
+  "height": "Inherited GBA height; original sentinels retained",
+  "variance": "gba_var is the standardized inherited variance; legacy var remains available",
+  "missing_modern_attributes": "null, not inferred false or zero",
+  "height_unit": "metres",
+  "edit_area_unit": "square metres",
+  "edit_area_crs": "EPSG:5070",
+  "null_semantics": "A null attribute means not recorded; it is distinct from false and zero."
+}

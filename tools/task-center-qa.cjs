@@ -1,0 +1,30 @@
+const fs=require('fs'),vm=require('vm'),path=require('path'),assert=require('assert');
+const checks=[],ok=(v,m)=>{assert(v,m);checks.push(m);console.log('PASS',m);};
+const load=(file,extra={})=>{const c={URL,console};Object.defineProperties(c,Object.getOwnPropertyDescriptors(extra));vm.createContext(c);vm.runInContext(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),c);return c;};
+const N=load('local-engine-client.js').PortalNativeCore,T=load('task-center.js').PortalTasksCore;
+ok(N.endpoint()==='http://127.0.0.1:52763'&&N.endpoint('http://127.0.0.1:50001/')==='http://127.0.0.1:50001','Only a normalized loopback endpoint is accepted');
+for(const url of ['https://example.org','http://127.0.0.1.evil.test:52763','http://name:password@127.0.0.1:52763','http://127.0.0.1:52763/proxy','http://127.0.0.1:52763/?token=x'])assert.throws(()=>N.endpoint(url));
+ok(true,'Remote hosts, credentials, endpoint paths and query-string credentials cannot receive the local token');
+for(const value of ['/v1/../other','//other/v1/status','/v1/jobs/%2e%2e/status','/v1/status#fragment'])assert.throws(()=>N.safePath(value));
+ok(N.safePath('/v1/files/stat?path=Results%2Ffile..parquet').startsWith('/v1/files/stat'),'API traversal is rejected without rejecting ordinary dotted filenames in query data');
+const row={id:'browser:qa',execution:'browser',status:'completed',progress:{completedParts:3,plannedParts:4,failedParts:0,actualRows:90}};
+ok(T.normalize(row).status==='partial'&&row.status==='completed','An incomplete source plan cannot be displayed as completed, and normalization leaves the original receipt unchanged');
+ok(T.normalize({...row,progress:{completedParts:5,plannedParts:4}}).status==='partial','Contradictory part totals cannot silently become a completed task');
+ok(T.normalize({...row,progress:{completedParts:4,plannedParts:4,failedParts:1}}).status==='partial','A failed source part remains partial even if a reader reports a complete counter');
+ok(T.normalize({...row,progress:{completedParts:0,plannedParts:0,actualRows:0}}).status==='completed','A genuine empty completed request retains its zero count');
+ok(T.normalize({...row,progress:{actualRows:NaN}}).progress.actualRows===null,'Unknown record estimates remain unknown instead of becoming zero');
+const native=T.nativeRow({id:'job-1',operation:'load',status:'partial',token:'never-store',endpoint:'http://127.0.0.1:52763',progress:{completedParts:2,plannedParts:3,failedParts:1,actualRows:123},scope:{label:'County',geometry:{type:'Polygon',coordinates:[]},crs:'EPSG:4326'},parts:[{id:'part-3',error:'Failed part'}],capabilities:{resume:true}},'workspace-1');
+ok(native.id==='native:workspace-1:job-1'&&native.workspaceId==='workspace-1'&&native.capabilities.resume,'Native task identities are scoped to the actual workspace and retain real resume capability');
+ok(!JSON.stringify(native).includes('never-store')&&!JSON.stringify(native).includes('127.0.0.1')&&!native.scope.geometry,'Task history excludes native credentials and endpoint details and avoids copying large scope geometry');
+ok(T.estimatedLabel({estimatedRows:100000,estimatedBytes:5000,partCount:3}).exact===false,'Source estimates remain explicitly upper bounds before spatial filtering');
+ok(T.estimatedLabel({estimatedRows:0,estimatedBytes:1024,estimatedRowsComplete:false,estimatedBytesComplete:false}).rows===null&&T.estimatedLabel({estimatedRows:0,estimatedBytes:1024,estimatedRowsComplete:false,estimatedBytesComplete:false}).bytes===null,'Missing source counts cannot become a zero estimate or a false upper bound');
+for(const bad of [{...row,status:'pretend-complete'},{...row,execution:'cloud'},{...row,id:12}])assert.throws(()=>T.normalize(bad));ok(true,'Unknown task states and execution locations are rejected');
+let storageAccess=0,network=0;
+for(const file of ['local-engine-client.js','task-center.js','device-settings.js']){
+ const readonly=load(file,{PortalReadOnlyMode:true,document:{},get sessionStorage(){storageAccess++;throw Error('must not read credentials');},get indexedDB(){storageAccess++;throw Error('must not open database');},fetch(){network++;throw Error('must not connect');}});
+ if(file==='local-engine-client.js'){ok(readonly.PortalNativeEngine.status().readonly&&!readonly.PortalNativeEngine.status().connected,'A shared map cannot report a connected native engine');assert.throws(()=>readonly.PortalNativeEngine.pair('123456'),/read-only/);}
+ if(file==='task-center.js')assert.throws(()=>readonly.PortalTasks.open(),/read-only/);
+ if(file==='device-settings.js')assert.throws(()=>readonly.PortalDeviceSettings.open(),/read-only/);
+}
+ok(storageAccess===0&&network===0,'Read-only shared maps create no task database, read no pairing credentials and make no native network request');
+console.log(JSON.stringify({passed:true,checks:checks.length}));

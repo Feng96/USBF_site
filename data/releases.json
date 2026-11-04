@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "releases": [
+    {
+      "id": "usbf-v1-20261027-f496596a4a78",
+      "sourceId": "usbf-live",
+      "release": {
+        "name": "USBF_v1",
+        "updated": "2026-10-27T22:25:21.308964+00:00",
+        "buildings": 150261726,
+        "tiles": 3522
+      },
+      "original": {
+        "url": "data/releases/usbf-v1-f496596a4a78-original-manifest.json",
+        "sha256": "f496596a4a78e1dbbae1db41e76cac6e7524ceb4ee0b6cfa75b7b26d6ab3e8d1",
+        "sourceUrl": "https://data.source.coop/opengeos/us-buildings/USBF_v1/manifest.json",
+        "baseUrl": "https://data.source.coop/opengeos/us-buildings/USBF_v1/"
+      },
+      "display": {
+        "url": "data/releases/usbf-v1-a2f7afa583c7-display-manifest.json",
+        "sha256": "a2f7afa583c7f9f6136bae9e82eacb89ba978b6055d750315c95fba52eed4d22",
+        "sourceUrl": "https://data.source.coop/opengeos/us-buildings/USBF_display/manifest.json",
+        "archiveSha256": "1efa1809528d49af890fafe7db834cdc0bce09b3e7c6ff8970cf59ba58204c7f",
+        "archiveBytes": 33960614346
+      },
+      "crs": "EPSG:4326",
+      "rights": {
+        "statement": "Retain per-record component rights. Sharing a map does not relicense its data.",
+        "components": [
+          "ODbL 1.0",
+          "CC BY-NC 4.0"
+        ],
+        "licenseUrl": "https://data.source.coop/opengeos/us-buildings/USBF_v1/LICENSES.md",
+        "schemaUrl": "https://data.source.coop/opengeos/us-buildings/USBF_v1/schema.json",
+        "citation": "USBF / opengeos, USBF_v1, source publication 2026-10-27T22:25:21.308964+00:00",
+        "persistentIdentifier": null,
+        "snapshotUrl": "data/releases/usbf-v1-eb5490d9fd61-LICENSES.md",
+        "sha256": "eb5490d9fd617aab2803118710743d769e8627af0df0b2baa77dd4adcb14eaf9"
+      },
+      "verification": {
+        "originalManifest": "SHA256 of exact upstream bytes",
+        "displayManifest": "SHA256 of exact upstream bytes and matching source manifest hash",
+        "displayArchive": "Expected SHA256 recorded; the 33.96 GB archive is not rehashed by the browser",
+        "originalFiles": "Flat upstream keys may be replaced; pinned processing must verify expected bytes and fail if unavailable"
+      },
+      "schema": {
+        "url": "data/releases/usbf-v1-41a2d43c39c6-schema.json",
+        "sha256": "41a2d43c39c6c301d07658fcdc8273e2666f7056dcbdd70978d0ee43b634e207",
+        "sourceUrl": "https://data.source.coop/opengeos/us-buildings/USBF_v1/schema.json",
+        "geometry": "Current USBF footprint WKB",
+        "heightUnit": "metres",
+        "nullSemantics": "A null attribute means not recorded; it is distinct from false and zero."
+      },
+      "coverage": {
+        "scope": "CONUS48+DC",
+        "requestCompletion": "Task completion measures successfully read source parts and processed records, not real-world provider completeness.",
+        "sourceOwnership": "Browser subsets use inherited cx/cy ownership coordinates plus a 0.002-degree buffer. Native processing intersects full geometry from the selected published file bboxes.",
+        "geometryBoundsGuarantee": null,
+        "providerRealWorldCompleteness": null
+      }
+    }
+  ]
+}
