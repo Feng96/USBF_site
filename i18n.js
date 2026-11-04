@@ -11,6 +11,9 @@
 
   // Interpolated values are copied verbatim, including field names, places and model names.
   const patterns = [
+    [/^Browser copy saved\. Folder copy failed: (.+)$/, m => '浏览器备份已保存，文件夹副本保存失败：' + t(m[1])],
+    [/^Project file saved to (.+)\. Browser project revision is unchanged\.$/, m => '项目文件已保存至 ' + m[1] + '。浏览器中的项目修订号未改变。'],
+    [/^(Saved to Results folder · |Downloaded )([\d,]+) records\. (Some buildings in this area were unavailable\. )?Data details include the area, date and source\.$/, m => (m[1].startsWith('Saved') ? '已保存至 Results 文件夹 · ' : '已下载 ') + m[2] + ' 条记录。' + (m[3] ? '此区域部分建筑不可用。' : '') + '数据详情包含范围、日期与来源。'],
     [/^Loading area parts… (\d+) \/ (\d+)$/, m => '正在加载区域分块… ' + m[1] + ' / ' + m[2]],
     [/^Reading input (\d+) \/ (\d+)$/, m => '正在读取输入 ' + m[1] + ' / ' + m[2]],
     [/^([\d,]+) output records( · partial coverage)?$/, m => m[1] + ' 条输出记录' + (m[2] ? ' · 覆盖范围不完整' : '')],

@@ -9,7 +9,7 @@ function load(saved, blocked = false) {
     CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init.detail; } }
   };
   vm.createContext(context);
-  for (const file of ['i18n-zh.js', 'i18n-projects-zh.js', 'i18n-usbf-zh.js', 'i18n-gis-zh.js', 'i18n-scope-zh.js', 'i18n.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context);
+  for (const file of ['i18n-zh.js', 'i18n-projects-zh.js', 'i18n-usbf-zh.js', 'i18n-gis-zh.js', 'i18n-scope-zh.js', 'i18n-device-zh.js', 'i18n-storage-zh.js', 'i18n.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context);
   return { ...context, api: context.window.PortalI18n, events };
 }
 const c = load(null), i = c.api;
@@ -29,6 +29,8 @@ ok(i.t('Loading buildings… 1,000 / 15,277') === '正在加载建筑… 1,000 /
 ok(i.t('50,000 buildings · partial coverage · zoom in').includes('尚未完整加载'), 'Partial source coverage has an explicit Chinese interface warning');
 ok(i.t('Unknown system message') === 'Unknown system message', 'Unknown messages fall back to their original English');
 ok(i.t('Value: {name}', { name: 'Layers <script>' }) === 'Value: Layers <script>', 'Parameter substitution does not recursively translate or interpret HTML');
+ok(i.t('Project file saved to Projects/Layers.usbf.json. Browser project revision is unchanged.').includes('Projects/Layers.usbf.json'), 'Translated project-save status preserves the complete original filename');
+ok(i.t('Saved to Results folder · 1,234 records. Some buildings in this area were unavailable. Data details include the area, date and source.').includes('1,234 条记录。此区域部分建筑不可用。'), 'Local result status translates counts and partial coverage without inventing completeness');
 i.setLocale('en');
 ok(i.t('Layers') === 'Layers', 'Switching back restores the English source copy');
 ok(load('zh-CN').api.locale === 'zh-CN', 'A saved supported language is restored');

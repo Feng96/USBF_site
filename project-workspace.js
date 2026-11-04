@@ -13,7 +13,7 @@
     const map = portal.map, center = map.getCenter(), round = value => Number(value.toFixed(7));
     return JSON.stringify({ name, camera: [center.lng, center.lat, map.getZoom(), map.getPitch(), map.getBearing()].map(round), basemap: portal.getBasemap(), view3d: portal.view3d, crs: PortalCRS.get(),
       active: PortalLayers.active?.id || null,
-      layers: Array.from(PortalLayers.layers.values(), l => ({ id: l.id, name: l.cfg.name, visible: l.visible, color: l.color, opacity: l.opacity, mode: l.colorMode, filter: l.sourceFilter || '', area: l.minArea || 0, height: l.heightField || null, data: l.cfg.type === 'geojson' ? objectID(l.data) : null })),
+      layers: Array.from(PortalLayers.layers.values(), l => ({ id: l.id, name: l.cfg.name, visible: l.visible, color: l.color, opacity: l.opacity, mode: l.colorMode, filter: l.sourceFilter || '', area: l.minArea || 0, height: l.heightField || null, data: l.cfg.type === 'geojson' ? objectID(l.data) : null, dataScope: l.cfg.type === 'geojson' ? [l.data?.provenance?.workspaceArea?.active||false,l.data?.provenance?.workspaceActiveWorkset||false] : null })),
       models: root.PortalLocalModels?.serializeModelEntries() || [],
       research: root.PortalModels?.enabled && PortalModels.current ? { id: PortalModels.current.id, method: PortalModels.method, edges: $('#model-edges').checked, roof: $('#model-roof-only').checked, visible: $('#model-visible').checked } : null,
       legend: document.body.classList.contains('legend-visible'), layout: PortalComposer.projectOptions()
@@ -65,10 +65,21 @@
       const metadata = await PortalProjectStore.put({ ...next, updatedAt: p.savedAt, layers: p.layers.length, models: p.models.length }, result.json, next.revision);
       active = { ...next, revision: metadata.revision }; baseline = before;
       if ($('#project-name')) $('#project-name').value = active.name;
-      message('Project saved in this browser. Export a file to share it or keep a backup.');
+      if (root.PortalLocalFiles?.status().connected) {
+        try { const saved = await PortalLocalFiles.saveProject({ id: active.id, name: active.name, json: result.json });message('Project saved in this browser and Projects folder.'); }
+        catch (error) { message('Browser copy saved. Folder copy failed: ' + error.message, true); }
+      } else message('Project saved in this browser. Connect a workspace folder to save project files there too.');
       await renderLibrary(); return metadata;
     } catch (error) { message(error.message, true); return false; }
     finally { setBusy(false); }
+  }
+  async function saveToFolder() {
+    if (busy || !ready) return false;
+    setBusy(true); message('Saving project file to Projects folder…');
+    try { update(); const result = await capture(active, active.revision, dirty || active.revision === 0);
+      const saved = await PortalLocalFiles.saveProject({ id: active.id, name: active.name, json: result.json, snapshot: true });
+      message('Project file saved to ' + saved.path.join('/') + '. Browser project revision is unchanged.');return saved;
+    } catch (error) { message(error.message, true); throw error; } finally { setBusy(false); }
   }
   async function exportCurrent() {
     if (busy || !ready) return false;
@@ -191,7 +202,7 @@
     dialog.innerHTML = `<div class="workspace-dialog-heading"><div><h2 id="map-project-title" data-i18n>Projects</h2><p class="project-subheading" data-project-status data-i18n-system></p></div><button type="button" data-close-project aria-label="Close saved maps" data-i18n-aria-label>×</button></div>
       <div class="workspace-dialog-body"><div class="project-current-heading"><h3 data-i18n>Current project</h3><span id="project-current-revision" data-i18n-system></span><button type="button" id="project-new" data-i18n>New project</button></div>
       <form id="project-save-form" class="workspace-form"><label data-i18n>Project name<input id="project-name" maxlength="120" required></label><div class="project-actions"><button class="primary" id="project-save-button" type="submit" data-i18n>Save project</button><button type="button" id="project-save-copy" data-i18n>Save a copy</button><button type="button" id="project-export-button" data-i18n>Export for sharing</button></div></form>
-      <p class="project-note" data-i18n>Projects are saved in this browser. Export a project file to back up your work or send it to a teammate.</p><p class="project-note" data-i18n>Team cloud sync is not connected. Opening a shared file creates a separate project copy.</p>
+      <p class="project-note" data-i18n>Save keeps a browser backup and also writes to Projects when a workspace folder is connected.</p><p id="project-folder-note" class="project-note" data-i18n-system></p><div class="project-actions"><button type="button" id="project-save-folder" data-i18n>Save project file to folder</button><button type="button" data-device-settings data-device-tab="files" data-i18n>Manage local files</button></div><p class="project-note" data-i18n>Team cloud sync is not connected. Opening a shared file creates a separate project copy.</p>
       <div class="project-open-label"><strong data-i18n>Open project file</strong><input id="project-file" type="file" hidden accept=".usbf.json,.json,application/json"><button type="button" id="project-file-picker" data-i18n>Choose a file</button></div><p class="project-note" data-i18n>Layers, styles, view, drawings, models and map layout are included. Online sources reconnect to their latest publication.</p>
       <p id="project-message" role="status" aria-live="polite" data-i18n-system></p><hr><div class="project-library-heading"><h3 data-i18n>Saved projects in this browser</h3><button type="button" id="project-library-refresh" data-i18n>Refresh</button></div><div id="project-library-list" class="project-library-list"></div><hr>
       <div class="project-actions"><button type="button" id="project-clear-cache" data-i18n>Clear cache</button></div><p class="project-note" data-i18n>Clear cache keeps your current work and saved projects. New project starts with an empty map.</p></div>`;
@@ -203,7 +214,7 @@
     $('#project-export-button').onclick = exportCurrent;
     $('#project-file-picker').onclick = () => $('#project-file').click();
     $('#project-file').onchange = event => openFile(event.target.files[0]);
-    $('#project-new').onclick = newProject; $('#project-clear-cache').onclick = clearCache;
+    $('#project-save-folder').onclick = () => saveToFolder().catch(() => {});$('#project-new').onclick = newProject; $('#project-clear-cache').onclick = clearCache;
     $('#project-library-refresh').onclick = renderLibrary;
     dialog.addEventListener('cancel', event => { if (busy) event.preventDefault(); });
     dialog.addEventListener('click', async event => {
@@ -214,7 +225,7 @@
     });
     return dialog;
   }
-  function open() { if (!ready) return; ensureDialog(); $('#project-name').value = active.name; update(); renderLibrary(); if (!dialog.open) dialog.showModal(); }
+  function open() { if (!ready) return; ensureDialog();const folder=root.PortalLocalFiles?.status();$('#project-folder-note').textContent=folder?.connected?folder.rootName+'/Projects':'No workspace folder connected. Choose one in Files & device.';$('#project-save-folder').disabled=!folder?.connected; $('#project-name').value = active.name; update(); renderLibrary(); if (!dialog.open) dialog.showModal(); }
   function init() {
     if (ready || !root.portal?.ready) return;
     ready = true; baseline = signature(); update();
@@ -230,8 +241,8 @@
     });
     const serviceBusy = Object.getOwnPropertyDescriptor(PortalProject, 'busy').get;
     Object.defineProperty(PortalProject, 'busy', { get: () => busy || serviceBusy() });
-    Object.assign(PortalProject, { save: saveCurrent, openFile, saveLocal: saveCurrent, exportFile: exportCurrent, newProject, openSaved, importFile: openFile, clearCache });
+    Object.assign(PortalProject, { save: saveCurrent, openFile, saveLocal: saveCurrent, exportFile: exportCurrent, saveToFolder, newProject, openSaved, importFile: openFile, clearCache });
   }
-  root.PortalProjects = { open, save: saveCurrent, exportFile: exportCurrent, newProject, openSaved, openFile, clearCache, refresh: update, get current() { return { ...active }; }, get dirty() { update(); return dirty; }, get busy() { return busy; } };
+  root.PortalProjects = { open, save: saveCurrent, exportFile: exportCurrent, saveToFolder, newProject, openSaved, openFile, clearCache, refresh: update, get current() { return { ...active }; }, get dirty() { update(); return dirty; }, get busy() { return busy; } };
   document.addEventListener('portal-ready', init); init();
 })(globalThis);

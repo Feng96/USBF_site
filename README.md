@@ -691,3 +691,75 @@ Current acceptance entry points are `tools/data-scope-qa.cjs`,
 per-tool implicit current-view loading are superseded by these scope cases.
 The GIS regression, raw geometry, attributes, projection, source quality and
 Project unit checks remain applicable.
+
+### Local workspace, files and cache (v1.9)
+
+Open **Files & device** in the header (also available from Tools and Settings),
+then choose a parent folder. In browsers supporting the File System Access API,
+the explicit folder picker grants access to this folder only. The portal creates
+these siblings without moving or deleting any existing files:
+
+```text
+Your chosen USBF workspace/
+  Projects/  portable .usbf.json project files
+  Results/   explicitly saved data and PNG exports
+  Files/     copies of files you add through the file manager
+  Cache/     optional managed analysis snapshots
+  Engine/    reserved for the future isolated native runtime
+```
+
+**Project Save** retains the existing browser backup and, when a workspace is
+connected, writes the same revision to `Projects/<project-id>.usbf.json`.
+A failed disk write is reported separately from a successful browser backup.
+**Save project file to folder** creates a separate snapshot without advancing the
+browser revision. Existing project revision checks remain active; an unfamiliar
+or newer disk file is never silently overwritten. Projects can be opened from
+the file manager through the same validation and unsaved-change guard as imports.
+Changing or disconnecting the parent folder leaves its files in place. Reconnect
+is explicit if the browser no longer grants access.
+
+The file manager lists names, types, sizes and modified dates, with breadcrumbs,
+search and sorting. It supports creating folders, copying user-selected files,
+downloading, renaming and confirmed individual-file deletion. Original input
+files currently referenced by a layer/model must be detached before rename or
+deletion. There is no recursive folder deletion. `Engine` is read-only, and the
+managed cache directory uses its dedicated cleanup action. Adding a local data
+file to the map still presents the import options for format and coordinate
+system; it does not guess that every file is longitude/latitude GeoJSON.
+
+**Storage & cache** distinguishes renderer/worker memory cache from disk cache.
+Disk caching is opt-in and stores fixed analysis worksets as GeoJSON snapshots
+under `Cache/browser-v1/`; it is not a general PMTiles, HTTP or GeoParquet cache.
+The snapshot wrapper allows at most 64 MiB per file, with a 256 MiB aggregate
+managed-cache budget. Ownership-authenticated metadata, sizes and modified dates
+restrict cleanup to unchanged files created by this browser. Unrecognized or
+externally modified files are preserved, along with Projects, Results and Files.
+Losing browser storage can leave orphaned cache files that require manual review;
+it never authorizes deleting an arbitrary Cache directory. Clearing memory cache
+does not remove project backups or browser HTTP cache. Opening a cached snapshot
+copies its source bytes into the loaded layer, so clearing disk cache cannot
+break a later portable Project save.
+
+**Save data to Results** uses the same explicit workset/scope contract as Download;
+**Save PNG to Results** writes the current composed visual map. Both await the
+actual file write before reporting success. Standard imports and downloads remain
+available when direct directory access is unsupported (use desktop Chrome/Edge
+for this workflow). The site cannot infer an absolute OS path or silently assign
+a folder without the browser's user-initiated picker.
+
+The device overview labels browser, native and cloud execution separately.
+`data/engine-releases.json` currently declares **unreleased**: no signed native
+installer, native computation service, or cloud backend is included. Installation,
+native connection and uninstall controls therefore remain disabled. `Engine/`
+only reserves the agreed location; the setup prototype is explicitly a design
+preview. The proposed future runtime uses an isolated environment instead of
+automatically borrowing an installed GDAL/DuckDB environment.
+
+Validation: `tools/local-files-qa.cjs` covers permission, persistence, project
+revisions, collisions, ownership and deletion boundaries. The browser workflow in
+`tools/local-workspace-workflow-checks.cjs` exercises actual File System Access,
+IndexedDB, project/result/cache writes and file-manager interactions. Automation
+substitutes only the directory picker with an isolated browser-owned filesystem
+directory; native OS picker dialogs and OS-specific permissions still require
+manual acceptance. Interface translations remain separate from file names, data
+values, fields and technical formats.

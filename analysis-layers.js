@@ -14,7 +14,7 @@
    if(!linked(l)||controller.signal.aborted)throw new DOMException('Loading cancelled.','AbortError');
    const data=root.PortalAnalysisData.sourceGeoJSON(snapshot);root.PortalDataWorkspace?.tag(data,l,range);const p=data.provenance;
    const loaded=await root.PortalLayers.addGeoJSON(l.cfg.name+' · '+(range?.label||'analysis area'),data,{sourceFormat:'geojson',dataRole:p.featureRole,heightField:p.heightField||undefined,allowHeight:p.autoHeight,license:l.cfg.license,attribution:l.cfg.attribution,page:l.cfg.page,sourceUrl:l.cfg.page,provider:l.cfg.provider,provenance:p,sourceNote:'Original records for the captured area. This layer stays fixed when the map moves.'},{restore:true});
-   if(range&&range.meta.kind!=='view')root.portal.map.fitBounds([[range.bounds[0],range.bounds[1]],[range.bounds[2],range.bounds[3]]],{padding:50,maxZoom:18,duration:0});note(l,'Analysis layer added for the captured area.');root.PortalInventory?.openTable(loaded.id,{scope:'loaded'});return loaded;
+   if(range&&range.meta.kind!=='view')root.portal.map.fitBounds([[range.bounds[0],range.bounds[1]],[range.bounds[2],range.bounds[3]]],{padding:50,maxZoom:18,duration:0});note(l,'Analysis layer added for the captured area.');if(root.PortalLocalCache?.enabled)void root.PortalLocalCache.store(loaded).catch(()=>{});root.PortalInventory?.openTable(loaded.id,{scope:'loaded'});return loaded;
   }catch(error){note(l,error.name==='AbortError'?'Loading cancelled.':error.message||'Original data could not load. Try again.',error.name!=='AbortError');}
   finally{signal?.removeEventListener('abort',stop);jobs.delete(l);root.PortalLayers?.refresh();}
  }
