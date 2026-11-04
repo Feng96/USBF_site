@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="An interactive design preview of USBF local processing, installation and environment management. All device information and actions are simulated.">
+<title>USBF · Processing & device · Design preview</title>
+<link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="prototype.css?v=1"><script defer src="prototype.js?v=1"></script>
+</head>
+<body>
+<svg class="symbols" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs>
+<symbol id="i-browser" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18M6 6.5h.1M9 6.5h.1"/></symbol>
+<symbol id="i-computer" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="13" rx="2"/><path d="M8 21h8M12 16v5"/></symbol>
+<symbol id="i-cloud" viewBox="0 0 24 24"><path d="M6.5 18a4.5 4.5 0 0 1-.4-9A6.5 6.5 0 0 1 18.5 8a5 5 0 0 1-.5 10Z"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7V5h7l2 3h9v12H3Zm0 3h18"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 21 7v6c0 4-4 7-9 9-5-2-9-5-9-9V7Z"/><path d="m8 12 3 3 5-6"/></symbol>
+<symbol id="i-history" viewBox="0 0 24 24"><path d="M4 8a9 9 0 1 1-1 7M3 3v6h6M12 7v6l4 2"/></symbol>
+<symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 15v6h16v-6"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/></symbol>
+</defs></svg>
+<a class="skip" href="#content" data-t="Skip to settings">Skip to settings</a>
+<div class="preview-banner"><span data-t="Design preview"></span><span data-t="All device details and actions are simulated. Nothing is installed, removed or read from your computer."></span></div>
+<header class="topbar"><a class="brand" href="../../"><span class="brandmark"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 27V13l8-5v19M12 27V4l9 5v18M21 27V15l7-4v16M2 28h28"/></svg></span><b>US Buildings</b></a><span class="header-separator"></span><span class="product-label" data-t="Processing & device"></span><div class="top-actions"><a href="../../" data-t="Open map"></a><label><span class="sr-only" data-t="Language"></span><select id="language" aria-label="Language / 语言"><option value="en">English</option><option value="zh-CN">中文</option></select></label></div></header>
+<div class="shell"><aside class="sidebar"><p class="eyebrow" data-t="WORKSPACE SETTINGS"></p><nav id="navigation" aria-label="Settings"></nav><div class="sidebar-bottom"><div class="device-mini" id="mini-status"></div><button class="text-button" data-action="reset" data-t="Reset preview"></button></div></aside><main id="content" tabindex="-1"></main></div>
+<dialog id="modal" aria-labelledby="modal-title"><header><h2 id="modal-title"></h2><button data-action="close-dialog" aria-label="Close">×</button></header><div id="modal-body"></div></dialog>
+<div id="notice" role="status" aria-live="polite"></div>
+</body></html>
