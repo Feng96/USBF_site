@@ -51,12 +51,22 @@ module.exports = async qa => {
   }, id);
   ok(await p.locator('[data-explorer-load-building]').isVisible(), 'A real displayed building offers explicit access to its original record');
   await p.locator('[data-explorer-load-building]').click();
-  await p.waitForFunction(id => { const l = PortalLayers.layers.get(id), f = PortalLayers.selection?.feature; return f && l.data.features.includes(f); }, id, { timeout: 120000 });
-  const original = await p.evaluate(id => {
-    const l = PortalLayers.layers.get(id), f = PortalLayers.selection.feature;
-    return { id: f.properties.usbf_id, height: f.properties.height_m, fields: Object.keys(f.properties), geometry: f.geometry.type, area: PortalExplorer.footprintArea(l, f) };
-  }, id);
-  ok(raw.length > 0 && original.id === preview.id && original.height === preview.height && original.area > 0 && original.fields.includes('footprint_license') && original.fields.includes('height_license'), 'An explicit real original read preserves the selected ID, supplied height, full footprint and component licenses');
+  await p.waitForSelector('#data-workspace-panel:not([hidden])');
+  ok(raw.length === 0, 'Inspecting a display fragment opens explicit scope preparation without silently loading a changing map view');
+  const original = await p.evaluate(async ({id, buildingId}) => {
+    const l = PortalLayers.layers.get(id), selected = PortalLayers.selection.feature;
+    const b = turf.bbox(selected), x = Number(selected.properties.cx), y = Number(selected.properties.cy);
+    if (Number.isFinite(x) && Number.isFinite(y)) { b[0] = Math.min(b[0], x); b[1] = Math.min(b[1], y); b[2] = Math.max(b[2], x); b[3] = Math.max(b[3], y); }
+    const mask = turf.bboxPolygon([b[0]-.0002,b[1]-.0002,b[2]+.0002,b[3]+.0002]);
+    const range = PortalGISRange.value(mask, 'Explicit original-building test area', {kind:'box',crs:'EPSG:4326'});
+    await PortalDataWorkspace.saveArea(range, range.label);
+    const workset = await PortalAnalysisLayers.load(l, {range});
+    const f = workset?.data?.features.find(f => f.properties.usbf_id === buildingId);
+    if (!f) throw Error('The selected building was absent from the explicitly loaded original workset.');
+    PortalLayers.selectLayer(workset.id);PortalLayers.inspect(workset,f);PortalDataWorkspace.hide();
+    return {id:f.properties.usbf_id,height:f.properties.height_m,fields:Object.keys(f.properties),geometry:f.geometry.type,area:PortalExplorer.footprintArea(workset,f),workset:workset.id};
+  }, {id,buildingId:preview.id});
+  ok(raw.length > 0 && original.id === preview.id && original.height === preview.height && original.area > 0 && original.fields.includes('footprint_license') && original.fields.includes('height_license'), 'The saved-area browser workset retains the real selected ID, supplied height, full footprint and component licenses');
   await qa.screenshot('public-pmtiles-desktop.png');
   const beforeMove = raw.length;
   await p.evaluate(() => { portal.map.jumpTo({ zoom: 17.4 }); }); await waitBuildings();

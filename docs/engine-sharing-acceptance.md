@@ -52,3 +52,12 @@ Browser acceptance entries are `tools/releases-sharing-workflow-checks.cjs` and 
 - The desktop process lock prevents duplicate workers for one workspace. The browser table renders the backend's original property objects, preserving identifiers, zero, false and null instead of showing missing-field placeholders.
 
 Website publication is recorded in [Pages deployment history](https://github.com/Feng96/USBF_site/actions). Final production acceptance and exact revision are also retained in the local publication receipt.
+
+
+## Production acceptance
+
+The deployed application passed **38 real browser checks**: all four download links, versioned public manifests, real PMTiles buildings in Washington/DC, New York, Los Angeles and Boston, bounded HTTP Range reads, zero original-data reads during repeated zooms, explicit saved-area original loading, exact selected IDs/heights/licenses, readonly URL/downloaded HTML, opaque authority boundaries, Chinese interface and phone layout. The updated public test follows the current saved-area workflow; the earlier single-record auto-load expectation was obsolete.
+
+One actual public USBF shard (29,754 bytes, expected SHA256 `17d027d23bdc90036b4be4235fa87e0aaea25fd11e4a6ad1cc7d2b6491a7f155`) also passed the native engine: 2 source rows produced 2 complete output rows, 67 ordinary attribute names/types and all values were retained, geometries were valid, and exact attribute/canonical WKB comparison found no differences. An all-null secondary `original_geometry` column retains its null values while DuckDB omits its spatial annotation; the primary geometry remains correctly tagged.
+
+Production checks can be run through `tools/engine-sharing-public-checks.cjs` with the existing browser harness. UI/native tests and the immutable native release remain attached to the implementation commit; the final documentation/test update changes no application code.
