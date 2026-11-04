@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const $ = selector => document.querySelector(selector);
-  const isOpen = () => innerWidth > 700 ? !document.body.classList.contains('sidebar-collapsed') : $('#sidebar').classList.contains('is-open');
+  const isOpen = () => window.PortalInterface?.isHidden('sidebar') ? false : innerWidth > 700 ? !document.body.classList.contains('sidebar-collapsed') : $('#sidebar').classList.contains('is-open');
   const currentTab = () => $('[data-tab][aria-selected=true]')?.dataset.tab || 'layers';
   function sync() {
     for (const [selector, tab] of [['[data-action=layers]', 'layers'], ['.models-tool[data-open-models]', 'models']]) {
@@ -29,6 +29,6 @@
     for (const tab of document.querySelectorAll('[data-tab]')) observer.observe(tab, { attributes: true, attributeFilter: ['aria-selected'] });
     window.addEventListener('resize', sync); sync();
   }
-  window.PortalSidebar = { open, close: () => setOpen(false), toggle, get isOpen() { return isOpen(); }, get tab() { return currentTab(); } };
+  window.PortalSidebar = { open, close: () => setOpen(false), toggle, refresh: sync, get isOpen() { return isOpen(); }, get tab() { return currentTab(); } };
   document.addEventListener('DOMContentLoaded', init, { once: true });
 })();

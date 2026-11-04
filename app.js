@@ -29,7 +29,7 @@
   var map,collection,selected=null,tool='explore',measurePoints=[],toastTimer,tileFailures=0,activeBasemap='light',mapReady=false,view3d=false,hoverPopup;
   var featuresById=new Map(),homeBounds;
   var reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var basemaps={
+  var basemaps=window.PortalBasemaps?PortalBasemaps.definitions:{
     light:{name:'Light canvas',description:'Esri Light Gray Canvas · a quiet reference map',url:'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',attribution:'Tiles &copy; Esri — Esri, HERE, Garmin, USGS',maxZoom:16},
     streets:{name:'OpenStreetMap',description:'Street names, places and local context',url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',maxZoom:19},
     satellite:{name:'Satellite imagery',description:'Esri World Imagery · reference imagery only',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',attribution:'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',maxZoom:19}
@@ -38,6 +38,7 @@
   function status(message) { $('#status-message').textContent=message; }
   function escapeHTML(v) { var span=document.createElement('span');span.textContent=String(v);return span.innerHTML; }
   function modal(kind) {
+    if(kind==='basemap'&&window.PortalBasemaps){PortalBasemaps.open();return;}
     if((kind==='catalog'||kind==='connections')&&window.PortalLayers){PortalLayers.open();return;}
     var title='',content='',eyebrow='US BUILDINGS · WORKSPACE';
     if(kind==='demo') {
@@ -106,7 +107,9 @@
     saveView();
   }
   function setBasemap(key) {
-    if(!mapReady || !basemaps[key])return;
+    if(!mapReady)return;
+    if(window.PortalBasemaps?.ready)return PortalBasemaps.set(key);
+    if(!basemaps[key])return;
     activeBasemap=key;tileFailures=0;$('#tile-warning').hidden=true;
     Object.keys(basemaps).forEach(function(k){visibility('base-'+k,k===key);});
     $('#basemap-label').textContent=basemaps[key].name;
@@ -169,6 +172,7 @@
     if(q.has('layers')){var ls=q.get('layers').split(',');['footprints','original','height','lod2'].forEach(function(k){$('#layer-'+k).checked=ls.includes(k);});}
     var opacity=Number(q.get('opacity'));if(q.has('opacity')&&Number.isFinite(opacity))$('#opacity').value=Math.min(100,Math.max(10,opacity));
     if(basemaps[q.get('base')])activeBasemap=q.get('base');
+    else if(q.get('base')==='custom'){activeBasemap='blank';toast('Custom basemaps reopen from Project files, not map links.');}
     var v=(q.get('v')||'').split(',').map(Number);
     if(v.length===3&&v.every(Number.isFinite)&&Math.abs(v[0])<=85&&Math.abs(v[1])<=180&&v[2]>=2&&v[2]<=20)map.jumpTo({center:[v[1],v[0]],zoom:v[2]});
     if(q.get('mode')==='3d'){setViewMode(true,false);var bearing=Number(q.get('bearing')),pitch=Number(q.get('pitch'));map.jumpTo({bearing:q.has('bearing')&&Number.isFinite(bearing)?Math.max(-180,Math.min(180,bearing)):-20,pitch:q.has('pitch')&&Number.isFinite(pitch)?Math.max(0,Math.min(60,pitch)):55});}
@@ -220,7 +224,7 @@
     if(name==='view-3d'){setViewMode(true,true);toast('3D view · only supplied heights or available roof models are shown.');}
     if(name==='clear-selection')clearSelection();
     if(name==='clear-measure')clearMeasure();
-    if(name==='retry-basemap'){tileFailures=0;$('#tile-warning').hidden=true;map.getSource('base-'+activeBasemap).setTiles([basemaps[activeBasemap].url]);}
+    if(name==='retry-basemap'){tileFailures=0;$('#tile-warning').hidden=true;if(window.PortalBasemaps?.ready)Promise.resolve(PortalBasemaps.retry()).catch(function(error){toast(error.message);});else if(basemaps[activeBasemap]?.url)map.getSource('base-'+activeBasemap)?.setTiles([basemaps[activeBasemap].url]);}
     if(name==='share') {
       saveView();
       try{await navigator.clipboard.writeText(location.href);toast('Map link copied. Use a saved map file to include local data and models.');}
@@ -294,22 +298,24 @@
   }
   async function init() {
     if(!window.maplibregl){$('#map-failure').hidden=false;status('Map unavailable · library loading failed');return;}
-    var initialHash=location.hash;
+    var initialHash=location.hash,requestedBase=new URLSearchParams(initialHash.slice(1)).get('base');
+    if(basemaps[requestedBase])activeBasemap=requestedBase;else if(requestedBase==='custom')activeBasemap='blank';
     var sources={},baseLayers=[{id:'background',type:'background',paint:{'background-color':'#e9ede4'}}];
-    Object.keys(basemaps).forEach(function(k){var b=basemaps[k];sources['base-'+k]={type:'raster',tiles:[b.url],tileSize:256,maxzoom:b.maxZoom,attribution:b.attribution};baseLayers.push({id:'base-'+k,type:'raster',source:'base-'+k,layout:{visibility:k==='light'?'visible':'none'},paint:{'raster-fade-duration':0}});});
+    Object.keys(basemaps).forEach(function(k){var b=basemaps[k];if(!b.url)return;sources['base-'+k]={type:'raster',tiles:[b.url],tileSize:256,maxzoom:b.maxZoom,attribution:b.attribution};baseLayers.push({id:'base-'+k,type:'raster',source:'base-'+k,layout:{visibility:k===activeBasemap?'visible':'none'},paint:{'raster-fade-duration':0}});});
     maplibregl.setWorkerCount(2);
     map=new maplibregl.Map({container:'map',style:{version:8,sources:sources,layers:baseLayers},center:[-98.5,39.5],zoom:4,minZoom:2,maxZoom:20,maxPitch:60,attributionControl:false,renderWorldCopies:false,canvasContextAttributes:{antialias:true,preserveDrawingBuffer:true}});
     var styleReady=new Promise(function(resolve){map.once('style.load',resolve);});
     map.addControl(new maplibregl.AttributionControl({compact:true}),'bottom-right');
     map.addControl(new maplibregl.ScaleControl({maxWidth:80,unit:'metric'}),'bottom-left');
     map.dragRotate.disable();map.touchZoomRotate.disableRotation();
-    map.on('error',function(e){if(e.sourceId&&e.sourceId==='base-'+activeBasemap){tileFailures++;if(tileFailures>=3)$('#tile-warning').hidden=false;}else console.warn('Map resource:',e.error&&e.error.message);});
-    map.on('sourcedata',function(e){if(e.sourceId==='base-'+activeBasemap&&e.isSourceLoaded)$('#tile-warning').hidden=true;});
+    map.on('error',function(e){if(e.sourceId&&e.sourceId===(window.PortalBasemaps?.ready?PortalBasemaps.sourceId:'base-'+activeBasemap)){tileFailures++;if(tileFailures>=3)$('#tile-warning').hidden=false;}else console.warn('Map resource:',e.error&&e.error.message);});
+    map.on('sourcedata',function(e){if(e.sourceId===(window.PortalBasemaps?.ready?PortalBasemaps.sourceId:'base-'+activeBasemap)&&e.isSourceLoaded)$('#tile-warning').hidden=true;});
     collection=await PortalData.load();
     collection.features.forEach(function(f){featuresById.set(f.id,f);});
     var bounds=collection.features.map(featureBounds);homeBounds=[[Math.min.apply(null,bounds.map(function(b){return b[0][0];})),Math.min.apply(null,bounds.map(function(b){return b[0][1];}))],[Math.max.apply(null,bounds.map(function(b){return b[1][0];})),Math.max.apply(null,bounds.map(function(b){return b[1][1];}))]];
     await styleReady;
     addDataLayers();mapReady=true;
+    window.PortalBasemaps?.init(map,function(key,definition){activeBasemap=key;tileFailures=0;$('#tile-warning').hidden=true;$('#basemap-label').textContent=definition.name;saveView();});
     if(initialHash)history.replaceState(null,'',initialHash);
     restoreView();setBasemap(activeBasemap);syncLayers();
     hoverPopup=new maplibregl.Popup({closeButton:false,closeOnClick:false,offset:12,className:'feature-tooltip'});

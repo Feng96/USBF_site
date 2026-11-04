@@ -763,3 +763,46 @@ substitutes only the directory picker with an isolated browser-owned filesystem
 directory; native OS picker dialogs and OS-specific permissions still require
 manual acceptance. Interface translations remain separate from file names, data
 values, fields and technical formats.
+
+### Basemaps, interface layout and interactive map design (v1.10)
+
+**Basemap** offers Light canvas, OpenStreetMap, Satellite imagery, Dark canvas,
+USGS Topo, Terrain relief and Blank canvas. Blank starts with a white background
+and makes no reference-tile requests; data layers remain available. Switching
+basemaps changes only reference sources and preserves the MapLibre style,
+analytical records, selection and local models.
+
+**Custom web tiles** accepts a public HTTPS XYZ template with `{z}`, `{x}` and
+`{y}`, tile size, zoom range, XYZ/TMS scheme, name and source attribution.
+**Upload basemap** accepts a PNG, JPG or WebP image with an explicit EPSG:4326
+rectangle, or a USBF XYZ configuration JSON. The current-view placement button
+fills that rectangle; it stretches the image to the entered extent and does not
+infer georeferencing. This basemap entry does not import general MapLibre vector
+styles or GeoTIFF. Images are limited to 16 MiB, 8,192 pixels per edge and 24
+megapixels, with an additional device texture-size check. Files stay in the
+browser. A portable Project embeds the exact original image, bounds, attribution
+and name, or the XYZ metadata. Custom basemaps reopen from Project files; a map
+view link alone opens a blank background with an explanation.
+
+The **Interface** toolbar group manages panel and map-tool visibility, the active
+Layers/Models contents tab, contents width and comfortable/compact density.
+Close controls hide panels without removing data, clearing selected records or
+cancelling analysis. Contextual controls such as drawing or selection reappear
+when they have content and are enabled. Focus on map keeps a route back through
+Interface; Restore default layout restores the standard workspace. Source
+attribution remains available. Preferences are remembered locally and included
+in Project presentation metadata; old Projects remain readable.
+
+**Create map** opens a modeless map designer alongside the actual MapLibre map.
+Pan, zoom and layer editing remain available. A lightweight live paper guide
+responds to layout and view changes; it does not create another map or download
+analytical data. The final PNG preview remains an explicit capture and is marked
+stale when inputs change. PNG/PDF export regenerates the actual map using the
+current settings, source attribution and existing frame/partial-coverage rules.
+The data-download tab retains its explicit workset and record-scope contract.
+This is an interactive authoring workspace; exported PNG/PDF files remain static.
+
+Portable design checks are in `tools/design-project-qa.cjs`; browser integration
+is covered by `tools/design-workflow-checks.cjs` and the basemap, interface and
+composer checks. They exercise real MapLibre source changes, original image
+bytes, Project restoration and panel interactions, including phone layouts.

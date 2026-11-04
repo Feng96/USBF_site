@@ -1,0 +1,52 @@
+/* Use the parent's retained browser; no additional browser processes. */
+const fs=require('fs');
+module.exports=async qa=>{
+ const p=qa.page,{ok}=qa;await qa.open('?empty=1');
+ await p.waitForFunction(()=>window.PortalInterface&&PortalInterface.panels.every(row=>!document.querySelector(row.selector)||document.querySelector(row.selector).querySelector('[data-interface-close="'+row.id+'"]')));
+ ok(await p.evaluate(()=>PortalInterface.panels.length===19),'The registry covers all workspace panels and map toolboxes with close controls');
+ const selected=await p.evaluate(()=>{portal.selectFeature(portal.data.features[0].id,false);return portal.selected;});
+ await p.locator('#properties [data-interface-close=properties]').click();
+ ok(await p.evaluate(selected=>portal.selected===selected&&!PortalInterface.visible('properties'),selected),'Closing feature details retains the selected original feature');
+ await p.evaluate(()=>{window.__interfaceOriginalLoader=PortalAnalysisLayers.load;window.__interfaceOriginalReads=0;PortalAnalysisLayers.load=(...args)=>{window.__interfaceOriginalReads++;return window.__interfaceOriginalLoader(...args);};PortalDataWorkspace.open();});
+ try{
+  await p.locator('#data-workspace-panel [data-interface-close=dataWorkspace]').click();
+  await p.evaluate(()=>PortalDataWorkspace.render());
+  ok(await p.evaluate(()=>!PortalInterface.visible('dataWorkspace')),'Implicit source and scope refreshes preserve a closed preparation panel');
+  await p.evaluate(()=>PortalDataWorkspace.open({intent:'statistics'}));
+  ok(await p.evaluate(()=>PortalInterface.visible('dataWorkspace')&&PortalInterface.getState().panels.dataWorkspace==='auto'&&window.__interfaceOriginalReads===0),'An explicit preparation request reopens a closed panel without reading original records');
+ }finally{await p.evaluate(()=>{PortalAnalysisLayers.load=window.__interfaceOriginalLoader;delete window.__interfaceOriginalLoader;delete window.__interfaceOriginalReads;PortalDataWorkspace.hide();});}
+ await p.evaluate(()=>PortalInterface.set('navigation','hide'));
+ await p.evaluate(()=>{document.querySelector('.map-controls').hidden=false;document.querySelector('.map-controls').classList.add('interface-qa-updated');});
+ ok(await p.evaluate(()=>getComputedStyle(document.querySelector('.map-controls')).display==='none'),'A later map UI update cannot resurrect explicitly hidden navigation controls');
+ await p.locator('[data-interface-open]').first().click();await p.locator('#interface-panel').waitFor({state:'visible'});
+ await p.locator('[data-interface-toggle=navigation]').check();
+ ok(await p.evaluate(()=>PortalInterface.visible('navigation')),'Interface reopens a closed toolbox in one action');
+ await p.locator('[data-interface-sidebar=models]').click();
+ ok(await p.evaluate(()=>PortalSidebar.isOpen&&PortalSidebar.tab==='models'),'Models and Layers can be selected from the shared panel manager');
+ await p.locator('#sidebar [data-interface-close=sidebar]').click();
+ ok(await p.evaluate(()=>!PortalSidebar.isOpen&&document.querySelector('[data-action=layers]').getAttribute('aria-expanded')==='false'),'Closing the contents panel also updates toolbar accessibility state');
+ await p.locator('[data-interface-toggle=sidebar]').check();
+ await p.locator('select[data-interface-density]').selectOption('compact');await p.locator('select[data-interface-width]').selectOption('wide');
+ const state=await p.evaluate(()=>PortalInterface.getState());
+ ok(state.sidebarTab==='models'&&state.density==='compact'&&state.sidebarWidth==='wide'&&await p.evaluate(()=>Math.round(document.querySelector('#sidebar').getBoundingClientRect().width)===350),'Layout customization changes the real contents width and density');
+ await p.evaluate(()=>PortalInterface.reset());await p.evaluate(value=>PortalInterface.applyState(value),state);
+ ok(await p.evaluate(()=>PortalInterface.getState().sidebarTab==='models'&&PortalInterface.getState().density==='compact'),'Saved interface values restore the selected panel and custom layout');
+ await p.evaluate(()=>{PortalInterface.set('draw','hide');document.querySelector('#drawing-strip').hidden=false;});
+ ok(await p.evaluate(()=>getComputedStyle(document.querySelector('#drawing-strip')).display==='none'),'Dynamic drawing controls honor the same persistent close preference');
+ await p.locator('[data-interface-focus]').click();
+ ok(await p.evaluate(()=>!PortalInterface.visible('sidebar')&&PortalInterface.visible('navigation')&&getComputedStyle(document.querySelector('.maplibregl-ctrl-attrib')).display!=='none'&&!!document.querySelector('[data-interface-open]')),'Map focus preserves navigation, source attribution and a reachable interface recovery control');
+ await p.locator('[data-interface-reset]').click();
+ await qa.screenshot('interface-controls-desktop.png');
+ await p.setViewportSize({width:390,height:844});
+ ok(await p.evaluate(()=>document.querySelector('.gis-ribbon').getBoundingClientRect().height<=76),'The phone toolbar stays in one compact row and preserves usable map height');
+ await p.evaluate(()=>{const ribbon=document.querySelector('.gis-ribbon');ribbon.scrollLeft=ribbon.scrollWidth;});
+ ok(await p.evaluate(()=>{const r=document.querySelector('[data-interface-open]').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth;}),'Interface stays reachable while other tool groups scroll horizontally');
+ await p.evaluate(()=>{document.querySelector('.gis-ribbon').scrollLeft=0;});
+ await p.locator('#interface-language').selectOption('zh-CN');
+ ok(await p.evaluate(()=>{const r=document.querySelector('#interface-panel').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&document.documentElement.scrollWidth<=innerWidth;}),'The interface manager fits a phone without page overflow');
+ await p.waitForFunction(()=>document.querySelector('#interface-title').textContent==='界面');
+ ok(true,'Panel management is available in Chinese without translating user data');
+ await qa.screenshot('interface-controls-phone.png');
+ await p.evaluate(()=>{PortalInterface.reset();PortalInterface.close();});ok(!qa.errors.length,'Panel management has no uncaught browser errors');
+ fs.writeFileSync(qa.out+'/interface-controls.json',JSON.stringify({passed:true,checks:qa.checks},null,2));
+};

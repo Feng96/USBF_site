@@ -11,7 +11,7 @@
   function signature(name = active.name) {
     if (!root.portal?.ready) return '';
     const map = portal.map, center = map.getCenter(), round = value => Number(value.toFixed(7));
-    return JSON.stringify({ name, camera: [center.lng, center.lat, map.getZoom(), map.getPitch(), map.getBearing()].map(round), basemap: portal.getBasemap(), view3d: portal.view3d, crs: PortalCRS.get(),
+    return JSON.stringify({ name, camera: [center.lng, center.lat, map.getZoom(), map.getPitch(), map.getBearing()].map(round), basemap: portal.getBasemap(), customBasemap: root.PortalBasemaps?.current().config || null, basemapFile: root.PortalBasemaps?.current().file ? objectID(PortalBasemaps.current().file) : null, interface: root.PortalInterface?.getState() || null, view3d: portal.view3d, crs: PortalCRS.get(),
       active: PortalLayers.active?.id || null,
       layers: Array.from(PortalLayers.layers.values(), l => ({ id: l.id, name: l.cfg.name, visible: l.visible, color: l.color, opacity: l.opacity, mode: l.colorMode, filter: l.sourceFilter || '', area: l.minArea || 0, height: l.heightField || null, data: l.cfg.type === 'geojson' ? objectID(l.data) : null, dataScope: l.cfg.type === 'geojson' ? [l.data?.provenance?.workspaceArea?.active||false,l.data?.provenance?.workspaceActiveWorkset||false] : null })),
       models: root.PortalLocalModels?.serializeModelEntries() || [],
@@ -230,7 +230,7 @@
     if (ready || !root.portal?.ready) return;
     ready = true; baseline = signature(); update();
     portal.map.on('moveend', schedule);
-    for (const name of ['portal-layers-changed', 'portal-style-changed', 'portal-models-changed', 'portal-crs-changed', 'portal-presentation-changed']) document.addEventListener(name, schedule);
+    for (const name of ['portal-layers-changed', 'portal-style-changed', 'portal-models-changed', 'portal-crs-changed', 'portal-presentation-changed','portal-basemap-changed','portal-interface-changed']) document.addEventListener(name, schedule);
     document.addEventListener('click', event => { if (event.target.closest('[data-action=legend],.legend-title')) schedule(); if (event.target.closest('[data-clear-cache]')) { document.querySelectorAll('details.tools-menu[open]').forEach(el => { el.open = false; }); clearCache(); } });
     document.addEventListener('portal-project-library-changed', event => { if (dialog?.open) renderLibrary(); if (event.detail?.id === active.id && event.detail.revision > active.revision && !busy) message('This project changed in another tab. Reopen it or save a copy.', true); });
     window.addEventListener('beforeunload', event => { update(); if (dirty) { event.preventDefault(); event.returnValue = ''; } });

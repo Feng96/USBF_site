@@ -6,18 +6,23 @@
   const importKeys=['type','url','crs','bounds','worldfile','bands','palette','min','max','nodata','viewOnly','readExtentWGS84'];
   let busy=false,serial=0,lastProject=null,restoredIDs=[];
   const pick=(o,keys)=>Object.fromEntries(keys.filter(k=>o?.[k]!==undefined&&typeof o[k]!=='function').map(k=>[k,clone(o[k])]));
-  function state(){const map=portal.map,c=map.getCenter();return {center:[c.lng,c.lat],zoom:map.getZoom(),pitch:map.getPitch(),bearing:map.getBearing(),view3d:portal.view3d,basemap:portal.getBasemap(),crs:PortalCRS.get()};}
-  function setPresentation(p){const visible=p?.legendVisible||false;document.body.classList.toggle('legend-visible',visible);$('#legend-card').hidden=!visible;$('.legend-body').hidden=false;$('.legend-title').setAttribute('aria-expanded',String(visible));root.PortalComposer?.applyProjectOptions(p?.layout);}
-  function setView(v){portal.setBasemap(v.basemap);portal.setViewMode(v.view3d,false);PortalCRS.set(v.crs);portal.map.jumpTo({center:v.center,zoom:v.zoom,pitch:v.pitch,bearing:v.bearing});}
+  function state(){const map=portal.map,c=map.getCenter();return {center:[c.lng,c.lat],zoom:map.getZoom(),pitch:map.getPitch(),bearing:map.getBearing(),view3d:portal.view3d,basemap:portal.getBasemap(),...(root.PortalBasemaps?.current().config?{customBasemap:clone(PortalBasemaps.current().config)}:{}),crs:PortalCRS.get()};}
+  function setPresentation(p){const visible=p?.legendVisible||false;document.body.classList.toggle('legend-visible',visible);$('#legend-card').hidden=!visible;$('.legend-body').hidden=false;$('.legend-title').setAttribute('aria-expanded',String(visible));root.PortalComposer?.applyProjectOptions(p?.layout);root.PortalInterface?.applyState(p?.interface);}
+  async function setView(v,files,customFile,applyBasemap=true){
+    if(applyBasemap){if(v.basemap==='custom'){const config=clone(v.customBasemap),file=customFile||files?.get(config.asset);delete config.asset;if(!root.PortalBasemaps)throw Error('The basemap tools are still loading.');await PortalBasemaps.restore(config,file);}else portal.setBasemap(v.basemap);}
+    portal.setViewMode(v.view3d,false);PortalCRS.set(v.crs);portal.map.jumpTo({center:v.center,zoom:v.zoom,pitch:v.pitch,bearing:v.bearing});
+  }
   function layerStyle(l){return {color:l.color,opacity:l.opacity,visible:l.visible,colorMode:l.colorMode,sourceFilter:l.sourceFilter||'',minArea:l.minArea||0,heightField:l.heightField||null};}
   function currentResearch(){const m=root.PortalModels;if(!m?.enabled||!m.current)return null;return {id:m.current.id,method:m.method,roofOnly:$('#model-roof-only').checked,edges:$('#model-edges').checked,visible:$('#model-visible').checked};}
   function projectName(){return $('#project-name')?.value.trim()||$('#workspace-document')?.textContent||'My building map';}
   async function collect(name=projectName()){
     const rows=Array.from(PortalLayers.layers.values());if(rows.length>core().limits.layers)throw Error('Save up to 24 layers in one map.');
     const p={format:'USBF map',version:1,name:name.slice(0,120),savedAt:new Date().toISOString(),place:($('#map-place-name')?.textContent||'United States').slice(0,200),view:state(),active:null,layers:[],models:[],assets:[],order:[],research:currentResearch(),notes:['Catalog sources reconnect to their latest publication. Saved imported and derived records retain their original source details.']};
-    p.presentation={legendVisible:document.body.classList.contains('legend-visible'),layout:PortalComposer.projectOptions()};
+    p.presentation={legendVisible:document.body.classList.contains('legend-visible'),layout:PortalComposer.projectOptions(),...(root.PortalInterface?{interface:PortalInterface.getState()}:{})};
     const files=[],assetIDs=new Map(),layerKeys=new Map();
     const asset=file=>{if(!file)return null;if(assetIDs.has(file))return assetIDs.get(file);const id='file-'+(files.length+1);assetIDs.set(file,id);files.push({id,file});return id;};
+    const basemap=root.PortalBasemaps?.current();
+    if(basemap?.id==='custom'&&basemap.config?.type==='image'){if(!basemap.file)throw Error('The original basemap image is unavailable.');p.view.customBasemap.asset=asset(basemap.file);}
     const previewJobs=[];
     for(let i=0;i<rows.length;i++){
       const l=rows[i],cfg=l.cfg,key='layer-'+(i+1),entry={key,name:cfg.name.slice(0,120),style:layerStyle(l)};layerKeys.set(l.id,key);if(PortalLayers.active?.id===l.id)p.active=key;
@@ -68,10 +73,10 @@
     $('#model-roof-only').checked=r.roofOnly;$('#model-edges').checked=r.edges;$('#model-visible').checked=r.visible;$('#model-roof-only').dispatchEvent(new Event('change'));
   }
   async function restore(prepared){
-    const {project:p,files}=prepared,oldRows=Array.from(PortalLayers.layers.values()),oldIDs=new Set(oldRows.map(l=>l.id)),previous={view:state(),active:PortalLayers.active?.id,place:$('#map-place-name').textContent,name:$('#workspace-document').textContent,research:currentResearch()},added=new Map(),token=++serial;
+    const {project:p,files}=prepared,oldRows=Array.from(PortalLayers.layers.values()),oldIDs=new Set(oldRows.map(l=>l.id)),previous={view:state(),basemap:root.PortalBasemaps?.current(),active:PortalLayers.active?.id,place:$('#map-place-name').textContent,name:$('#workspace-document').textContent,research:currentResearch()},added=new Map(),token=++serial;
     document.querySelectorAll('dialog[open]').forEach(d=>{if(d.id!=='map-project-dialog')d.close();});portal.cancelPlaceSearch?.();root.PortalLoD1?.cancel?.({clear:true});root.PortalLocalModels?.cancelPending?.();root.PortalImport?.cancelPending?.();root.PortalLayers.invalidatePending?.();for(const l of oldRows)l.cancelAnalysis?.();await root.PortalAnalysis?.cancel({clear:true});root.PortalDraw?.cancel();root.PortalExplorer?.clearLocation();portal.clearSelection();PortalLayers.clearExternalSelection();root.PortalModels?.hide();
     try{
-      setView(p.view);
+      await setView(p.view,files);
       for(const e of p.layers){setMessage('Opening '+e.name+'…');let l;try{l=await addEntry(e,files,token);}catch(error){error.restoreImportType=e.kind==='raster'?e.import.type:null;error.restoreLayer=e.name;throw error;}added.set(e.key,l);root.PortalDraw?.restoreLayerLabels?.(l);}
       await showResearch(p.research);
       for(const [key,part] of p.order){const id=added.get(key).id+'-'+part;if(portal.map.getLayer(id))portal.map.moveLayer(id,'measure-line');}
@@ -81,12 +86,12 @@
       for(const l of oldRows)PortalLayers.remove(l.id);
       for(const e of p.layers){const l=added.get(e.key);if(e.kind==='catalog')l.cfg.id=e.catalogId;}
       if(p.active)PortalLayers.selectLayer(added.get(p.active).id);
-      setView(p.view);setPresentation(p.presentation);$('#map-place-name').textContent=p.place;$('#workspace-document').textContent=p.name;$('#welcome-card').hidden=true;PortalLayers.syncOrder();PortalLayers.refresh();portal.saveView();lastProject=p;restoredIDs=Array.from(added.values(),l=>l.id);
+      await setView(p.view,files,undefined,false);setPresentation(p.presentation);$('#map-place-name').textContent=p.place;$('#workspace-document').textContent=p.name;$('#welcome-card').hidden=true;PortalLayers.syncOrder();PortalLayers.refresh();portal.saveView();lastProject=p;restoredIDs=Array.from(added.values(),l=>l.id);
       return {layers:added.size,models:p.models.length,notes:p.notes||[]};
     }catch(err){
       for(const l of Array.from(PortalLayers.layers.values()))if(!oldIDs.has(l.id))PortalLayers.remove(l.id);
-      setView(previous.view);if(previous.active&&PortalLayers.layers.has(previous.active))PortalLayers.selectLayer(previous.active);$('#map-place-name').textContent=previous.place;$('#workspace-document').textContent=previous.name;
-      await showResearch(previous.research);setView(previous.view);throw err;
+      await setView(previous.view,undefined,previous.basemap?.file);if(previous.active&&PortalLayers.layers.has(previous.active))PortalLayers.selectLayer(previous.active);$('#map-place-name').textContent=previous.place;$('#workspace-document').textContent=previous.name;
+      await showResearch(previous.research);await setView(previous.view,undefined,undefined,false);throw err;
     }
   }
   function setMessage(s,error=false){const el=$('#project-message');if(el){el.textContent=s;el.classList.toggle('composer-error',error);}}

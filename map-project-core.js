@@ -8,11 +8,32 @@
   function style(v){
     if(!object(v)||!/^#[a-f0-9]{6}$/i.test(v.color)||!Number.isFinite(v.opacity)||v.opacity<0||v.opacity>1||typeof v.visible!=='boolean'||!['uniform','source','height','change'].includes(v.colorMode)||!string(v.sourceFilter,500)||!Number.isFinite(v.minArea)||v.minArea<0||v.minArea>1e12||!(v.heightField===null||string(v.heightField,200)))fail('A saved layer has invalid display settings.');
   }
+  const basemapIDs=['light','streets','satellite','dark','topo','terrain','blank','custom'];
+  const interfacePanels=['sidebar','attributes','properties','legend','search','navigation','viewMode','scope','dataWorkspace','draw','measure','selection','placeShortcuts','neighborhood','modelCaption','location','welcome','statusbar','mapHints'];
+  function interfaceState(v){
+    if(!object(v)||Object.keys(v).some(k=>!['version','density','sidebarWidth','sidebarTab','panels'].includes(k))||v.version!==1||!['comfortable','compact'].includes(v.density)||!['narrow','normal','wide'].includes(v.sidebarWidth)||(v.sidebarTab!==undefined&&!['layers','models','catalog'].includes(v.sidebarTab))||!object(v.panels)||Object.keys(v.panels).some(k=>!interfacePanels.includes(k)||!['auto','show','hide'].includes(v.panels[k])))fail('The saved interface layout is invalid.');
+    return v;
+  }
+  function customBasemap(v){
+    const common=['version','type','name','attribution'];
+    if(!object(v)||v.version!==1||!['xyz','image'].includes(v.type)||!string(v.name,120)||!v.name.trim()||!string(v.attribution,4000))fail('The saved custom basemap is invalid.');
+    const allowed=common.concat(v.type==='xyz'?['url','tileSize','minzoom','maxzoom','scheme']:['coordinates','asset']);
+    if(Object.keys(v).some(k=>!allowed.includes(k)))fail('The saved custom basemap is invalid.');
+    if(v.type==='xyz'){
+      if(!string(v.url,4000)||!v.url.includes('{z}')||!v.url.includes('{x}')||!v.url.includes('{y}')||!Number.isInteger(v.minzoom)||!Number.isInteger(v.maxzoom)||v.minzoom<0||v.maxzoom>22||v.minzoom>v.maxzoom||![256,512].includes(v.tileSize)||!['xyz','tms'].includes(v.scheme))fail('The saved basemap tile connection is invalid.');
+      if(v.url!==v.url.trim()||/\s/.test(v.url)||/[{}]/.test(v.url.replace(/\{[zxy]\}/g,'')))fail('The saved basemap tile connection is invalid.');const address=new URL(https(v.url.replace(/\{[zxy]\}/g,'0')));if(address.hash)fail('The saved basemap tile connection is invalid.');
+    }else{
+      const c=v.coordinates;
+      if(!/^file-\d+$/.test(v.asset||'')||!Array.isArray(c)||c.length!==4||!c.every(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite)&&Math.abs(p[0])<=180&&Math.abs(p[1])<=85.05113)||c[0][0]!==c[3][0]||c[1][0]!==c[2][0]||c[0][1]!==c[1][1]||c[2][1]!==c[3][1]||c[0][0]>=c[1][0]||c[2][1]>=c[0][1])fail('The saved basemap image has invalid bounds or no original file.');
+    }
+    return v;
+  }
   function validate(p,options={}){
     if(!object(p)||p.format!=='USBF map'||p.version!==1)fail('Choose a USBF map file saved by this website.');
     if(p.projectInfo!==undefined){const i=p.projectInfo;if(!object(i)||!/^([a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12})$/i.test(i.id)||!Number.isSafeInteger(i.revision)||i.revision<0||!string(i.createdAt,40)||!Number.isFinite(Date.parse(i.createdAt)))fail('The project identity or revision is invalid.');if(i.draft!==undefined&&typeof i.draft!=='boolean')fail('The project identity or revision is invalid.');if(i.origin!==undefined&&(!object(i.origin)||!string(i.origin.id,80)||!Number.isSafeInteger(i.origin.revision)||i.origin.revision<0))fail('The project source revision is invalid.');}
-    if(p.presentation!==undefined){if(!object(p.presentation)||typeof p.presentation.legendVisible!=='boolean')fail('The project map layout is invalid.');layout(p.presentation.layout);}
-    if(!string(p.name,120)||!string(p.place,200)||!object(p.view)||!Array.isArray(p.view.center)||p.view.center.length!==2||!p.view.center.every(Number.isFinite)||Math.abs(p.view.center[0])>180||Math.abs(p.view.center[1])>85.05113||!Number.isFinite(p.view.zoom)||p.view.zoom<2||p.view.zoom>22||!Number.isFinite(p.view.pitch)||p.view.pitch<0||p.view.pitch>60||!Number.isFinite(p.view.bearing)||Math.abs(p.view.bearing)>360||typeof p.view.view3d!=='boolean'||!['light','streets','satellite'].includes(p.view.basemap)||!string(p.view.crs,4000))fail('This map file has an invalid map position or coordinate system.');
+    if(p.presentation!==undefined){if(!object(p.presentation)||typeof p.presentation.legendVisible!=='boolean')fail('The project map layout is invalid.');layout(p.presentation.layout);if(p.presentation.interface!==undefined)interfaceState(p.presentation.interface);}
+    if(!string(p.name,120)||!string(p.place,200)||!object(p.view)||!Array.isArray(p.view.center)||p.view.center.length!==2||!p.view.center.every(Number.isFinite)||Math.abs(p.view.center[0])>180||Math.abs(p.view.center[1])>85.05113||!Number.isFinite(p.view.zoom)||p.view.zoom<2||p.view.zoom>22||!Number.isFinite(p.view.pitch)||p.view.pitch<0||p.view.pitch>60||!Number.isFinite(p.view.bearing)||Math.abs(p.view.bearing)>360||typeof p.view.view3d!=='boolean'||!basemapIDs.includes(p.view.basemap)||!string(p.view.crs,4000))fail('This map file has an invalid map position or coordinate system.');
+    if(p.view.basemap==='custom')customBasemap(p.view.customBasemap);else if(p.view.customBasemap!==undefined)fail('A custom basemap must be selected to store its connection.');
     if(!Array.isArray(p.layers)||p.layers.length>limits.layers||!Array.isArray(p.assets)||p.assets.length>60||!Array.isArray(p.models)||p.models.length>limits.models||!Array.isArray(p.order)||p.order.length>200)fail('This map file contains too many layers or files.');
     const assets=new Set(),keys=new Set();let bytes=0;
     for(const a of p.assets){
@@ -20,6 +41,7 @@
       bytes+=a.bytes;if(bytes>limits.attachments)fail('The files stored in this map exceed 48 MB.');const padding=a.bytes%3===1?'==':a.bytes%3===2?'=':'';if(padding?a.base64.slice(-padding.length)!==padding||a.base64.slice(0,-padding.length).includes('='):a.base64.includes('='))fail('A stored file has invalid base64 padding.');assets.add(a.id);
     }
     const asset=id=>{if(id!==null&&id!==undefined&&!assets.has(id))fail('A saved layer is missing its original file.');};
+    if(p.view.basemap==='custom'&&p.view.customBasemap.type==='image')asset(p.view.customBasemap.asset);
     for(const l of p.layers){
       if(!object(l)||!/^layer-\d+$/.test(l.key)||keys.has(l.key)||!string(l.name,120)||!l.name)fail('A saved layer is invalid.');keys.add(l.key);style(l.style);asset(l.asset);if(l.meta!==undefined&&!object(l.meta))fail('A saved layer has invalid source details.');for(const k of ['page','sourceUrl'])if(l.meta?.[k])https(l.meta[k]);
       if(l.kind==='catalog'){if(!string(l.catalogId,120)||!l.catalogId)fail('A saved catalog source is invalid.');}
@@ -53,5 +75,5 @@
   async function decodeAssets(p){
     const files=new Map();for(const a of p.assets){const text=root.atob(a.base64),bytes=Uint8Array.from(text,c=>c.charCodeAt(0));if(bytes.length!==a.bytes||await digest(bytes)!==a.sha256)fail(a.name+' does not match its saved contents. Choose an undamaged map file.');files.set(a.id,new root.File([bytes],a.name,{type:a.type}));}return files;
   }
-  root.PortalProjectCore={limits,validate,layout,style,https,encodeAsset,decodeAssets,digest};
+  root.PortalProjectCore={limits,validate,layout,style,https,customBasemap,interfaceState,encodeAsset,decodeAssets,digest};
 })(globalThis);
