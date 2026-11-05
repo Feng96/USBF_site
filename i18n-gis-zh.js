@@ -1,5 +1,13 @@
 /* GIS interface only; raw field names, formats and place names stay unchanged. */
 Object.assign(window.PortalTranslations['zh-CN'], Object.fromEntries(`
+Focused map record|地图焦点记录
+This record is outside the current table input or filters.|此记录不在当前表格范围或筛选结果中。
+This record is outside the current table page or filters.|此记录不在当前表格页或筛选结果中。
+Clear focus|清除焦点
+Open feature table|打开此要素的属性表
+Record focus does not change the batch selection.|单要素焦点不会改变批量选择。
+Click a row to highlight it on the map. Use Locate to move the view.|点击记录可在地图上高亮，使用“定位”可移动视野。
+Showing the first 80 fields.|仅显示前 80 个字段。
 Locate|定位
 Locate on map|定位
 Locate this record on the map|在地图上定位此记录

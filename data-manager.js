@@ -17,7 +17,7 @@
   let catalogQuery='';
   const isTiled=l=>l.renderTiled===true||['pmtiles','vector'].includes(l.cfg.type);
   const isRaster=l=>['raster','image','raster-pmtiles'].includes(l.cfg.type)||l.cfg.sourceKind==='raster';
-  let api, map, protocol, seq=0, selected=null, active=null, tab='catalog',generation=0;
+  let api, map, protocol, seq=0, selected=null, active=null, tab='catalog',generation=0,focusRevision=0,focused=null;
   const layers=new Map(), pending=new Map();
   const text = v => {const n=document.createElement('span');n.textContent=String(v);return n.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;');};
   const uid = () => 'user-data-'+(++seq);
@@ -131,7 +131,7 @@
       }
       if(!isRaster(l)){l.heightField=l.cfg.allowHeight===false?null:l.heightField||['height_m','height','render_height'].find(f=>l.fields.includes(f))||null;if(l.heightField){insert({type:'fill-extrusion',filter:['all',['==',['geometry-type'],'Polygon'],['>', ['coalesce',['to-number',['get',l.heightField]],0],0]],paint:{'fill-extrusion-color':l.color,'fill-extrusion-height':['coalesce',['to-number',['get',l.heightField]],0],'fill-extrusion-opacity':l.opacity}});}applyStyle(l);}
       if(!options.restore){api.clearSelection();selected=null;['footprints','original','height','lod2'].forEach(k=>{const c=$('#layer-'+k);if(c.checked){c.checked=false;c.dispatchEvent(new Event('change'));}});$('#welcome-card').hidden=true;$('#tab-layers').click();}
-      if(cfg.type==='viewport'){l.onDataChanged=()=>{if(selected?.layer!==l.id)return;const fresh=l.featureById?.get(String(selected.feature.properties?.usbf_id));if(fresh)inspect(l,fresh);else if(!l.renderTiled){clearExternalSelection();api.clearSelection();}};PortalPublicSources.attach(l,map,refresh);}
+      if(cfg.type==='viewport'){l.onDataChanged=()=>{if(selected?.layer!==l.id)return;const fresh=l.featureById?.get(String(selected.feature.properties?.usbf_id));if(fresh)inspect(l,fresh,{origin:'refresh'});else if(!l.renderTiled){clearExternalSelection();api.clearSelection();}};PortalPublicSources.attach(l,map,refresh);}
       refresh();api.saveView();$('#status-message').textContent='Added '+cfg.name;message('Added '+cfg.name+'.');if(!options.restore)$('#data-dialog').close();return l;
     }catch(e){if(l){l.stop?.();l.renderIds.forEach(id=>{if(map.getLayer(id))map.removeLayer(id);});if(map.getSource(l.id))map.removeSource(l.id);layers.delete(l.id);}message(e.message||'Unable to add this source. Check its URL and browser access.',true);if(options.throwOnError)throw e;}
     finally{if(pending.get(key)===request)pending.delete(key);renderCatalog();}
@@ -147,11 +147,11 @@
     if(!map)throw Error('The map is not ready.');
     if(l&&layers.get(l.id)!==l)throw Error('Data changed. Select the feature again.');
     const feature=l?sourceFeature(l,f):f,b=featureBounds(feature),properties=$('#properties'),wasHidden=properties.hidden;
-    if(l){if(!l.visible)setStyle(l.id,{visible:true});inspect(l,feature);}else{clearExternalSelection();map.getSource('inventory-selection')?.setData({type:'FeatureCollection',features:[{type:'Feature',properties:{},geometry:feature.geometry}]});}
+    if(l&&!l.visible)setStyle(l.id,{visible:true});focusFeature(l,feature,{origin:'locate'});
     if(!l||wasHidden||map.getContainer().clientWidth<650)properties.hidden=true;
     map.resize();
     const viewport=map.getContainer().getBoundingClientRect(),padding={top:35,right:35,bottom:35,left:35};
-    const table=$('#attribute-table'),panels=[[properties,'right'],[table,'bottom'],[$('#sidebar'),'left']];
+    const table=$('#attribute-table'),panels=[[properties,'right'],[table,'bottom'],[$('#native-result-table'),'bottom'],[$('#sidebar'),'left']];
     for(const [panel,edge]of panels){if(!panel||panel.hidden||!panel.getClientRects().length)continue;const r=panel.getBoundingClientRect();if(r.right<=viewport.left||r.left>=viewport.right||r.bottom<=viewport.top||r.top>=viewport.bottom)continue;
       if(edge==='bottom')padding.bottom=Math.max(padding.bottom,viewport.bottom-r.top+20);
       else if(edge==='right')padding.right=Math.max(padding.right,viewport.right-r.left+20);
@@ -163,14 +163,25 @@
     map.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding,maxZoom:19,duration:0});
     return true;
   }
-  function remove(id){const l=layers.get(id);if(!l)return;l.stop?.();if(selected&&selected.layer===id){selected=null;api.clearSelection();}l.renderIds.forEach(k=>map.removeLayer(k));map.removeSource(id);layers.delete(id);refresh();api.saveView();}
+  function remove(id){const l=layers.get(id);if(!l)return;l.stop?.();if(selected&&selected.layer===id){clearExternalSelection();api.clearSelection();}l.renderIds.forEach(k=>map.removeLayer(k));map.removeSource(id);layers.delete(id);refresh();api.saveView();}
   function opacity(l,v){l.opacity=v;if(l.syncNativeStyle){l.syncNativeStyle();api.saveView();return;}l.renderIds.forEach(id=>{const type=map.getLayer(id).type;map.setPaintProperty(id,type+'-opacity',v);});l.syncCoverageStyle?.();PortalLegend.render(Array.from(layers.values()).reverse().filter(l=>l.visible),$('.legend-body'));api.saveView();}
-  function clearExternalSelection(){selected=null;if(map?.getSource('inventory-selection'))map.getSource('inventory-selection').setData({type:'FeatureCollection',features:[]});document.dispatchEvent(new CustomEvent('portal-selection-changed'));}
-  function inspect(l,f){
+  function beginFeatureFocus(){return ++focusRevision;}
+  function isFeatureFocusCurrent(token){return token===focusRevision;}
+  function publishFocus(l,f,options={}){focused=f?{layerId:l?.id||null,feature:f,origin:options.origin||'map',jobId:l?.cfg?.nativeSource?.jobId||options.jobId||null,focusToken:focusRevision}:null;document.dispatchEvent(new CustomEvent('portal-feature-focused',{detail:focused||{layerId:null,feature:null,origin:'clear',focusToken:focusRevision}}));}
+  function clearExternalSelection(){beginFeatureFocus();selected=null;focused=null;if(api)api.clearSelection();if(map?.getSource('inventory-selection'))map.getSource('inventory-selection').setData({type:'FeatureCollection',features:[]});document.dispatchEvent(new CustomEvent('portal-selection-changed'));publishFocus(null,null);}
+  function focusFeature(l,f,options={}){
+    if(l)return inspect(l,f,options);
+    if(!f||options.focusToken!==undefined&&!isFeatureFocusCurrent(options.focusToken))return false;
+    if(options.focusToken===undefined)beginFeatureFocus();api.clearSelection();selected=null;
+    map.getSource('inventory-selection')?.setData({type:'FeatureCollection',features:f.geometry?[{type:'Feature',properties:{},geometry:f.geometry}]:[]});
+    publishFocus(null,f,options);document.dispatchEvent(new CustomEvent('portal-selection-changed'));return true;
+  }
+  function inspect(l,f,options={}){
+    if(!l||layers.get(l.id)!==l||options.focusToken!==undefined&&!isFeatureFocusCurrent(options.focusToken))return false;
     f=sourceFeature(l,f);if(!f){$('#status-message').textContent='Data changed. Select the feature again.';return false;}
-    api.clearSelection();active=l.id;selected={layer:l.id,feature:f};if(map.getSource('inventory-selection'))map.getSource('inventory-selection').setData({type:'FeatureCollection',features:[{type:'Feature',properties:{},geometry:f.geometry}]});$('#properties').hidden=false;$('#welcome-card').hidden=true;
+    const propertiesWereHidden=$('#properties').hidden;if(options.focusToken===undefined)beginFeatureFocus();api.clearSelection();active=l.id;selected={layer:l.id,feature:f};if(map.getSource('inventory-selection'))map.getSource('inventory-selection').setData({type:'FeatureCollection',features:[{type:'Feature',properties:{},geometry:f.geometry}]});$('#properties').hidden=options.origin==='table'?propertiesWereHidden:false;$('#welcome-card').hidden=true;
     const props=f.properties||{},friendly=window.PortalExplorer?.renderFeature(l,f);$('#properties-content').innerHTML=friendly||'<span class="eyebrow">'+text(isTiled(l)?'TILED FEATURE':'ADDED DATA')+'</span><h2 class="feature-id">'+text(l.cfg.name)+'</h2><dl class="feature-properties">'+Object.entries(props).slice(0,80).map(([k,v])=>'<div><dt>'+text(k)+'</dt><dd>'+attributePreview(v)+'</dd></div>').join('')+'</dl><button class="feature-action" data-feature-zoom data-i18n>Zoom to feature</button>'+(props.model_id?'<button class="feature-action" data-model-id="'+text(props.model_id)+'" data-i18n>Open this 3D sample</button>':'')+'<p class="feature-notice">'+(isTiled(l)?'Tile geometry may be simplified or clipped. Use the source dataset for complete building geometries.':text(window.PortalNativeResults?.isExact(f)?'Original attributes and complete geometry read from the local result file.':l.cfg.sourceNote||'Attributes are shown as supplied by this data source.'))+'</p>'+(l.cfg.type==='geojson'&&!l.cfg.nativeSource?'<button class="feature-action" data-added-export="'+l.id+'" data-i18n>Export this GeoJSON layer</button>':'')+(l.cfg.page?'<a class="source-detail-link" target="_blank" rel="noopener" href="'+text(l.cfg.page)+'" data-i18n>Source data &amp; license ↗</a>':'');
-    $('#status-message').textContent='Feature selected · '+l.cfg.name;setTimeout(()=>map.resize(),10);document.dispatchEvent(new CustomEvent('portal-selection-changed'));
+    $('#status-message').textContent='Feature selected · '+l.cfg.name;setTimeout(()=>map.resize(),10);document.dispatchEvent(new CustomEvent('portal-selection-changed'));publishFocus(l,f,options);return true;
   }
   function sourceFeature(l,f){if(window.PortalNativeResults?.isExact(f))return f;if(l?.nativeMap&&f?.source===l.id)return f;if(l?.renderTiled)return f;return ['geojson','viewport'].includes(l?.cfg?.type)?PortalSourceFeatures.resolve(l,f):f;}
   function identify(e){if(window.PortalNativeResults?.identify(e))return true;const ids=Array.from(layers.values()).filter(l=>l.visible&&!isRaster(l)).flatMap(l=>l.renderIds);if(!ids.length)return false;const hits=map.queryRenderedFeatures(e.point,{layers:ids});if(!hits.length)return false;const l=layers.get(hits[0].source);if(!l)return false;inspect(l,hits[0]);return true;}
@@ -230,5 +241,5 @@
     let savedStyles=[];try{savedStyles=JSON.parse(q.get('styles')||'[]');if(!Array.isArray(savedStyles))savedStyles=[];}catch(e){}
     for(const saved of (q.get('data')||'').split(',').slice(0,20)){const [id,op,on]=saved.split(':'),c=catalog.find(c=>c.id===id);if(c){const n=Number(op);const st=savedStyles.find(x=>x[0]===id)||[];await add(c,{restore:true,colorMode:['uniform','source','height','change'].includes(st[1])?st[1]:'uniform',sourceFilter:typeof st[2]==='string'?st[2]:'',minArea:Number.isFinite(st[3])?Math.max(0,st[3]):0,opacity:Number.isFinite(n)?Math.max(0,Math.min(1,n)):.75,visible:on!=='0'});$('#welcome-card').hidden=true;}}
   }
-  window.PortalLayers={zoom,featureBounds,locateFeature,details,exportLayer,sourceFeature,syncOrder,reorder,invalidatePending:()=>{generation++;pending.clear();renderCatalog();},validateGeoJSON:geojson,remove,clear:()=>{for(const id of Array.from(layers.keys()))remove(id);},init,open,refresh,fullExtent,identify,setStyle,set3D,inspect,get active(){return layers.get(active);},get selection(){return selected;},selectLayer(id){active=id;refresh();},writeShare,handleExport,clearExternalSelection,catalog,get layers(){return layers;},add,addGeoJSON:(name,data,meta={},options={})=>add({...meta,id:meta.id||'import-'+(++seq),name,type:'geojson',data,sourceKind:'vector',analysisQuality:meta.analysisQuality||'complete-geometry'}, {...options,throwOnError:true}),isRaster};
+  window.PortalLayers={zoom,featureBounds,locateFeature,focusFeature,beginFeatureFocus,isFeatureFocusCurrent,get focus(){return focused;},details,exportLayer,sourceFeature,syncOrder,reorder,invalidatePending:()=>{generation++;beginFeatureFocus();pending.clear();renderCatalog();},validateGeoJSON:geojson,remove,clear:()=>{clearExternalSelection();for(const id of Array.from(layers.keys()))remove(id);},init,open,refresh,fullExtent,identify,setStyle,set3D,inspect,get active(){return layers.get(active);},get selection(){return selected;},selectLayer(id){if(active!==id)beginFeatureFocus();active=id;refresh();},writeShare,handleExport,clearExternalSelection,catalog,get layers(){return layers;},add,addGeoJSON:(name,data,meta={},options={})=>add({...meta,id:meta.id||'import-'+(++seq),name,type:'geojson',data,sourceKind:'vector',analysisQuality:meta.analysisQuality||'complete-geometry'}, {...options,throwOnError:true}),isRaster};
 })();

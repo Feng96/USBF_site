@@ -54,3 +54,11 @@
 .attribute-table .inventory-map-action button:hover{background:#e6f2e9}
 .attribute-table .inventory-map-action button:disabled{opacity:.45;cursor:not-allowed}
 .attribute-table .inventory-map-action button:focus-visible{outline:2px solid #34896e;outline-offset:2px}
+
+/* Map focus is separate from the green batch selection and source fields. */
+.attribute-table .table-scroll tr.inventory-row-focused{outline:2px solid #0c9389;outline-offset:-2px;background:#e5f6f4}
+.attribute-table .table-scroll tr.inventory-row-focused>td:first-child{background:#d8f0ed;box-shadow:inset 4px 0 #0c9389}
+.inventory-record-focus{flex-shrink:0;max-height:112px;overflow:auto;padding:7px 12px;border-bottom:1px solid #c6e4df;background:#f0faf7;font-size:11px;line-height:1.5}
+.inventory-record-focus>div:first-child{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.inventory-record-focus strong{color:#14776b}.inventory-record-focus>div>span{max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inventory-record-focus button{padding:3px 7px;border:1px solid #bedbd1;border-radius:4px;color:#246d53;background:#fff;font:inherit}.inventory-record-focus [data-table-focus-clear]{margin-left:auto}
+.inventory-record-focus p{margin:3px 0;color:#5e766d}.inventory-record-focus summary{cursor:pointer;color:#246d53}.inventory-focus-values{overflow:auto;max-height:95px}.inventory-focus-values table{border-collapse:collapse;width:100%}.inventory-focus-values th,.inventory-focus-values td{text-align:left;padding:4px 8px;border-bottom:1px solid #dceae3;overflow-wrap:anywhere;max-width:320px;vertical-align:top}

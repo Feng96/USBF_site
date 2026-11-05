@@ -15,6 +15,15 @@ one complete geometry by their exact result-row identity, including records
 beyond the preview. Stale requests and records without usable geometry cannot
 move the map. The Map action column is separate from original data and exports.
 
+Map feature clicks and table rows share one current focus. An open browser
+attribute table follows the matching source object through sorting and paging;
+table rows highlight the map without moving the camera. The native result table
+is a non-modal bottom dock so the map stays clickable. Unfiltered native rows
+can be revealed by their exact row identity; sorted/filtered/fixed inputs show
+an off-page focus record separately without changing filters, scope or exports.
+Focus remains separate from batch selection, and Locate still moves the map
+explicitly. Interface labels switch languages while original data stays raw.
+
 New workspaces start without automatically adding a dataset. Place and address
 search changes the map location without adding, unhiding or activating USBF.
 Datasets remain available through Add Data, and saved Projects and explicit
