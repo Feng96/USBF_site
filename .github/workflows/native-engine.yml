@@ -1,7 +1,7 @@
 name: Native engine preview
 on:
   push:
-    branches: [engine-release-20261104]
+    branches: [engine-release-20261105]
     paths: ["native-engine/**", "desktop-engine/**", ".github/workflows/native-engine.yml"]
   workflow_dispatch:
 permissions:

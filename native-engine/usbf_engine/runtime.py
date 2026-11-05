@@ -96,6 +96,9 @@ class Runtime:
             # Untrusted browser input can never activate extensions or fetch files
             # through SQL; all source bytes are acquired by the checked downloader.
             connection.execute("SET geometry_always_xy=true")
+            # Serialize timestamp instants consistently across desktop locales.
+            # Original Parquet timestamp types and instants remain unchanged.
+            connection.execute("SET TimeZone='UTC'")
             return connection
         except Exception:
             connection.close()

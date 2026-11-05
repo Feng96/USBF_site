@@ -155,7 +155,7 @@ def serve(engine, port=52763, origins=None):
                     return self._json(200, engine.plan(self._body()))
                 if path == "/v1/jobs":
                     return self._json(201, engine.create_job(self._body())) if method == "POST" else self._json(200, {"jobs": engine.jobs(summaries=True)})
-                match = re.fullmatch(r"/v1/jobs/([a-f0-9-]{36})/(map|query|selection|summary|export|features/([0-9]+)|tiles/([0-9]+)/([0-9]+)/([0-9]+)\.pbf)", path)
+                match = re.fullmatch(r"/v1/jobs/([a-f0-9-]{36})/(map|query|selection|summary|comparison-summary|export|features/([0-9]+)|tiles/([0-9]+)/([0-9]+)/([0-9]+)\.pbf)", path)
                 if match:
                     job_id, action, row_id, z, x, y = match.groups()
                     if action == "map" and method == "GET":
@@ -166,6 +166,8 @@ def serve(engine, port=52763, origins=None):
                         return self._json(200, engine.result_selection(job_id, self._body()))
                     if action == "summary" and method == "POST":
                         return self._json(200, engine.result_summary(job_id, self._body()))
+                    if action == "comparison-summary" and method == "POST":
+                        return self._json(200, engine.result_comparison_summary(job_id, self._body()))
                     if row_id is not None and method == "GET":
                         return self._json(200, engine.result_feature(job_id, row_id))
                     if z is not None and method == "GET":

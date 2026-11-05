@@ -69,6 +69,8 @@ def run(workspace: Path, report: Path) -> int:
             ok(error.code == 403, 'An untrusted origin cannot access the paired runtime')
         status = request('GET', '/v1/status')
         ok(bool(status), 'Paired status reports the actual runtime')
+        ok(set(status['capabilities']['originalDataProviders']) >= {'osm-buildings', 'overture-buildings', 'gba-usa', 'dc-government', 'nyc-government'},
+           'The installed runtime advertises its actual shared original-data provider readers')
         settings = request('GET', '/v1/maintenance')
         ok(settings['execution'] == 'local' and settings['automaticDeletion'] is False,
            'Native cache maintenance reports its real local data-preserving policy')
@@ -101,6 +103,15 @@ def run(workspace: Path, report: Path) -> int:
            'Bounded previews preserve original long IDs, nulls and boolean values')
         table = request('GET', '/v1/jobs/' + job['id'] + '/table?offset=1&limit=1')
         ok(bool(table), 'The installed result exposes paginated attributes')
+        import pyarrow.parquet as pq
+        original = pq.read_table(workspace / job['result']['path'])
+        ok(original.num_rows == 2 and original.column('original_id').to_pylist()[0] == '9007199254740993123'
+           and original.column('flag').to_pylist() == [False, False],
+           'Bundled Arrow reads genuine GeoParquet without changing long identifiers or booleans')
+        comparison = request('POST', '/v1/jobs/' + job['id'] + '/comparison-summary', {})
+        ok(comparison['records'] == 2 and comparison['geometry']['polygonRecords'] == 2
+           and comparison['geometry']['areaM2'] > 0 and comparison['execution'] == 'native-full-result',
+           'The installed comparison endpoint aggregates complete original geometries')
         metadata = request('GET', '/v1/jobs/' + job['id'] + '/map')
         ok(metadata['recordCount'] == 2 and metadata['spatialIndex'] == 'DuckDB RTree',
            'The installed engine indexes every result record for full viewport browsing')

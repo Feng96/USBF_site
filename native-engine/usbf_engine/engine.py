@@ -26,6 +26,8 @@ import psutil
 
 from .runtime import Runtime, ident, sqlstr
 from .results import ResultsMixin
+from .providers import ProvidersMixin, PROVIDER_IDS
+from .comparison import ComparisonMixin
 from .maintenance import EngineMaintenance
 from .geometry_metadata import preserve_empty_geoparquet
 from .security import https_context
@@ -33,7 +35,7 @@ from .validation import (FOLDERS, FORMATS, OPERATIONS, MAX_SPEC_BYTES, bounds, c
                          intersects, json_exact, normalize_spec, public_url,
                          safe_name, scope_geometry, workspace_path)
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 GEOM = "__usbf_geometry"
 TERMINAL = {"completed", "partial", "failed", "cancelled", "interrupted"}
 PREVIEW_MAX_BYTES = 8 * 1024 * 1024
@@ -60,7 +62,7 @@ class CheckedRedirect(urllib.request.HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
-class Engine(ResultsMixin):
+class Engine(ProvidersMixin, ResultsMixin, ComparisonMixin):
     def __init__(self, workspace, *, extension_path=None, threads=2, memory_limit="1GB",
                  allow_install=True, autostart=True, downloader=None):
         self.workspace = Path(workspace).expanduser().resolve()
@@ -236,6 +238,8 @@ class Engine(ResultsMixin):
                 "capabilities": {"operations": sorted(OPERATIONS), "resume": True, "table": True, "preview": True,
                                  "resultMap": True, "resultQuery": True, "resultSelection": True, "resultExport": True,
                                  "projectPackages": True, "maintenance": True, "resultSummary": True,
+                                 "originalDataProviders": list(PROVIDER_IDS),
+                                 "resultComparisonSummary": True,
                                  "uninstallRequest": bool(self.uninstall_handler), "uninstall": False},
                 "activeJobs": self._active_count()}
 
@@ -362,6 +366,8 @@ class Engine(ResultsMixin):
                     raise ValueError("Use the browser provider adapter for paginated API sources.")
                 parts.append({"id": str(number), "kind": "url", "url": url, "format": fmt, "name": source.get("name", url.rsplit("/", 1)[-1]),
                               "bytes": source.get("bytes"), "rows": source.get("rows"), "sha256": source.get("sha256"), "crs": source.get("crs", "EPSG:4326"), "crsExplicit": "crs" in source})
+            elif kind == "provider":
+                parts.extend(self._provider_plan(source, spec.get("scope"), number))
             elif kind in {"usbf", "usbf-manifest", "manifest-files"}:
                 if not isinstance(source.get("files"), list):
                     source = self._read_manifest(source)
@@ -513,6 +519,8 @@ class Engine(ResultsMixin):
             raise ValueError("The downloaded source does not match its pinned SHA256.")
 
     def _source_file(self, part, directory, job_id):
+        if part["kind"] in {"provider-parquet", "provider-api"}:
+            return self._provider_materialize(part, directory, job_id)
         if part["kind"] == "file":
             path = workspace_path(self.workspace, part["path"])
             stat = path.stat()
@@ -553,6 +561,8 @@ class Engine(ResultsMixin):
         return self.maintenance.source_store(part, destination, job_id)
 
     def _source_crs(self, part, source, geometry, connection):
+        if part["kind"] == "provider-api":
+            return "EPSG:4326"
         if part["kind"] == "frozen":
             return "EPSG:4326"
         detected = None
@@ -609,6 +619,9 @@ class Engine(ResultsMixin):
                 raise ValueError("The source row count does not match its pinned manifest.")
         geometry = next((row[0] for row in description if str(row[1]).startswith("GEOMETRY")), None)
         expression = ident(geometry) if geometry else None
+        if part.get("providerGeometryColumn"):
+            geometry = part["providerGeometryColumn"]
+            expression = "CASE WHEN " + ident(geometry) + " IS NULL THEN NULL::GEOMETRY ELSE ST_GeomFromGeoJSON(" + ident(geometry) + ") END"
         if geometry is None:
             geometry = next((row[0] for row in description if row[0].lower() in {"geometry", "geom", "wkb_geometry"} and row[1] == "BLOB"), None)
             if geometry:
@@ -626,6 +639,8 @@ class Engine(ResultsMixin):
         columns = ",".join(ident(name) for name in properties)
         projection = (columns + "," if columns else "") + expression + " AS " + ident(GEOM)
         selected = "SELECT " + projection + " FROM (" + query + ")"
+        if part.get("regionFilter"):
+            selected = "SELECT * FROM (" + selected + ") WHERE " + ident("region") + "=" + sqlstr(part["regionFilter"])
         geom = scope_geometry(job.get("scope"))
         if geom:
             boundary = "ST_GeomFromGeoJSON(" + sqlstr(json.dumps(geom, allow_nan=False)) + ")"
@@ -718,6 +733,8 @@ class Engine(ResultsMixin):
         job["coverage"] = {"requestComplete": len(good) == len(job["parts"]), "providerCoverage": "source-defined",
                            "spatialRule": "whole-geometry-intersects-v1", "candidateIndex": next(iter(indexes)) if len(indexes) == 1 else "mixed",
                            "geometryBoundsGuaranteed": True if guaranteed else None, "providerCompleteness": None,
+                           "sourceReleases": list({digest_json(p["sourceRelease"]): p["sourceRelease"] for p in job["parts"] if p.get("sourceRelease")}.values()),
+                           "snapshotIsolation": False if any(p.get("providerId") in {"dc-government", "nyc-government", "gba-usa"} for p in job["parts"]) else None,
                            "missingParts": [{"id": p["id"], "name": p["name"], "status": p["status"], "error": p.get("error")} for p in job["parts"] if p["status"] != "completed"]}
 
     def _finish(self, job, directory, connection):

@@ -25,7 +25,7 @@ from DuckDB's HTTPS CDN into the workspace cache; `--no-extension-install`
 disables this fallback. An existing system GDAL, Python or DuckDB installation
 is never used by a packaged build.
 
-The implementation pins DuckDB 2.0.0, psutil 7.2.1 and certifi 2026.10.23. Public
+The implementation pins DuckDB 2.0.0, PyArrow 24.0.0, pytz 2026.6, psutil 7.2.1 and certifi 2026.10.23. Public
 HTTPS uses the bundled CA certificates with hostname and certificate checks;
 it does not rely on a host Python certificate installation. Runtime status reports the
 versions actually loaded, including Spatial and PROJ. GDAL is provided by
@@ -42,7 +42,7 @@ from usbf_engine import Engine
 from usbf_engine.server import serve
 
 engine = Engine(workspace_parent, extension_path=bundled_signed_extension)
-engine.set_build_info({"packageVersion": "0.2.0-preview.1", "revision": revision,
+engine.set_build_info({"packageVersion": "0.3.0-preview.1", "revision": revision,
                        "platform": platform_name, "signed": False})
 engine.set_uninstall_handler(request_local_desktop_confirmation)
 pairing_code = engine.pairing_code()  # Display locally, never expose through HTTP.
@@ -319,3 +319,22 @@ the browser workset budget, long IDs/nulls, exact whole-geometry extraction,
 projected CRS conversion, failed-part restart/resume, checksum mismatch,
 cancellation, recoverable publication, pairing and HTTP origin/path restrictions.
 Installer builds require their own Windows/macOS/Linux artifact smoke tests.
+
+
+## Shared original-data providers and comparisons (0.3 preview)
+
+The updated engine advertises `originalDataProviders` and accepts
+`inputs:[{kind:"provider",providerId,releaseId?}]` with a mandatory saved scope.
+Supported IDs are `osm-buildings`, `overture-buildings`, `gba-usa`,
+`dc-government` and `nyc-government`. USBF retains its existing verified
+publication contract. Provider endpoints are fixed server-side, with checked
+HTTPS Range access and exact final geometry intersection. Sources retain their
+original attributes; live publication identity and request completeness are
+recorded separately from real-world coverage.
+
+`POST /v1/jobs/{id}/comparison-summary` accepts `selectionId` and optional
+`heightField`; `resultComparisonSummary` advertises support. It summarizes
+complete original records rather than map previews, with ellipsoidal whole
+polygon area and supplied height availability. See
+[the shared workflow](../docs/unified-data-workflow.md) for exact scope,
+transport, source identity and comparison limitations.

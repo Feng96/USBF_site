@@ -106,7 +106,7 @@ def resources() -> Path:
 def build_info() -> dict:
     path = resources() / 'engine-build.json'
     return json.loads(path.read_text(encoding='utf-8')) if path.is_file() else {
-        'version': '0.2.0-preview', 'revision': 'development', 'signed': False}
+        'version': '0.3.0-preview', 'revision': 'development', 'signed': False}
 
 
 def default_workspace() -> Path:

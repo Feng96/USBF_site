@@ -17,7 +17,9 @@ FORMATS = {"parquet", "geoparquet", "geojson", "json", "gpkg", "fgb", "shp"}
 OPERATIONS = {"load", "extract-box", "extract-mask", "merge", "measure", "buffer"}
 HOSTS = {"data.source.coop", "data.source.cooperative", "data.sourcecooperative.org",
          "raw.githubusercontent.com", "feng96.github.io", "opendata.arcgis.com", "maps2.dcgis.dc.gov",
-         "services.arcgis.com", "data.cityofnewyork.us", "s3.amazonaws.com"}
+         "services.arcgis.com", "data.cityofnewyork.us", "s3.amazonaws.com",
+         "stac.overturemaps.org", "data.openstreetmap.us",
+         "overturemaps-us-west-2.s3.us-west-2.amazonaws.com"}
 MAX_SPEC_BYTES = 16 * 1024 * 1024
 
 

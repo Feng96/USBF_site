@@ -15,7 +15,7 @@ import tarfile
 import urllib.request
 import zipfile
 
-VERSION = '0.2.0-preview.1'
+VERSION = '0.3.0-preview.1'
 
 
 def digest(path: Path) -> str:
@@ -114,11 +114,14 @@ def main() -> int:
                '--paths', str(repository / 'desktop-engine'),
                '--collect-all', 'duckdb',
                '--collect-all', 'certifi',
+               '--collect-all', 'pyarrow',
+               '--collect-all', 'pytz',
                '--copy-metadata', 'duckdb', '--copy-metadata', 'psutil',
-               '--copy-metadata', 'certifi',
+               '--copy-metadata', 'certifi', '--copy-metadata', 'pyarrow', '--copy-metadata', 'pytz',
                '--hidden-import', '_duckdb',
                '--add-data', str(extension_resource) + os.pathsep + '.',
                '--add-data', str(info) + os.pathsep + '.',
+               '--add-data', str(repository / 'native-engine' / 'usbf_engine' / 'gba-usa-index.json') + os.pathsep + 'usbf_engine',
                '--add-data', str(repository / 'desktop-engine' / 'THIRD_PARTY_NOTICES.md') + os.pathsep + '.']
     if system in ('windows', 'darwin'):
         command += ['--windowed']
