@@ -15,6 +15,10 @@ one complete geometry by their exact result-row identity, including records
 beyond the preview. Stale requests and records without usable geometry cannot
 move the map. The Map action column is separate from original data and exports.
 
+Adding or importing data preserves the current map center, zoom, bearing and
+pitch, including asynchronous loads and original-data worksets. Use **Zoom to
+layer**, **Locate** or a model card’s **View** action to navigate explicitly.
+
 Native **Charts** now summarizes complete results or immutable selected/saved-area
 records, including records beyond the map preview. Histograms, category counts
 and grouped means transfer bounded aggregates; original fields and typed values
