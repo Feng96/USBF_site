@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="vendor/maplibre-gl-5.6.2.css" integrity="sha384-gNYNsUmuZqDYiT3gbirWTV5K7rt71RoveS/yXAaU09d4ZUmeDVTD3XoqB6uJAIFR" crossorigin="anonymous">
   <link rel="stylesheet" href="styles.css?v=1.7-gis">
   <link rel="stylesheet" href="layer-actions.css?v=1.13-unified">
-  <link rel="stylesheet" href="source-comparison.css?v=1.13-unified">
+  <link rel="stylesheet" href="source-comparison.css?v=1.14-analysis">
   <script defer src="vendor/maplibre-gl-5.6.2.js" integrity="sha384-1qC0PnXk2fgMDybOtZF1ui4LM5Sxm7o0TbEkwfxTTVdlZvuNENNGCKUub7d644HP" crossorigin="anonymous"></script>
   <script defer src="vendor/pmtiles-4.3.0.js"></script>
   <script defer src="vendor/proj4-2.12.1.js"></script>
@@ -24,7 +24,7 @@
   <script defer src="i18n-gis-zh.js?v=1.8-scope"></script>
   <script defer src="i18n-scope-zh.js?v=1.8-scope"></script>
   <script defer src="i18n-device-zh.js?v=1.12.1-local-network"></script>
-  <script defer src="i18n-storage-zh.js?v=1.9-local"></script>
+  <script defer src="i18n-storage-zh.js?v=1.14-analysis"></script>
   <script defer src="i18n-basemaps-zh.js?v=1.10-design"></script>
   <script defer src="i18n-interface-zh.js?v=1.10-design"></script>
   <script defer src="i18n-composer-zh.js?v=1.10-design"></script>
@@ -34,7 +34,10 @@
   <script defer src="i18n-workflows-zh.js?v=1.12-results"></script>
   <script defer src="i18n-data-sources-zh.js?v=1.13-unified"></script>
   <script defer src="i18n-layer-actions-zh.js?v=1.13-unified"></script>
-  <script defer src="i18n-comparison-zh.js?v=1.13-unified"></script>
+  <script defer src="i18n-comparison-zh.js?v=1.14-analysis"></script>
+  <script defer src="i18n-toolbar-zh.js?v=1.14-dropdowns"></script>
+  <script defer src="toolbar-layout.js?v=1.14-dropdowns"></script>
+  <script defer src="i18n-native-charts-zh.js?v=1.14-analysis"></script>
   <script defer src="i18n.js?v=1.11-engine"></script>
   <script defer src="sidebar.js?v=1.10-design"></script>
   <script defer src="interface-controls.js?v=1.12-results"></script>
@@ -53,18 +56,19 @@
   <script defer src="analysis-data.js?v=1.11-engine"></script>
   <script defer src="data-sources.js?v=1.13-unified"></script>
   <script defer src="layer-purpose.js?v=1.13-unified"></script>
-  <script defer src="local-engine-client.js?v=1.13-unified"></script>
-  <script defer src="task-center.js?v=1.13-unified"></script>
+  <script defer src="local-engine-client.js?v=1.14-analysis"></script>
+  <script defer src="task-center.js?v=1.14-analysis"></script>
   <script defer src="analysis-layers.js?v=1.11-engine"></script>
   <script defer src="gis-core.js?v=1.8-scope"></script>
   <script defer src="gis-range.js?v=1.12-results"></script>
   <script defer src="gis-selection.js?v=1.12-results"></script>
   <script defer src="native-result-map.js?v=1.12-results"></script>
   <script defer src="gis-workspace.js?v=1.13-unified"></script>
-  <script defer src="data-workspace.js?v=1.13-unified"></script>
-  <script defer src="layer-actions.js?v=1.13-unified"></script>
-  <script defer src="source-comparison.js?v=1.13-unified"></script>
-  <script defer src="analysis-ui.js?v=1.11-engine"></script>
+  <script defer src="data-workspace.js?v=1.14-analysis"></script>
+  <script defer src="layer-actions.js?v=1.14-analysis"></script>
+  <script defer src="source-building-matches.js?v=1.14-analysis"></script>
+  <script defer src="source-comparison.js?v=1.14-analysis"></script>
+  <script defer src="analysis-ui.js?v=1.14-analysis"></script>
   <script defer src="map-composer.js?v=1.12.2-native-map"></script>
   <script defer src="workspace-tools.js?v=1.4-ui"></script>
   <script defer src="map-project-core.js?v=1.12-results"></script>
@@ -79,7 +83,7 @@
   <script defer src="project-packages.js?v=1.12-results"></script>
   <script defer src="task-guides.js?v=1.13-unified"></script>
   <script defer src="map-share.js?v=1.11-engine"></script>
-  <script defer src="device-settings.js?v=1.12.1-local-network"></script>
+  <script defer src="device-settings.js?v=1.14-analysis"></script>
   <script defer src="app.js?v=1.11-engine"></script>
   <script type="module" src="model-browser.js?v=1.5-projects"></script>
   <script type="module" src="local-models.js?v=1.5-projects"></script>
@@ -102,22 +106,46 @@
   <link rel="stylesheet" href="task-center.css?v=1.12-results">
   <link rel="stylesheet" href="map-share.css?v=1.11-engine">
   <link rel="stylesheet" href="readonly-viewer.css?v=1.11-engine">
+  <link rel="stylesheet" href="toolbar-layout.css?v=1.14-dropdowns">
 </head>
 <body>
   <a class="skip-link" href="#map" data-i18n>Skip to map</a>
-  <header class="app-header">
+  <header class="app-header compact-workspace-header">
     <a class="brand" href="./" aria-label="US Buildings home" data-i18n-aria-label><span class="brand-mark"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 26V13l8-5v18M12 26V4l9 5v17M21 26V15l7-4v15M2 27h28"/></svg></span><strong>US Buildings</strong></a>
     <div class="workspace-document-control"><button class="workspace-document" id="workspace-document" data-project-open>Untitled project</button><span id="project-state-dot" class="project-state-dot" aria-hidden="true"></span><span class="sr-only" data-project-status data-i18n-system></span></div>
-    <div class="header-actions"><label class="language-control"><span class="sr-only" data-i18n>Language</span><select id="interface-language" aria-label="Language / 语言" data-i18n-aria-label><option value="en" lang="en">English</option><option value="zh-CN" lang="zh-CN">中文</option></select></label><button class="quiet-button" data-share-map title="Copy this map view" data-i18n-title><span data-icon="share"></span><span data-i18n>Share</span></button><button class="quiet-button" data-workspace-tool="download"><span data-icon="download"></span><span data-i18n>Download</span></button><button class="quiet-button" data-task-center aria-label="Task center" data-i18n-aria-label><span data-icon="list"></span><span data-i18n>Tasks</span></button><button class="quiet-button" data-device-settings aria-label="Files &amp; device" data-i18n-aria-label><span data-icon="folder"></span><span data-i18n>Files &amp; device</span></button><button class="icon-button" data-workspace-tool="settings" title="CRS and workspace settings" aria-label="Settings" data-i18n-title data-i18n-aria-label><span data-icon="settings"></span></button></div>
+    <div class="header-actions"><label class="language-control"><span class="sr-only" data-i18n>Language</span><select id="interface-language" aria-label="Language / 语言" data-i18n-aria-label><option value="en" lang="en">English</option><option value="zh-CN" lang="zh-CN">中文</option></select></label></div>
   </header>
-  <div class="ribbon gis-ribbon" role="toolbar" aria-label="GIS workspace tools" data-i18n-aria-label>
-    <div class="gis-tool-group"><span class="gis-group-caption" data-i18n>DATA</span><div class="gis-group-tools"><button class="add-data-primary" data-add-data><span data-icon="plus"></span><span data-i18n>Add data</span></button><button class="tool" data-task-guides><span data-icon="list"></span><span data-i18n>Start a task</span></button><button class="tool" data-data-workspace><span data-icon="download"></span><span data-i18n>Data &amp; scope</span></button><button class="tool" data-action="table" id="table-toggle" aria-controls="attribute-table" aria-expanded="false"><span data-icon="table"></span><span data-i18n>Attributes</span></button></div></div>
-    <div class="gis-tool-group"><span class="gis-group-caption" data-i18n>MAP</span><div class="gis-group-tools"><button class="tool layers-toggle" data-action="layers" aria-label="Toggle layers" aria-controls="sidebar" aria-expanded="true" data-i18n-aria-label><span data-icon="layers"></span><span data-i18n>Layers</span></button><button class="tool models-tool" data-open-models aria-label="Toggle models" aria-controls="sidebar" aria-expanded="false" data-i18n-aria-label><span data-icon="cube"></span><span data-i18n>3D models</span></button><details class="tools-menu"><summary class="tool"><span data-icon="hand"></span><span data-i18n>Navigate</span></summary><div class="tools-popover"><button data-tool="explore" data-i18n>Pan &amp; zoom</button><button data-tool="identify" data-i18n>Identify</button><button data-tool="measure" data-i18n>Measure distance</button><button data-explorer-choose data-i18n>Choose a U.S. place</button><button data-modal="basemap" data-i18n>Basemap</button><button data-action="legend" data-i18n>Legend</button></div></details></div></div>
-    <div class="gis-tool-group interface-tool-group"><span class="gis-group-caption" data-i18n>INTERFACE</span><div class="gis-group-tools"><button class="tool" data-interface-open aria-controls="interface-panel" aria-label="Customize interface" data-i18n-aria-label><span data-icon="sliders"></span><span data-i18n>Interface</span></button></div></div>
-    <div class="gis-tool-group"><span class="gis-group-caption" data-i18n>SELECTION</span><div class="gis-group-tools"><details class="tools-menu"><summary class="tool"><span data-icon="pointer"></span><span data-i18n>Select features</span></summary><div class="tools-popover"><button data-gis-select="click" data-i18n>Click / multiple selection</button><button data-gis-select="box" data-i18n>Box selection</button><button data-gis-select="polygon" data-i18n>Polygon selection</button><button data-gis-action="select-location" data-i18n>Select by location</button><button data-gis-action="attribute-select" data-i18n>Select by attribute</button><button data-gis-action="select-all" data-i18n>Select all loaded records</button><button data-gis-action="invert-selection" data-i18n>Invert selection</button><button data-gis-action="clear-selection" data-i18n>Clear selection</button></div></details><details class="tools-menu"><summary class="tool"><span data-i18n>Selected</span><b data-gis-selection-count>0</b></summary><div class="tools-popover"><button data-gis-action="selection-table" data-i18n>Selected records table</button><button data-gis-action="zoom-selection" data-i18n>Zoom to selection</button><button data-gis-action="export-selected-geojson" data-i18n>Export selected GeoJSON</button><button data-gis-action="export-selected-csv" data-i18n>Export selected CSV</button><button data-gis-action="selected-new" data-i18n>Add selected to new layer</button><button data-gis-action="unselected-new" data-i18n>Extract unselected records</button></div></details></div></div>
-    <div class="gis-tool-group"><span class="gis-group-caption" data-i18n>PROCESSING</span><div class="gis-group-tools"><details class="tools-menu" id="workspace-tools-menu"><summary class="tool"><span data-icon="analysis"></span><span data-i18n>Geoprocessing</span></summary><div class="tools-popover"><button data-gis-action="extract-box" data-i18n>Extract by box</button><button data-gis-action="extract-mask" data-i18n>Extract by mask</button><button data-gis-action="clip" data-i18n>Clip outlines</button><button data-gis-action="erase" data-i18n>Erase by mask</button><button data-gis-action="merge" data-i18n>Merge layers</button><button data-gis-action="dissolve" data-i18n>Dissolve polygons</button><button data-gis-action="buffer" data-i18n>Buffer</button><button data-gis-action="measure" data-i18n>Add area and boundary length</button><button data-gis-action="centroid" data-i18n>Create center points</button><button data-gis-action="singlepart" data-i18n>Multipart to singlepart</button><button data-gis-action="deduplicate" data-i18n>Remove exact duplicates</button><button data-workspace-tool="analysis" data-i18n>Overlay &amp; area summaries</button></div></details><details class="tools-menu"><summary class="tool"><span data-icon="chart"></span><span data-i18n>Statistics</span></summary><div class="tools-popover"><button data-workspace-tool="statistics" data-layer-action="statistics" data-i18n>Statistics</button><button data-workspace-tool="chart" data-layer-action="chart" data-i18n>Charts</button><button data-source-comparison data-i18n>Compare sources</button><button data-workspace-tool="draw" data-i18n>Draw on the map</button></div></details></div></div>
-    <div class="gis-tool-group"><span class="gis-group-caption" data-i18n>LAYERS</span><div class="gis-group-tools"><details class="tools-menu"><summary class="tool"><span data-icon="layers"></span><span data-i18n>Layer actions</span></summary><div class="tools-popover"><div data-layer-actions-menu><button data-gis-action="zoom-layer" data-i18n>Zoom to layer</button><button data-gis-action="duplicate-layer" data-i18n>Duplicate layer</button><button data-gis-action="rename-layer" data-i18n>Rename layer</button><button data-gis-action="extent-layer" data-i18n>Create layer extent</button><button data-gis-action="layer-up" data-i18n>Move up</button><button data-gis-action="layer-down" data-i18n>Move down</button></div><button data-gis-action="undo-result" data-i18n>Remove last GIS output</button></div></details></div></div>
-    <div class="gis-tool-group gis-output-group"><span class="gis-group-caption" data-i18n>PROJECT &amp; OUTPUT</span><div class="gis-group-tools"><button class="tool" data-project-open><span data-icon="map"></span><span data-i18n>Projects</span></button><button class="tool map-output-tool" data-workspace-tool="map"><span data-icon="map"></span><span data-i18n>Create map</span></button><details class="tools-menu"><summary class="tool" aria-label="Workspace options" data-i18n-aria-label><span data-icon="settings"></span></summary><div class="tools-popover"><button data-workspace-tool="download" data-i18n>Download</button><button data-device-settings data-device-tab="files" data-i18n>Local files &amp; cache</button><button data-clear-cache data-i18n>Clear cache</button><button data-workspace-tool="settings" data-i18n>CRS &amp; settings</button><button data-modal="help" data-i18n>Help</button></div></details></div></div>
+  <div class="ribbon gis-ribbon compact-toolbar" role="toolbar" aria-label="GIS workspace tools" data-i18n-aria-label>
+    <div class="toolbar-shortcuts" role="group" aria-label="Quick actions" data-i18n-aria-label>
+      <button class="add-data-primary" data-add-data><span data-icon="plus"></span><span data-i18n>Add data</span></button>
+      <button class="tool toolbar-scope-shortcut" data-data-workspace><span data-icon="download"></span><span data-i18n>Data &amp; scope</span></button>
+      <button class="tool toolbar-create-shortcut" data-workspace-tool="map"><span data-icon="map"></span><span data-i18n>Create map</span></button>
+    </div>
+    <div class="toolbar-menus" role="group" aria-label="Workspace menus" data-i18n-aria-label>
+      <details class="tools-menu toolbar-dropdown" data-toolbar-menu="data"><summary class="tool" id="toolbar-data-trigger" aria-expanded="false" aria-controls="toolbar-data-menu" aria-haspopup="menu"><span data-i18n>Data</span></summary><div class="tools-popover toolbar-popover" id="toolbar-data-menu" role="menu" aria-labelledby="toolbar-data-trigger">
+        <button data-add-data data-i18n>Add data</button><button data-data-workspace data-i18n>Data &amp; scope</button><button data-action="table" id="table-toggle" aria-controls="attribute-table" aria-expanded="false" data-i18n>Attributes</button><button data-task-guides data-i18n>Start a task</button>
+      </div></details>
+      <details class="tools-menu toolbar-dropdown" data-toolbar-menu="map"><summary class="tool" id="toolbar-map-trigger" aria-expanded="false" aria-controls="toolbar-map-menu" aria-haspopup="menu"><span data-i18n>Map</span></summary><div class="tools-popover toolbar-popover" id="toolbar-map-menu" role="menu" aria-labelledby="toolbar-map-trigger">
+        <button data-workspace-tool="map" data-i18n>Create map</button><div class="toolbar-menu-section" role="presentation" data-i18n>Explore the map</div><button data-tool="explore" data-i18n>Pan &amp; zoom</button><button data-tool="identify" data-i18n>Identify</button><button data-tool="measure" data-i18n>Measure distance</button><button data-explorer-choose data-i18n>Choose a U.S. place</button><button data-modal="basemap" data-i18n>Basemap</button><button data-workspace-tool="draw" data-i18n>Draw on the map</button>
+      </div></details>
+      <details class="tools-menu toolbar-dropdown" data-toolbar-menu="select"><summary class="tool" id="toolbar-select-trigger" aria-expanded="false" aria-controls="toolbar-select-menu" aria-haspopup="menu"><span data-i18n>Select</span><b class="toolbar-selection-count" data-gis-selection-count>0</b></summary><div class="tools-popover toolbar-popover" id="toolbar-select-menu" role="menu" aria-labelledby="toolbar-select-trigger">
+        <div class="toolbar-menu-section" role="presentation" data-i18n>Select features</div><button data-gis-select="click" data-i18n>Click / multiple selection</button><button data-gis-select="box" data-i18n>Box selection</button><button data-gis-select="polygon" data-i18n>Polygon selection</button><button data-gis-action="select-location" data-i18n>Select by location</button><button data-gis-action="attribute-select" data-i18n>Select by attribute</button><button data-gis-action="select-all" data-i18n>Select all loaded records</button><button data-gis-action="invert-selection" data-i18n>Invert selection</button><button data-gis-action="clear-selection" data-i18n>Clear selection</button>
+        <div class="toolbar-menu-section" role="presentation" data-i18n>Selected records</div><button data-gis-action="selection-table" data-i18n>Selected records table</button><button data-gis-action="zoom-selection" data-i18n>Zoom to selection</button><button data-gis-action="export-selected-geojson" data-i18n>Export selected GeoJSON</button><button data-gis-action="export-selected-csv" data-i18n>Export selected CSV</button><button data-gis-action="selected-new" data-i18n>Add selected to new layer</button><button data-gis-action="unselected-new" data-i18n>Extract unselected records</button>
+      </div></details>
+      <details class="tools-menu toolbar-dropdown" id="workspace-tools-menu" data-toolbar-menu="analysis"><summary class="tool" id="toolbar-analysis-trigger" aria-expanded="false" aria-controls="toolbar-analysis-menu" aria-haspopup="menu"><span data-i18n>Analysis</span></summary><div class="tools-popover toolbar-popover" id="toolbar-analysis-menu" role="menu" aria-labelledby="toolbar-analysis-trigger">
+        <button data-workspace-tool="statistics" data-layer-action="statistics" data-i18n>Statistics</button><button data-workspace-tool="chart" data-layer-action="chart" data-i18n>Charts</button><button data-source-comparison data-i18n>Compare sources</button><button data-workspace-tool="analysis" data-i18n>Overlay &amp; area summaries</button>
+        <div class="toolbar-menu-section" role="presentation" data-i18n>Geoprocessing</div><button data-gis-action="extract-box" data-i18n>Extract by box</button><button data-gis-action="extract-mask" data-i18n>Extract by mask</button><button data-gis-action="clip" data-i18n>Clip outlines</button><button data-gis-action="erase" data-i18n>Erase by mask</button><button data-gis-action="merge" data-i18n>Merge layers</button><button data-gis-action="dissolve" data-i18n>Dissolve polygons</button><button data-gis-action="buffer" data-i18n>Buffer</button><button data-gis-action="measure" data-i18n>Add area and boundary length</button><button data-gis-action="centroid" data-i18n>Create center points</button><button data-gis-action="singlepart" data-i18n>Multipart to singlepart</button><button data-gis-action="deduplicate" data-i18n>Remove exact duplicates</button>
+      </div></details>
+      <details class="tools-menu toolbar-dropdown" data-toolbar-menu="layer"><summary class="tool" id="toolbar-layer-trigger" aria-expanded="false" aria-controls="toolbar-layer-menu" aria-haspopup="menu"><span data-i18n>Layer</span></summary><div class="tools-popover toolbar-popover" id="toolbar-layer-menu" role="menu" aria-labelledby="toolbar-layer-trigger">
+        <div data-layer-actions-menu><button data-gis-action="zoom-layer" data-i18n>Zoom to layer</button><button data-gis-action="duplicate-layer" data-i18n>Duplicate layer</button><button data-gis-action="rename-layer" data-i18n>Rename layer</button><button data-gis-action="extent-layer" data-i18n>Create layer extent</button><button data-gis-action="layer-up" data-i18n>Move up</button><button data-gis-action="layer-down" data-i18n>Move down</button></div><div class="toolbar-menu-divider" role="separator"></div><button data-gis-action="undo-result" data-i18n>Remove last GIS output</button>
+      </div></details>
+      <details class="tools-menu toolbar-dropdown" data-toolbar-menu="project"><summary class="tool" id="toolbar-project-trigger" aria-expanded="false" aria-controls="toolbar-project-menu" aria-haspopup="menu"><span data-i18n>Project</span></summary><div class="tools-popover toolbar-popover" id="toolbar-project-menu" role="menu" aria-labelledby="toolbar-project-trigger">
+        <button data-project-open data-i18n>Projects</button><button data-share-map title="Copy this map view" data-i18n-title data-i18n>Share</button><button data-workspace-tool="download" data-i18n>Download</button><button data-task-center data-i18n>Tasks</button><div class="toolbar-menu-section" role="presentation" data-i18n>Workspace</div><button data-device-settings data-i18n>Files &amp; device</button><button data-device-settings data-device-tab="files" data-i18n>Local files &amp; cache</button><button data-clear-cache data-i18n>Clear cache</button><button data-workspace-tool="settings" data-i18n>CRS &amp; settings</button><button data-modal="help" data-i18n>Help</button>
+      </div></details>
+      <details class="tools-menu toolbar-dropdown" data-toolbar-menu="interface"><summary class="tool" id="toolbar-interface-trigger" aria-expanded="false" aria-controls="toolbar-interface-menu" aria-haspopup="menu"><span data-i18n>Interface</span></summary><div class="tools-popover toolbar-popover" id="toolbar-interface-menu" role="menu" aria-labelledby="toolbar-interface-trigger">
+        <button data-interface-open aria-controls="interface-panel" aria-expanded="false" data-i18n>Customize interface</button><div class="toolbar-menu-section" role="presentation" data-i18n>Common panels</div><button class="layers-toggle" data-action="layers" aria-controls="sidebar" aria-expanded="true" data-i18n>Layers</button><button class="models-tool" data-open-models aria-controls="sidebar" aria-expanded="false" data-i18n>3D models</button><button data-action="legend" data-i18n>Legend</button>
+      </div></details>
+    </div>
   </div>
 
   <div class="workspace">

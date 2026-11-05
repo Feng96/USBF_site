@@ -1,5 +1,35 @@
 # US Buildings
 
+## Analysis and compact workspace (1.14 / engine 0.4 preview)
+
+The toolbar groups Data, Map, Select, Analysis, Layer, Project and Interface
+actions in keyboard-accessible dropdowns. Add Data, Data & scope and Create Map
+remain direct shortcuts. Menus close on Escape/outside click, restore focus and
+fit narrow English and Chinese layouts. Layer actions still use the shared
+capability registry and target the explicit active layer.
+
+Native **Charts** now summarizes complete results or immutable selected/saved-area
+records, including records beyond the map preview. Histograms, category counts
+and grouped means transfer bounded aggregates; original fields and typed values
+remain unchanged. Scatter plots continue to require a browser analytical workset.
+
+**Analysis → Compare sources → Building matches** compares two original polygon
+worksets within one saved area. Compatible provenance IDs take priority, followed
+by equal-area overlap/coverage thresholds. Reports preserve one-to-many,
+many-to-one, ambiguous, unmatched and invalid footprints. Report categories can
+create ordinary source selections/layers; thresholds and correspondence are
+inspectable evidence, not independent accuracy validation.
+
+Original-provider downloads share a validated metadata and materialization cache
+under the existing Files & device manager. Every mutable source is checked again
+before reuse. An unchanged OSM test improved from 45.2 to 1.6 seconds; the GBA
+test improved from 296.9 seconds before the update to 71.5 seconds cold and
+38.4 seconds warm while still validating all 189 source files. These are bounded
+25-record request measurements on one machine, not nationwide throughput claims.
+Update the isolated local engine to 0.4 to use these new native capabilities.
+
+See [analysis implementation and acceptance](docs/analysis-workspace-acceptance.md).
+
 ## Unified layers and original-data connections (1.13)
 
 Layer rows, the active-layer ribbon and Data & scope share one capability-aware
@@ -16,8 +46,9 @@ remain display connections with provider links and original-file import.
 **Compare sources** summarizes two original polygon worksets for one saved area,
 including complete native records beyond the preview, whole-polygon area and
 supplied height availability. Exported receipts preserve exact input scopes,
-source identities and measurement methods. This release does not perform
-one-to-one footprint matching or claim independent accuracy validation.
+source identities and measurement methods. The 1.13 summary comparison remains
+available alongside the new correspondence report; neither claims independent
+accuracy validation.
 
 See [the unified workflow and source contract](docs/unified-data-workflow.md).
 [Acceptance evidence and practical limits](docs/unified-data-acceptance.md).

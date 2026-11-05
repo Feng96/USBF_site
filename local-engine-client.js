@@ -7,7 +7,7 @@ function endpoint(value=DEFAULT){let u;try{u=new URL(value);}catch(_){throw Erro
 function safePath(path){if(typeof path!=='string'||!path.startsWith('/v1/')||/[\r\n#]/.test(path)||path.split('?')[0].split('/').some(v=>{try{return decodeURIComponent(v)==='..';}catch(_){return true;}})||path.startsWith('//'))throw Error('Invalid local engine request.');return path;}
 root.PortalNativeCore={endpoint,safePath,defaultEndpoint:DEFAULT};
 if(!root.document)return;
-if(root.PortalReadOnlyMode){const unavailable=()=>{throw Error('Local engine access is disabled in a read-only shared map.');};root.PortalNativeEngine={defaultEndpoint:DEFAULT,endpoint,status:()=>({paired:false,connected:false,readonly:true,information:null,error:''}),...Object.fromEntries(['health','pair','refresh','plan','create','jobs','job','cancel','resume','preview','table','files','importGeoJSON','download','requestUninstall','resultMap','resultTile','resultFeature','queryResult','selectResult','maintenance','configureResources','cleanNativeCache','diagnostics','projectExport','projectImport','projectRelink','projectPackageDownload','summary','comparisonSummary'].map(k=>[k,unavailable])),unpair(){},compareWorkspace:async()=>({matched:null}),fileInfo:async()=>({available:false,reason:'Local engine access is disabled in a read-only shared map.'})};return;}
+if(root.PortalReadOnlyMode){const unavailable=()=>{throw Error('Local engine access is disabled in a read-only shared map.');};root.PortalNativeEngine={defaultEndpoint:DEFAULT,endpoint,status:()=>({paired:false,connected:false,readonly:true,information:null,error:''}),...Object.fromEntries(['health','pair','refresh','plan','create','jobs','job','cancel','resume','preview','table','files','importGeoJSON','download','requestUninstall','resultMap','resultTile','resultFeature','queryResult','selectResult','maintenance','configureResources','cleanNativeCache','diagnostics','projectExport','projectImport','projectRelink','projectPackageDownload','summary','comparisonSummary','createMatching','matchingPage','matchingSelection','downloadMatches','chart','cancelChart'].map(k=>[k,unavailable])),unpair(){},compareWorkspace:async()=>({matched:null}),fileInfo:async()=>({available:false,reason:'Local engine access is disabled in a read-only shared map.'})};return;}
 const supported=!/Android|iPhone|iPad|iPod/i.test(root.navigator?.userAgent||'');
 let base=DEFAULT,token=null,info=null,healthInfo=null,error='',poll=null,refreshing=null,refreshGeneration=-1,generation=0;
 try{const saved=JSON.parse(sessionStorage.getItem(KEY)||'null');if(saved&&typeof saved.token==='string'&&saved.token.length<=512){base=endpoint(saved.endpoint);token=saved.token;}}catch(_){}
@@ -58,6 +58,13 @@ root.PortalNativeEngine={defaultEndpoint:DEFAULT,endpoint,status,health,pair,unp
  table:(id,offset=0,limit=100)=>request(jobPath(id)+'/table?offset='+Math.max(0,offset)+'&limit='+Math.min(1000,Math.max(1,limit))),
  summary:(id,body={},options={})=>request(jobPath(id)+'/summary',{method:'POST',body,timeout:120000,...options}),
  comparisonSummary:(id,body={},options={})=>request(jobPath(id)+'/comparison-summary',{method:'POST',body,timeout:120000,...options}),
+ chart:(id,body={},options={})=>request(jobPath(id)+'/chart',{method:'POST',body,timeout:120000,...options}),
+ cancelChart:(id,requestId)=>request(jobPath(id)+'/chart-cancel',{method:'POST',body:{requestId}}),
+ createMatching:(body,options={})=>request('/v1/matches',{method:'POST',body,timeout:120000,...options}),
+ matchingPage:(id,body={},options={})=>request(jobPath(id)+'/matches',{method:'POST',body,timeout:120000,...options}),
+ matchingSelection:(id,body={},options={})=>request(jobPath(id)+'/match-selection',{method:'POST',body,timeout:120000,...options}),
+ downloadMatches:(id,format='csv')=>saveDownload(jobPath(id)+'/match-export?format='+encodeURIComponent(format),'building-matches-'+id+'.'+(format==='json'?'json':'csv')),
+
  resultMap:(id,options={})=>request(resultPath(id)+'/map',{timeout:120000,...options}),
  resultTile:(id,z,x,y,{selectionId=null,signal}={})=>request(resultPath(id)+'/tiles/'+[z,x,y].join('/')+'.pbf'+(selectionId?'?selectionId='+encodeURIComponent(selectionId):''),{response:'arrayBuffer',signal,timeout:120000}),
  resultFeature:(id,row,options={})=>request(resultPath(id)+'/features/'+encodeURIComponent(String(row).split(':').at(-1)),{timeout:60000,...options}),

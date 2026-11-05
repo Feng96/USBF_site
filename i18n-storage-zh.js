@@ -18,3 +18,10 @@ Choose a managed analysis snapshot.|请选择网站管理的分析快照。
 This cache snapshot is too large.|此缓存快照过大。
 This is not an analysis snapshot.|这不是分析快照。
 `.trim().split('\n').map(row=>{const i=row.indexOf('|');return[row.slice(0,i),row.slice(i+1)];})));
+
+Object.assign(window.PortalTranslations['zh-CN'], {
+  'Verified provider metadata': '已验证的来源元数据',
+  'Reusable provider data blocks': '可复用的来源数据块',
+  'Verified provider cache hits': '已验证的来源缓存命中次数',
+  'Source identities are checked before reuse. Changed sources invalidate cached metadata and data blocks.': '复用前检查来源身份；来源变化后，相关元数据和数据块缓存会失效。'
+});

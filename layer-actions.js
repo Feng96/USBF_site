@@ -23,7 +23,7 @@
     require(ready||native,preview||raster||cap.attributePreview?display:fixed);
     if(native){require(nativeReady,nativeConnection);scope='native-result';}
     if(native&&id==='statistics')require(!!engine?.information?.capabilities?.resultSummary,'Update and pair the local engine to summarize full results.');
-    if(id==='chart')require(!native,'Charts need a fixed browser workset. The bounded native preview is not the full analytical input.');
+    if(id==='chart'&&native)require(!!engine?.information?.capabilities?.resultCharts,'Update the local engine to chart complete native results.');
    }
    if(id==='table'){
     require(!raster,'Raster display layers do not supply vector records.');

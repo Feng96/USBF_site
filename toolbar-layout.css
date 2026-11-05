@@ -1,0 +1,79 @@
+/* Compact workspace chrome. Other tools-menu popups keep their own layout. */
+.compact-workspace-header.app-header{height:56px;min-height:56px;padding:0 20px;gap:24px}
+.compact-workspace-header .brand{min-width:0;flex-shrink:0;gap:9px}
+.compact-workspace-header .brand-mark{width:31px;height:33px;border-radius:7px}
+.compact-workspace-header .brand-mark svg{width:25px;height:25px}
+.compact-workspace-header .brand strong{font-size:13px;letter-spacing:.5px}
+.compact-workspace-header .workspace-document-control{display:flex;flex:1;min-width:0;max-width:450px}
+.compact-workspace-header .workspace-document{display:block;min-width:0;font-size:12px;max-width:100%;padding:7px 4px}
+.compact-workspace-header .header-actions{gap:0;flex-shrink:0}
+.compact-workspace-header .language-control select{max-width:95px;font-size:12px;padding:6px 7px}
+.ribbon.gis-ribbon.compact-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px;width:100%;min-width:0;height:auto;min-height:49px;max-height:none;padding:6px 18px;overflow:visible;touch-action:auto;position:relative;z-index:1250}
+.compact-toolbar .toolbar-shortcuts,.compact-toolbar .toolbar-menus{display:flex;align-items:center;gap:4px;min-width:0}
+.compact-toolbar .toolbar-shortcuts{flex:0 0 auto;padding-right:16px;border-right:1px solid #dce5dd}
+.compact-toolbar .toolbar-menus{flex:0 1 auto;flex-wrap:wrap;gap:2px}
+.compact-toolbar .toolbar-shortcuts>button{position:static;display:flex;align-items:center;justify-content:center;gap:6px;min-height:35px;padding:7px 11px;font-size:12px;line-height:19px;white-space:nowrap}
+.compact-toolbar .toolbar-shortcuts .add-data-primary{border:1px solid #245c4c;background:#244f43;color:#fff;border-radius:5px}
+.compact-toolbar .toolbar-shortcuts .add-data-primary:hover{background:#326c58}
+.compact-toolbar .toolbar-shortcuts>button svg{width:15px;height:15px}
+.compact-toolbar .toolbar-dropdown{position:relative;flex:0 0 auto;min-width:0}
+.compact-toolbar .toolbar-dropdown>summary.tool{display:flex;align-items:center;justify-content:center;gap:7px;min-height:35px;padding:7px 10px;font-size:12px;font-weight:550;line-height:19px;color:#415e50;border-radius:5px;list-style:none;white-space:nowrap;cursor:pointer}
+.compact-toolbar .toolbar-dropdown>summary::-webkit-details-marker{display:none}
+.compact-toolbar .toolbar-dropdown>summary:after{content:"";width:5px;height:5px;flex-shrink:0;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:translateY(-2px) rotate(45deg);opacity:.65}
+.compact-toolbar .toolbar-dropdown[open]>summary{background:#e9f1e8;color:#1d654e}
+.compact-toolbar .toolbar-dropdown[open]>summary:after{transform:translateY(1px) rotate(225deg)}
+.compact-toolbar .toolbar-dropdown>summary:focus-visible{outline-offset:0}
+.compact-toolbar .toolbar-selection-count{padding:1px 5px;background:#ede8f3;color:#74499b;border-radius:4px;font-size:10px;font-weight:650;line-height:16px}
+.compact-toolbar .toolbar-selection-count:empty{display:none}
+.compact-toolbar .toolbar-popover.tools-popover{position:fixed;inset:auto;z-index:1800;width:280px;min-width:0;max-width:calc(100vw - 16px);max-height:calc(100dvh - 100px);overflow:auto;overscroll-behavior:contain;padding:6px;background:#fff;border:1px solid #cbdacf;border-radius:8px;box-shadow:0 10px 32px #143a2c28;scrollbar-width:thin;text-align:left}
+.compact-toolbar .toolbar-dropdown:not([open])>.toolbar-popover{display:none}
+.compact-toolbar .toolbar-popover button{display:flex;align-items:center;gap:8px;width:100%;min-height:35px;padding:8px 10px;font-size:12px;font-weight:400;line-height:1.5;text-align:left;white-space:normal;overflow-wrap:anywhere;border:0;border-radius:4px;color:#294b3c;background:none}
+.compact-toolbar .toolbar-popover button:hover:not(:disabled),.compact-toolbar .toolbar-popover button:focus-visible{background:#edf5ed;color:#1c634b}
+.compact-toolbar .toolbar-popover button:focus-visible{outline:2px solid #34896e;outline-offset:-2px}
+.compact-toolbar .toolbar-popover button:disabled{color:#7d8b80;opacity:.68;cursor:default}
+.compact-toolbar .toolbar-popover .active{background:#eef4ec;color:#22674f;font-weight:600}
+.compact-toolbar .toolbar-popover .toolbar-menu-section{padding:10px 10px 4px;margin:4px 0 2px;border-top:1px solid #e7ede7;color:#748478;font-size:10px;font-weight:650;line-height:1.5;letter-spacing:.35px}
+.compact-toolbar .toolbar-popover>.toolbar-menu-section:first-child{border-top:0;margin-top:0;padding-top:5px}
+.compact-toolbar .toolbar-menu-divider{height:1px;margin:6px 4px;background:#e7ede7}
+.compact-toolbar .toolbar-popover .layer-action-item{margin:0}
+.compact-toolbar .toolbar-popover .layer-action-reason{padding:0 10px 6px;font-size:10px;line-height:1.5;color:#7f8c81;overflow-wrap:anywhere}
+.compact-toolbar .toolbar-popover [data-layer-actions-menu]{display:block}
+.compact-toolbar .toolbar-popover .models-tool{background:none;flex-shrink:1}
+.interface-panel{top:var(--portal-toolbar-bottom,110px)}
+@media(max-width:1100px){
+ .ribbon.gis-ribbon.compact-toolbar{gap:4px 8px;padding-left:12px;padding-right:12px}
+ .compact-toolbar .toolbar-shortcuts{padding-right:8px}
+ .compact-toolbar .toolbar-shortcuts>.toolbar-create-shortcut{display:none}
+ .compact-toolbar .toolbar-dropdown>summary.tool{padding-left:8px;padding-right:8px}
+}
+@media(max-width:700px){
+ .compact-workspace-header.app-header{height:49px;min-height:49px;padding:0 10px;gap:12px}
+ .compact-workspace-header .brand strong{font-size:11px;letter-spacing:0}
+ .compact-workspace-header .brand{gap:6px}
+ .compact-workspace-header .brand-mark{width:26px;height:29px;border-radius:6px}
+ .compact-workspace-header .brand-mark svg{width:22px;height:22px}
+ .compact-workspace-header .workspace-document-control{display:flex;gap:4px}
+ .compact-workspace-header .workspace-document{font-size:11px;padding:6px 0}
+ .compact-workspace-header .language-control select{max-width:80px;font-size:11px;padding:5px 3px}
+ .ribbon.gis-ribbon.compact-toolbar{display:flex;flex-wrap:wrap;gap:3px;padding:5px 8px;min-height:0;max-height:none;height:auto;overflow:visible}
+ .compact-toolbar .toolbar-shortcuts{display:contents}
+ .compact-toolbar .toolbar-shortcuts>button{min-height:33px;padding:6px 10px;font-size:12px}
+ .compact-toolbar .toolbar-menus{display:contents}
+ .compact-toolbar .toolbar-dropdown{width:auto}
+ .compact-toolbar .toolbar-dropdown>summary.tool{min-height:31px;justify-content:center;padding:5px 3px;gap:4px;font-size:12px;line-height:21px}
+ .compact-toolbar .toolbar-selection-count{font-size:9px;padding:0 4px}
+ .compact-toolbar .toolbar-popover.tools-popover{width:300px;max-width:calc(100vw - 16px)}
+ .compact-toolbar .toolbar-popover button{min-height:38px;font-size:13px}
+ .interface-panel{top:var(--portal-toolbar-bottom,162px);max-height:calc(100dvh - var(--portal-toolbar-bottom,162px) - 36px)}
+}
+@media(max-width:330px){
+ .compact-workspace-header.app-header{height:auto;min-height:69px;flex-wrap:wrap;gap:1px 8px;padding-top:4px;padding-bottom:3px}
+ .compact-workspace-header .brand strong{max-width:62px;line-height:1.15}
+ .compact-workspace-header .workspace-document-control{order:2;flex:1 0 100%;max-width:100%;min-height:22px}
+ .compact-workspace-header .workspace-document{padding:2px 0}
+ .compact-toolbar .toolbar-shortcuts{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-right:0;padding-right:0}
+ .compact-toolbar .toolbar-shortcuts>button{min-width:0;padding:5px 4px;white-space:normal;text-align:left}
+ .compact-toolbar .toolbar-shortcuts>button>span:last-child{overflow-wrap:anywhere}
+ .compact-toolbar .toolbar-menus{width:100%;display:flex;flex-wrap:wrap}
+ .compact-toolbar .toolbar-dropdown>summary.tool{justify-content:flex-start;padding-left:3px;padding-right:3px}
+}

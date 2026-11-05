@@ -44,5 +44,61 @@ This comparison input exceeds the browser vertex budget. Use the local engine.|�
 One polygon exceeds the browser geometry budget. Use the local engine.|单个面超出浏览器几何容量限制，请使用本地引擎。
 Source comparison requires a complete native result query.|来源比较需要查询完整本地结果。
 Choose all, selected or saved-area records.|请选择全部记录、已选记录或已保存区域内记录。
+Optional building correspondence|可选建筑对应分析
+Match complete original buildings with the local engine|使用本地引擎匹配完整原始建筑记录
+Building matches|建筑匹配
+Summary|汇总
+IoU threshold|交并比阈值
+Either-side coverage threshold|任一侧覆盖率阈值
+Compatible source IDs take priority. Other candidates require positive exact overlap and either threshold. Splits, merges and ambiguities stay visible.|优先采用兼容的来源标识。其他候选必须存在实际面积重叠，并满足交并比或任一侧覆盖率阈值。保留拆分、合并和歧义关系。
+Building correspondence requires an updated paired local engine. Summary comparison also works in the browser.|建筑对应分析需要更新并配对本地引擎。汇总比较也可直接在浏览器中使用。
+Connect and pair the local engine to match complete original buildings.|请连接并配对本地引擎，以匹配完整原始建筑记录。
+Update and pair the local engine to match complete original buildings.|请更新并配对本地引擎，以匹配完整原始建筑记录。
+This browser workset exceeds the 15 MiB staging budget. Import its original file in the local engine.|此浏览器分析数据集超出 15 MiB 暂存限制。请在本地引擎中导入原始文件。
+Saving complete original records in the local engine…|正在向本地引擎保存完整原始记录…
+Matching complete original buildings…|正在匹配完整原始建筑…
+Enable building correspondence and compare sources to create a full native pair report.|启用建筑对应分析并比较来源，以生成完整本地对应报告。
+One to one|一对一
+One to many / possible split|一对多／可能拆分
+Many to one / possible merge|多对一／可能合并
+Ambiguous correspondence|对应关系有歧义
+First source only|仅第一个来源
+Second source only|仅第二个来源
+Invalid first-source outline|第一个来源的无效轮廓
+Invalid second-source outline|第二个来源的无效轮廓
+Correspondence candidates retain splits, merges and ambiguities. Agreement is not independent validation or an accuracy score.|候选对应关系保留拆分、合并和歧义。结果一致不构成独立验证，也不代表准确率。
+Matched original records|具有对应关系的原始记录
+All report rows|全部报告行
+Download full pair report (CSV)|下载完整对应报告（CSV）
+Download full pair report (JSON)|下载完整对应报告（JSON）
+report rows|报告行
+selected pairs|已选对应行
+First source ID|第一个来源的标识
+Second source ID|第二个来源的标识
+Correspondence|对应关系
+Coverage first / second|覆盖率：第一／第二
+Select pair|选择对应行
+Compatible source provenance|兼容的来源溯源标识
+Exact spatial overlap|精确空间重叠
+No accepted correspondence|没有符合条件的对应关系
+Previous page|上一页
+Next page|下一页
+Clear selected pairs|清除所选对应行
+Record actions use selected pairs, or every row in the current category when no pairs are selected. Original attributes are preserved.|记录操作使用已选对应行；未选择时使用当前类别中的全部行。保留原始属性。
+Open original records table|打开原始记录表
+Export original records (GeoJSON)|导出原始记录（GeoJSON）
+Add discrepancy records to map|将差异记录添加至地图
+Report task|报告任务
+Exact polygon intersections in EPSG:6933 equal-area projection, square metres|在 EPSG:6933 等积投影中精确计算面交集，单位为平方米
+Reading complete original records…|正在读取完整原始记录…
+Complete original record action finished.|完整原始记录操作已完成。
+This report category has no original records on this source side.|此报告类别在所选来源一侧没有原始记录。
+Building correspondence report|建筑对应报告
+Building correspondence records|建筑对应记录
+Creating a complete discrepancy layer…|正在创建完整差异图层…
+Building correspondence report loaded.|建筑对应报告已加载。
+All or selected records require worksets loaded for this same saved area.|全部或已选记录要求数据集按同一个已保存区域加载。
+Building correspondence exceeds the 2,000,000 candidate budget. Use a smaller saved study area or explicit selections.|建筑对应分析超出 2,000,000 条候选关系限制。请使用更小的已保存区域或明确的选择记录。
+IoU and coverage thresholds must be greater than zero and at most one.|交并比与覆盖率阈值必须大于零且不超过一。
 `.trim().split('\n')){const i=line.indexOf('|');if(i>0)dictionary[line.slice(0,i)]=line.slice(i+1);}
 })();

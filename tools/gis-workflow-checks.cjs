@@ -7,7 +7,7 @@ module.exports=async qa=>{
   const features=[f('a',-77.072,10),f('b',-77.0716,20),f('c',-77.0712,30)];const l=await PortalLayers.addGeoJSON('GIS source buildings',{type:'FeatureCollection',features},{dataRole:'buildings',heightField:'height_m'});portal.map.jumpTo({center:[-77.0716,38.9121],zoom:18,pitch:0,bearing:0});return l.id;
  });
  await p.waitForFunction(id=>portal.map.isSourceLoaded(id),dataset);
- ok(await p.locator('.gis-group-caption').evaluateAll(elements=>['DATA','MAP','INTERFACE','SELECTION','PROCESSING','LAYERS','PROJECT & OUTPUT'].every(name=>elements.some(el=>el.textContent.trim()===name))),'The toolbar separates data, map, interface, selection, processing, layers and output');
+ ok(await p.evaluate(()=>['data','map','select','analysis','layer','project','interface'].every(name=>document.getElementById('toolbar-'+name+'-menu'))),'The compact toolbar groups data, map, selection, analysis, layers, projects and interface into reachable menus');
  await p.evaluate(id=>{const l=PortalLayers.layers.get(id);PortalGISSelection.set(l,[l.data.features[0],l.data.features[1]],'replace');},dataset);
  ok(await p.evaluate(()=>PortalGISSelection.count()===2),'Bulk selection keeps two distinct source records with duplicate feature IDs');
  await p.evaluate(()=>PortalGIS.action('selection-table'));
@@ -61,7 +61,7 @@ module.exports=async qa=>{
  await p.evaluate(async saved=>PortalProject.restore(await PortalProject.prepare(saved)),saved);
  ok(await p.evaluate(()=>Array.from(PortalLayers.layers.values()).some(l=>l.cfg.name==='Projected extract'&&l.data.provenance.range.crs==='EPSG:3857')),'Project restoration retains GIS outputs and the exact range CRS');
  await p.locator('#interface-language').selectOption('zh-CN');
- await p.waitForFunction(()=>Array.from(document.querySelectorAll('.gis-group-caption')).some(el=>el.textContent==='选择'));
+ await p.waitForFunction(()=>document.getElementById('toolbar-select-trigger')?.textContent.includes('选择'));
  await qa.screenshot('gis-workspace-desktop.png');await p.setViewportSize({width:390,height:844});
  ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Grouped GIS tools fit the phone viewport');
  await qa.screenshot('gis-workspace-phone.png');ok(!qa.errors.length,'GIS range, selection and processing workflows have no uncaught errors');

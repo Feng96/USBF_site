@@ -1,7 +1,8 @@
 /* User-facing statistics and charts; each action binds an independent source input. */
 (function(root){
   'use strict';
-  const A=()=>root.PortalAnalysisData,$=id=>document.getElementById('analysis-'+id);
+  const A=()=>root.PortalAnalysisData,$=id=>document.getElementById('analysis-'+id),nativeSchemas=new WeakMap();
+  const native=l=>!!l?.cfg?.nativeSource;
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmt=(v,d=1)=>v===null||v===undefined?'—':Number(v).toLocaleString('en-US',{maximumFractionDigits:d});
   const storage='usbf-analysis-options-v2',objects=new WeakMap(),jobs=new WeakMap();
@@ -15,13 +16,14 @@
   function selectedKey(selection){const id=selection?.feature?.properties?.usbf_id;return [selection?.layer,id!==null&&id!==undefined&&String(id).trim()!==''?String(id):identity(selection?.feature)];}
   function layer(){return root.PortalLayers?.layers.get($('layer')?.value);}
   function studyLayer(){return root.PortalLayers?.layers.get($('study-area')?.value);}
-  function available(){const l=layer();return !!root.PortalDataWorkspace?.ready(l)&&($('scope').value!=='selection'||root.PortalGISSelection.count(l)>0)&&($('scope').value!=='area'||!!root.PortalDataWorkspace.area());}
+  function available(){const l=layer(),engine=root.PortalNativeEngine?.status(),nativeReady=native(l)&&tab==='chart'&&engine?.connected&&engine.information?.capabilities?.resultCharts&&(engine.information.workspace?.id||engine.information.workspaceId)===l.cfg.nativeSource.workspaceId;return !!(nativeReady||root.PortalDataWorkspace?.ready(l))&&($('scope').value!=='selection'||root.PortalGISSelection.count(l)>0)&&($('scope').value!=='area'||!!root.PortalDataWorkspace.area());}
   function bounds(){const b=root.portal?.map.getBounds();return b?[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()]:null;}
   function inputBinding(){
     const l=layer();if(!l)return '';const mode=$('scope').value,area=mode==='area'?root.PortalDataWorkspace.area():null;
-    return JSON.stringify([l.id,identity(l.data),l.data?.features.length,mode,mode==='selection'?root.PortalGISSelection.features(l).map(identity):null,area?[area.id,identity(area.data)]:null]);
+    return JSON.stringify([l.id,identity(l.data),l.cfg.nativeSource||null,native(l)?Boolean(root.PortalNativeEngine?.status().connected):null,l.data?.features.length,mode,mode==='selection'?(native(l)?root.PortalNativeResults.selection(l):root.PortalGISSelection.features(l).map(identity)):null,area?[area.id,identity(area.data)]:null]);
   }
   function fieldLabel(key){
+    if(native(layer())&&!['$area_m2','$length_m'].includes(key))return String(key);
     if(key==='$area_m2')return snapshot?.provenance.featureRole==='buildings'?'Footprint area · m²':'Area · m²';
     if(key==='$length_m')return 'Boundary length · m';
     if(snapshot?.provenance.featureRole!=='buildings'&&key==='height_m')return 'Height · m';
@@ -29,7 +31,7 @@
     const names={height_m:'Building height · m',height:'Original height value',render_height:'Building height · m',source:'Footprint source',bf_source:'Footprint source',state:'State',usbf_id:'Building ID',modified:'Footprint change'};
     return names[key]||String(key).replace(/_/g,' ').replace(/^./,c=>c.toUpperCase());
   }
-  function sourceNote(l){return root.PortalDataWorkspace?.ready(l)?'Fixed workset. Map movement, visibility and style filters do not change analysis records.':'Create a fixed analysis workset in Data & scope first.';}
+  function sourceNote(l){if(native(l))return 'Charts scan the complete local result or its exact selected records. Only chart summaries enter the browser.';return root.PortalDataWorkspace?.ready(l)?'Fixed workset. Map movement, visibility and style filters do not change analysis records.':'Create a fixed analysis workset in Data & scope first.';}
   function scopeLabel(p){return p.inputContract?p.scopeLabel:p.scopeLabel||'Explicit input records';}
   function featureWord(s=snapshot){return s?.provenance.featureRole==='buildings'?'buildings':'features';}
   function save(name,data,type){const u=URL.createObjectURL(data instanceof Blob?data:new Blob([data],{type})),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),30000);}
@@ -74,19 +76,19 @@
   function clearProducts(){summary=null;lastStats=null;lastChart=null;lastResult=null;$('overview').innerHTML='';$('stats-result').innerHTML='';$('geometry-result').innerHTML='';$('chart-result').innerHTML='';$('spatial-result').innerHTML='';}
   function clearSnapshot(){invalidate();snapshot=null;binding=null;clearProducts();$('snapshot').hidden=true;$('changed').hidden=true;updateButtons();}
   function fieldsForSource(){
-    const l=layer();if(!l)return [];
+    const l=layer();if(!l)return [];if(native(l))return (nativeSchemas.get(l)?.columns||[]).filter(c=>c.scalar).map(c=>c.name);
     return Array.from(new Set([...(l.fields||[]),...l.data?.features.slice(0,200).flatMap(f=>Object.keys(f.properties||{}))||[]]));
   }
   function fillSelect(id,options,preferred){
     const el=$(id),old=el.value,wanted=preferred??old;
-    el.innerHTML=options.map(([v,text])=>'<option value="'+esc(v)+'"'+(v===wanted?' selected':'')+'>'+esc(text)+'</option>').join('')||'<option value="">'+(id==='layer'?'No data added':id==='numeric-field'?'No numeric values':'No suitable field')+'</option>';
+    el.innerHTML=options.map(([v,text])=>'<option value="'+esc(v)+'"'+(v===wanted?' selected':'')+'>'+esc(id==='scope'||v==='__area__'||String(v).startsWith('$')?root.PortalI18n.t(text):text)+'</option>').join('')||'<option value="">'+(id==='layer'?'No data added':id==='numeric-field'?'No numeric values':'No suitable field')+'</option>';
     if(options.some(o=>o[0]===wanted))el.value=wanted;
   }
   function valueFields(){
     const c=A().capabilities(layer()),names=snapshot?snapshot.fields:fieldsForSource();
-    const numeric=snapshot?A().numericFields(snapshot):names.filter(k=>['height_m','height','render_height'].includes(k)||layer()?.data?.features.some(f=>A().number(f.properties?.[k])!==null));
+    const numeric=native(layer())?names.filter(name=>{const c=nativeSchemas.get(layer())?.columns.find(c=>c.name===name);return c?.numeric||['height_m','height','height_roof','height_meters','height_metres'].includes(name);}):snapshot?A().numericFields(snapshot):names.filter(k=>['height_m','height','render_height'].includes(k)||layer()?.data?.features.some(f=>A().number(f.properties?.[k])!==null));
     const options=numeric.map(k=>[k,fieldLabel(k)]);
-    if(c.geometryAnalysis)options.push(['$area_m2',fieldLabel('$area_m2')],['$length_m',fieldLabel('$length_m')]);
+    if(c.geometryAnalysis||native(layer()))options.push(['$area_m2',fieldLabel('$area_m2')],['$length_m',fieldLabel('$length_m')]);
     if(!options.length&&c.attributePreview)return names.map(k=>[k,fieldLabel(k)]);
     return options;
   }
@@ -104,7 +106,7 @@
   function refreshLayers(){
     if(!dialog)return;const layers=root.PortalLayers?.layers;if(!layers)return;
     const old=$('layer').value,selected=old&&layers.has(old)?old:root.PortalLayers.active?.id;
-    fillSelect('layer',root.PortalDataWorkspace.worksets().map(l=>[l.id,l.cfg.name]),selected);
+    fillSelect('layer',Array.from(layers.values()).filter(l=>root.PortalDataWorkspace.ready(l)||native(l)).map(l=>[l.id,l.cfg.name]),selected);
     const reference=$('reference').value;
     const areas=Array.from(layers.values()).filter(l=>{const c=A().capabilities(l);return c.wholeLayer&&c.geometryAnalysis&&l.data?.features.length&&l.data.features.every(f=>['Polygon','MultiPolygon'].includes(f.geometry?.type));}),oldArea=$('study-area').value;
     fillSelect('reference',[['__area__','Saved study area'],...areas.map(l=>[l.id,l.cfg.name])],reference||'__area__');
@@ -118,16 +120,16 @@
     const l=layer(),D=root.PortalDataWorkspace,previous=$('scope').value;
     $('purpose').innerHTML=root.PortalLayerPurpose?.analysisMarkup(l)||'';$('source-note').textContent=sourceNote(l);$('tile-preview').hidden=true;$('original-data').hidden=false;$('original-data').textContent='Manage data & scope';$('return-map').hidden=!lastError;
     fillSelect('scope',[['layer','All workset records'],['selection','Selected workset records'],['area','Workset records in saved study area']],['layer','selection','area'].includes(previous)?previous:(D.defaultMode(l)==='selection'?'selection':'layer'));
-    $('study-wrap').hidden=true;$('study-note').hidden=true;$('capture').disabled=!available();$('scope').disabled=!D.ready(l);updateButtons();
-    const revision=++scopeReview,review=$('input-review');if(!D.ready(l)){review.textContent='Create a fixed analysis workset in Data & scope first.';return;}
+    $('study-wrap').hidden=true;$('study-note').hidden=true;$('capture').disabled=!available();$('scope').disabled=!D.ready(l)&&!native(l);updateButtons();
+    const revision=++scopeReview,review=$('input-review');if(native(l)){const state=root.PortalNativeEngine.status(),count=$('scope').value==='selection'?root.PortalNativeResults.count(l):nativeSchemas.get(l)?.records??l.cfg.nativeSource.recordCount;review.textContent=l.cfg.name+' · '+(l.cfg.nativeSource.format||'GeoParquet')+'\n'+root.PortalI18n.t(D.recordLabel($('scope').value))+' · '+($('scope').value==='area'?root.PortalI18n.t('The saved area count is calculated when preparing input.'):Number(count||0).toLocaleString('en-US')+' '+root.PortalI18n.t('input records'))+'\n'+root.PortalI18n.t(state.connected?'Complete local data · original values are retained':'Connect the workspace containing the full native result.');return;}if(!D.ready(l)){review.textContent='Create a fixed analysis workset in Data & scope first.';return;}
     D.records(l,$('scope').value).then(items=>{if(revision===scopeReview)review.textContent=l.cfg.name+' · '+D.describe(l).format+'\n'+root.PortalI18n.t(D.recordLabel($('scope').value))+' · '+items.length.toLocaleString('en-US')+' '+root.PortalI18n.t('input records')+'\n'+root.PortalI18n.t(D.coverage(l));}).catch(e=>{if(revision===scopeReview)review.textContent=e.message;});
   }
   function updateButtons(){
     if(!dialog||busy)return;
     const can=available(),c=A().capabilities(layer());
-    $('run-stats').disabled=!can||!$('numeric-field').value;$('run-groups').disabled=!can||!$('group-field').value;
-    $('run-geometry').disabled=!can||!c.geometryAnalysis;$('run-chart').disabled=!can||!$('chart-field').value;
-    $('run-spatial').disabled=!can||!c.geometryAnalysis;$('snapshot-download').disabled=!snapshot;
+    $('run-stats').disabled=!can||native(layer())||!$('numeric-field').value;$('run-groups').disabled=!can||native(layer())||!$('group-field').value;
+    $('run-geometry').disabled=!can||native(layer())||!c.geometryAnalysis;$('run-chart').disabled=!can||!$('chart-field').value;
+    $('run-spatial').disabled=!can||native(layer())||!c.geometryAnalysis;$('snapshot-download').disabled=!snapshot;
     $('stats-download').disabled=!lastStats&&!summary;$('chart-svg').disabled=!lastChart;$('chart-csv').disabled=!lastChart;$('chart-png').disabled=!lastChart;
     $('data-download').hidden=!snapshot?.provenance.studyArea;$('data-download').disabled=!snapshot?.provenance.studyArea||!snapshot.capabilities.geometryAnalysis;
     $('spatial-add').disabled=!lastResult?.features.length;$('spatial-download').disabled=!lastResult;
@@ -140,7 +142,7 @@
   function renderSnapshot(){
     const p=snapshot.provenance,word=featureWord(),count=p.fragmentCount!==undefined?fmt(p.fragmentCount,0)+' display '+(p.fragmentCount===1?'sample':'samples'):fmt(p.featureCount,0)+' '+(p.featureCount===1?word.replace(/s$/,''):word);
     $('snapshot').hidden=false;$('snapshot-name').textContent=p.name;$('snapshot-scope').textContent=count+' · '+scopeLabel(p);
-    $('snapshot-time').textContent='Data used: '+new Date(p.capturedAt).toLocaleString();$('snapshot-limit').hidden=!p.limited;
+    $('snapshot-time').textContent=root.PortalI18n.t('Data used')+': '+new Date(p.capturedAt).toLocaleString();$('snapshot-limit').hidden=!p.limited;
     $('snapshot-provenance').innerHTML=sourceFacts(p);populateFields();
   }
   function sourceFacts(p){
@@ -152,11 +154,25 @@
     if(p.studyArea){rows.push(['Study area',p.studyArea.name],['Included',p.studyArea.geometryRule]);if(p.studyArea.withinLoadedBounds===false)rows.push(['Area coverage','Part of this area is outside the loaded neighborhood']);}
     if(p.licenses?.length)rows.push(['Terms',p.licenses.join(' · ')]);
     if(p.lineage?.length)rows.push(['Based on',p.lineage.map(l=>l.name||l.scopeLabel||'Source data').join(' · ')]);
-    return rows.map(([key,value])=>'<div><dt>'+esc(key)+'</dt><dd>'+esc(value)+'</dd></div>').join('');
+    return rows.map(([key,value])=>'<div><dt data-i18n>'+esc(key)+'</dt><dd data-i18n-ignore>'+esc(value)+'</dd></div>').join('');
+  }
+  async function loadNativeSchema(l,signal){
+    const ref=l.cfg.nativeSource,key=JSON.stringify(ref),existing=nativeSchemas.get(l);if(existing?.key===key)return existing;
+    if(!root.PortalNativeEngine.status().information?.capabilities?.resultCharts)throw Error('Update the local engine to chart complete native results.');
+    const check=await root.PortalNativeEngine.fileInfo(ref);if(!check.available)throw Error(check.reason);
+    const schema=await root.PortalNativeEngine.chart(ref.jobId,{kind:'schema'},{signal});
+    if(signal?.aborted||root.PortalLayers.layers.get(l.id)!==l||JSON.stringify(l.cfg.nativeSource)!==key)throw aborted();
+    if(ref.sha256&&schema.sourceSha256!==ref.sha256)throw Error('The native source changed. Reopen the complete result before charting.');
+    nativeSchemas.set(l,{...schema,key});return schema;
   }
   async function prepare(signal){
     const l=layer();if(!l)throw Error('Create a fixed analysis workset in Data & scope first.');
-    const start=inputBinding(),captured=await root.PortalDataWorkspace.capture(l,{mode:$('scope').value,signal});
+    const start=inputBinding();let captured;
+    if(native(l)){
+      await loadNativeSchema(l,signal);const kind=root.PortalDataWorkspace.normalize($('scope').value),selected=await root.PortalDataWorkspace.nativeScope(l,kind),schema=nativeSchemas.get(l),area=kind==='area'?root.PortalDataWorkspace.range():null;
+      if(signal.aborted||inputBinding()!==start)throw aborted();
+      captured={features:[],fields:schema.columns.filter(c=>c.scalar).map(c=>c.name),nativeInput:{jobId:l.cfg.nativeSource.jobId,selectionId:selected.selectionId,sourceSha256:schema.sourceSha256},capabilities:{supported:true,nativeFull:true,geometryAnalysis:false,attributePreview:false},provenance:{name:l.cfg.name,capturedAt:new Date().toISOString(),scope:'native-full-result-aggregate',scopeLabel:root.PortalI18n.t(root.PortalDataWorkspace.recordLabel(kind)),featureCount:kind==='all'?schema.records:selected.count,spatialEligible:false,featureRole:l.cfg.dataRole==='buildings'?'buildings':'features',heightField:l.heightField||null,sourceSha256:schema.sourceSha256,execution:'native',limited:l.data?.provenance?.nativeJobStatus==='partial'||l.data?.provenance?.coverage?.requestComplete===false,licenses:Array.from(new Set([l.cfg.license,...(l.data?.provenance?.licenses||[])].filter(Boolean))),release:l.cfg.nativeSource.release||null,inputContract:{version:1,recordMode:kind,recordCount:kind==='all'?schema.records:selected.count,sourceRecordCount:schema.records,sourceSha256:schema.sourceSha256,...(area?{processingArea:area.meta}:{})}}};
+    }else captured=await root.PortalDataWorkspace.capture(l,{mode:$('scope').value,signal});
     const own=currentJob(signal);if(binding!==start)clearProducts();own.snapshot=captured;own.binding=start;snapshot=captured;binding=start;renderSnapshot();return captured;
   }
   function metric(value,label,detail=''){return '<div class="analysis-metric"><strong>'+esc(value)+'</strong><span>'+esc(label)+'</span>'+(detail?'<small>'+esc(detail)+'</small>':'')+'</div>';}
@@ -197,7 +213,7 @@
     autoPending=false;job(refreshStatistics);
   }
   function updateChartFields(){
-    if(!dialog)return;const kind=$('chart-kind').value,choices=valueFields(),categories=(snapshot?snapshot.fields:fieldsForSource()).map(k=>[k,fieldLabel(k)]),changed=fieldChartKind!==kind,saved=preferences.chartOptions?.[kind]||{};
+    if(!dialog)return;const scatter=$('chart-kind').querySelector('[value=scatter]');scatter.disabled=native(layer());scatter.title=native(layer())?root.PortalI18n.t('Point plots need a bounded browser workset. Complete native results support distributions, category counts and grouped means.'):'';if(native(layer())&&$('chart-kind').value==='scatter')$('chart-kind').value='histogram';const kind=$('chart-kind').value,choices=valueFields(),categories=(snapshot?snapshot.fields:fieldsForSource()).map(k=>[k,fieldLabel(k)]),changed=fieldChartKind!==kind,saved=preferences.chartOptions?.[kind]||{};
     const height=choices.find(o=>o[0]===snapshot?.provenance.heightField)?.[0]||choices.find(o=>o[0]==='height_m')?.[0]||choices[0]?.[0],source=categories.find(o=>['source','bf_source','geom_source','state'].includes(o[0]))?.[0]||categories[0]?.[0];
     const preferred=changed?saved.field||(kind==='category'?source:kind==='scatter'&&choices.some(o=>o[0]==='$area_m2')?'$area_m2':height):$('chart-field').value;
     fillSelect('chart-field',kind==='category'?categories:choices,preferred);
@@ -205,13 +221,13 @@
     fillSelect('chart-y',choices,changed?saved.y||height:$('chart-y').value);
     if(kind==='scatter'&&$('chart-y').value===$('chart-field').value){const other=choices.find(o=>o[0]!==$('chart-field').value);if(other)$('chart-y').value=other[0];}
     fieldChartKind=kind;$('bins-wrap').hidden=kind!=='histogram';$('chart-y-wrap').hidden=kind!=='scatter';$('chart-group-wrap').hidden=kind!=='grouped';
-    $('chart-field-label').textContent=kind==='scatter'?'Horizontal axis':kind==='grouped'?'Value to compare':'Field';updateButtons();
+    $('chart-field-label').textContent=kind==='scatter'?'Horizontal axis':kind==='grouped'?'Value to compare':'Field';$('chart-positive-wrap').hidden=!['histogram','grouped'].includes(kind);updateButtons();
   }
   function compact(v){if(v===null)return '—';if(Math.abs(v)>=1000000)return fmt(v/1000000,1)+'m';if(Math.abs(v)>=1000)return fmt(v/1000,1)+'k';return fmt(v,2);}
   function chartSVG(chart,data=snapshot){
     const p=chart.provenance,w=900,h=560,kind=chart.kind,category=['category','grouped'].includes(kind),left=category?245:85,right=category?100:50,top=110,bottom=120,width=w-left-right,height=h-top-bottom;
     const name=kind==='scatter'?fieldLabel(chart.xField)+' and '+fieldLabel(chart.yField):kind==='grouped'?'Average '+fieldLabel(chart.valueField)+' by '+fieldLabel(chart.groupField):fieldLabel(chart.field);
-    let body='',axis='',rows=chart.rows||[];
+    let body='',axis='',rows=(chart.rows||[]).map(r=>({...r,label:r.other?root.PortalI18n.t('Other categories'):r.missing===true||Object.hasOwn(r,'value')&&r.value===null?root.PortalI18n.t('Not provided'):r.empty===true||Object.hasOwn(r,'value')&&r.value===''?root.PortalI18n.t('Empty string'):r.label}));
     if(kind==='scatter'){
       let {xmin,xmax,ymin,ymax}=chart.range;if(xmin===xmax){const d=Math.max(1,Math.abs(xmin)*.05);xmin-=d;xmax+=d;}if(ymin===ymax){const d=Math.max(1,Math.abs(ymin)*.05);ymin-=d;ymax+=d;}
       for(let i=0;i<=4;i++){const f=i/4,x=left+width*f,y=top+height-height*f;body+='<line x1="'+x+'" y1="'+top+'" x2="'+x+'" y2="'+(top+height)+'" stroke="#e5ebe7"/><line x1="'+left+'" y1="'+y+'" x2="'+(left+width)+'" y2="'+y+'" stroke="#e5ebe7"/><text x="'+x+'" y="'+(top+height+23)+'" text-anchor="middle">'+esc(compact(xmin+(xmax-xmin)*f))+'</text><text x="'+(left-12)+'" y="'+(y+4)+'" text-anchor="end">'+esc(compact(ymin+(ymax-ymin)*f))+'</text>';}
@@ -228,12 +244,24 @@
   }
   async function chart(signal,definition){
     const data=inputFor(signal),def=definition||chartDefinition();validateField(def.field,data);let result;
-    if(def.kind==='scatter'){validateField(def.y,data);result=await A().scatter(data,def.field,def.y,{signal,onProgress:progress});}
-    else if(def.kind==='grouped'){validateField(def.group,data);result=await A().groupedStatistics(data,def.group,def.field,{signal,onProgress:progress,maxGroups:10});if(!result.rows.some(r=>r.valid))throw Error('No numeric values are available in these groups. Choose another field.');}
-    else{const rows=def.kind==='category'?A().frequencies(data,def.field,10):A().histogram(await A().valuesAsync(data,def.field,{signal,onProgress:progress}),def.bins);if(!rows.length)throw Error('No numeric values are available. Choose another field.');result={kind:def.kind,field:def.field,rows,provenance:data.provenance};}
-    currentJob(signal);lastChart=result;lastChart.svg=chartSVG(lastChart,data);$('chart-result').innerHTML=lastChart.svg;updateButtons();
+    if(data.nativeInput){
+      const requestId=crypto.randomUUID(),stop=()=>{void root.PortalNativeEngine.cancelChart(data.nativeInput.jobId,requestId).catch(()=>{});};signal.addEventListener('abort',stop,{once:true});
+      try{result=await root.PortalNativeEngine.chart(data.nativeInput.jobId,{kind:def.kind,field:def.field,...(def.kind==='grouped'?{group:def.group}:{}),bins:def.bins,maxGroups:10,positiveOnly:!!def.positiveOnly,requestId,...(data.nativeInput.selectionId?{selectionId:data.nativeInput.selectionId}:{})},{signal});}
+      finally{signal.removeEventListener('abort',stop);}
+      if(result.sourceSha256!==data.nativeInput.sourceSha256)throw Error('The native source changed. Prepare the chart input again.');
+      result.provenance={...data.provenance,featureCount:result.records,numericEncoding:result.numericEncoding,chartInput:{field:def.field,group:def.group||null,positiveOnly:!!def.positiveOnly,valid:result.valid,missing:result.missing,invalid:result.invalid,excludedNonpositive:result.excludedNonpositive}};
+      if(!result.rows.length&&result.records>0)throw Error('No numeric values are available. Choose another field.');
+    }else if(def.kind==='scatter'){validateField(def.y,data);result=await A().scatter(data,def.field,def.y,{signal,onProgress:progress});}
+    else if(def.kind==='grouped'){validateField(def.group,data);let groupData=data,valueField=def.field;if(def.positiveOnly){const vals=await A().valuesAsync(data,def.field,{signal,onProgress:progress});valueField='_usbf_chart_value';while(data.fields.includes(valueField))valueField+='_';groupData={...data,fields:[...data.fields,valueField],features:data.features.map((f,i)=>({...f,properties:{...f.properties,[valueField]:vals[i]>0?vals[i]:null}}))};}result=await A().groupedStatistics(groupData,def.group,valueField,{signal,onProgress:progress,maxGroups:10});result.valueField=def.field;result.provenance=data.provenance;if(!result.rows.some(r=>r.valid))throw Error('No numeric values are available in these groups. Choose another field.');}
+    else{const rows=def.kind==='category'?A().frequencies(data,def.field,10):A().histogram((await A().valuesAsync(data,def.field,{signal,onProgress:progress})).map(v=>def.positiveOnly&&!(v>0)?null:v),def.bins);if(!rows.length)throw Error('No numeric values are available. Choose another field.');result={kind:def.kind,field:def.field,rows,provenance:data.provenance};}
+    currentJob(signal);lastChart=result;lastChart.svg=chartSVG(lastChart,data);$('chart-result').innerHTML=lastChart.svg+(data.nativeInput?nativeChartFacts(result):'');updateButtons();
   }
-  function chartDefinition(){return {kind:$('chart-kind').value,field:$('chart-field').value,y:$('chart-y').value,group:$('chart-group').value,bins:Number($('bins').value)};}
+  function nativeChartFacts(result){
+    const t=root.PortalI18n.t,category=result.kind==='category';
+    const values=[['Full input records',result.records],[category?'Provided values':'Included values',result.valid],[category?'Null values':'Excluded or unavailable values',category?result.missing:result.missing+result.invalid+result.excludedNonpositive]];
+    return '<p class="analysis-note">'+values.map(([label,value])=>esc(t(label))+': '+Number(value).toLocaleString('en-US')).join(' · ')+'</p>'+(category?'':'<details class="analysis-note"><summary>'+esc(t('Input quality'))+'</summary><p>'+[['Null values',result.missing],['Non-numeric or non-finite values',result.invalid],['Excluded non-positive values',result.excludedNonpositive]].map(([label,value])=>esc(t(label))+': '+Number(value).toLocaleString('en-US')).join(' · ')+'</p></details>');
+  }
+  function chartDefinition(){return {kind:$('chart-kind').value,field:$('chart-field').value,y:$('chart-y').value,group:$('chart-group').value,bins:Number($('bins').value),positiveOnly:['histogram','grouped'].includes($('chart-kind').value)&&$('chart-positive').checked};}
   function updateOperation(){
     if(!dialog)return;const op=$('operation').value;
     $('distance-wrap').hidden=op!=='buffer';$('reference-wrap').hidden=!['filter','clip','intersect','aggregate'].includes(op);$('predicate-wrap').hidden=op!=='filter';
@@ -300,13 +328,13 @@
       '<section id="analysis-snapshot" class="analysis-snapshot" hidden><strong id="analysis-snapshot-name"></strong><p id="analysis-snapshot-scope" data-i18n-system></p><span id="analysis-snapshot-time" class="analysis-note"></span><p id="analysis-snapshot-limit" class="analysis-warning" hidden data-i18n>Some data was unavailable. Results cover the available features only.</p><details><summary data-i18n>Data source and area</summary><dl id="analysis-snapshot-provenance" class="analysis-source-facts"></dl><button type="button" id="analysis-snapshot-download" class="analysis-text-button" data-i18n>Download source details</button></details></section>',
       '<section id="analysis-panel-stats" role="tabpanel" aria-labelledby="analysis-tab-stats"><div id="analysis-overview"></div><p id="analysis-overview-note" class="analysis-note" data-i18n-system></p><details class="analysis-more-statistics"><summary data-i18n>Explore a field</summary><div class="analysis-grid"><div><label data-i18n>Numeric value<select id="analysis-numeric-field"></select></label><button type="button" id="analysis-run-stats" data-i18n>Calculate</button></div><div><label data-i18n>Group by<select id="analysis-group-field"></select></label><button type="button" id="analysis-run-groups" data-i18n>Count groups</button></div></div><div class="analysis-actions"><button type="button" id="analysis-run-geometry" data-i18n>Measure outlines</button></div><div id="analysis-stats-result" class="analysis-result"></div><div id="analysis-geometry-result" class="analysis-result"></div></details><div class="analysis-actions"><button type="button" id="analysis-stats-download" data-i18n>Download statistics</button><button type="button" id="analysis-data-download" hidden data-i18n>Download buildings</button></div></section>',
       '<section id="analysis-panel-spatial" role="tabpanel" aria-labelledby="analysis-tab-spatial" hidden><label data-i18n>What would you like to do?<select id="analysis-operation"><option value="buffer" data-i18n>Add an area around each feature (buffer)</option><option value="filter" data-i18n>Keep features in a study area</option><option value="clip" data-i18n>Trim outlines to a study area (clip)</option><option value="aggregate" data-i18n>Count and measure features by area</option><option value="intersect" data-i18n>Compare overlapping areas</option><option value="measure" data-i18n>Add area and boundary length</option><option value="centroid" data-i18n>Create center points</option></select></label><p id="analysis-operation-note" class="analysis-note" data-i18n-system></p><div class="analysis-grid"><label id="analysis-distance-wrap" data-i18n>Distance · m<input id="analysis-distance" type="number" value="50" min=".01" max="100000" step="any"></label><label id="analysis-reference-wrap" hidden data-i18n>Study area<select id="analysis-reference"></select></label><label id="analysis-predicate-wrap" hidden data-i18n>Include features that<select id="analysis-predicate"><option value="intersects" data-i18n>Touch or overlap the area</option><option value="representative-point" data-i18n>Have a point inside the area</option></select></label></div><div class="analysis-actions"><button type="button" id="analysis-run-spatial" class="analysis-primary" data-i18n-system>Run</button><button type="button" id="analysis-spatial-add" hidden data-i18n>Add result to map</button><button type="button" id="analysis-spatial-download" hidden data-i18n>Download result</button></div><div id="analysis-spatial-result" class="analysis-result"></div></section>',
-      '<section id="analysis-panel-chart" role="tabpanel" aria-labelledby="analysis-tab-chart" hidden><div class="analysis-grid"><label data-i18n>Chart type<select id="analysis-chart-kind"><option value="histogram" data-i18n>Distribution</option><option value="category" data-i18n>Counts by category</option><option value="scatter" data-i18n>Compare two values</option><option value="grouped" data-i18n>Average by category</option></select></label><label><span id="analysis-chart-field-label" data-i18n-system>Field</span><select id="analysis-chart-field"></select></label><label id="analysis-chart-y-wrap" hidden data-i18n>Vertical axis<select id="analysis-chart-y"></select></label><label id="analysis-chart-group-wrap" hidden data-i18n>Group by<select id="analysis-chart-group"></select></label><label id="analysis-bins-wrap" data-i18n>Number of groups<input id="analysis-bins" type="number" value="10" min="2" max="30" step="1"></label></div><div class="analysis-actions"><button type="button" id="analysis-run-chart" class="analysis-primary" data-i18n>Make chart</button><button type="button" id="analysis-chart-png">PNG image</button><button type="button" id="analysis-chart-svg">SVG</button><button type="button" id="analysis-chart-csv" data-i18n>Chart data</button></div><div id="analysis-chart-result" class="analysis-chart-result"></div></section></div>'
+      '<section id="analysis-panel-chart" role="tabpanel" aria-labelledby="analysis-tab-chart" hidden><div class="analysis-grid"><label data-i18n>Chart type<select id="analysis-chart-kind"><option value="histogram" data-i18n>Distribution</option><option value="category" data-i18n>Counts by category</option><option value="scatter" data-i18n>Compare two values</option><option value="grouped" data-i18n>Average by category</option></select></label><label><span id="analysis-chart-field-label" data-i18n-system>Field</span><select id="analysis-chart-field"></select></label><label id="analysis-chart-y-wrap" hidden data-i18n>Vertical axis<select id="analysis-chart-y"></select></label><label id="analysis-chart-group-wrap" hidden data-i18n>Group by<select id="analysis-chart-group"></select></label><label id="analysis-bins-wrap" data-i18n>Number of groups<input id="analysis-bins" type="number" value="10" min="2" max="30" step="1"></label></div><label id="analysis-chart-positive-wrap" class="analysis-optin"><input type="checkbox" id="analysis-chart-positive"><span data-i18n>Use positive values only</span></label><div class="analysis-actions"><button type="button" id="analysis-run-chart" class="analysis-primary" data-i18n>Make chart</button><button type="button" id="analysis-chart-png">PNG image</button><button type="button" id="analysis-chart-svg">SVG</button><button type="button" id="analysis-chart-csv" data-i18n>Chart data</button></div><div id="analysis-chart-result" class="analysis-chart-result"></div></section></div>'
     ].join('');
     document.body.append(dialog);
     dialog.querySelector('[data-analysis-close]').onclick=()=>{controller?.abort();dialog.close();};
     dialog.addEventListener('cancel',()=>controller?.abort());$('cancel').onclick=()=>controller?.abort();$('return-map').onclick=()=>dialog.close();
-    dialog.querySelectorAll('[data-analysis-tab]').forEach(b=>{b.onclick=()=>{switchTab(b.dataset.analysisTab);if(tab==='stats'&&!snapshot){autoPending=false;}};b.onkeydown=e=>{if(['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();const tabs=['stats','spatial','chart'],next=tabs[(tabs.indexOf(tab)+(e.key==='ArrowRight'?1:2))%3];$('tab-'+next).click();$('tab-'+next).focus();}};});
-    $('layer').onchange=()=>{clearSnapshot();updateScope();populateFields();autoPending=false;};
+    dialog.querySelectorAll('[data-analysis-tab]').forEach(b=>{b.onclick=()=>{if(native(layer())&&b.dataset.analysisTab!=='chart'){dialog.close();if(b.dataset.analysisTab==='stats')root.PortalTaskGuides.open('count',{layerId:layer().id,mode:root.PortalDataWorkspace.normalize($('scope').value)});else{root.PortalLayers.selectLayer(layer().id);root.PortalGIS.open('extract-mask');root.PortalGIS.setInputMode?.(root.PortalDataWorkspace.normalize($('scope').value));}return;}switchTab(b.dataset.analysisTab);if(tab==='stats'&&!snapshot){autoPending=false;}};b.onkeydown=e=>{if(['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();const tabs=['stats','spatial','chart'],next=tabs[(tabs.indexOf(tab)+(e.key==='ArrowRight'?1:2))%3];$('tab-'+next).click();$('tab-'+next).focus();}};});
+    $('layer').onchange=()=>{clearSnapshot();if(native(layer())){switchTab('chart');job(async signal=>{await loadNativeSchema(layer(),signal);currentJob(signal);populateFields();});}updateScope();populateFields();autoPending=false;};
     $('scope').onchange=()=>{clearSnapshot();updateScope();populateFields();remember();autoPending=false;};
     $('study-area').onchange=()=>{clearSnapshot();populateFields();autoPending=false;};
     $('tile-optin').onchange=()=>{clearSnapshot();updateScope();populateFields();};
@@ -318,13 +346,14 @@
     $('run-chart').onclick=()=>{const definition=chartDefinition();remember();job(async signal=>{await prepare(signal);await chart(signal,definition);});};
     $('run-spatial').onclick=()=>{const definition={operation:$('operation').value,distance:Number($('distance').value),reference:$('reference').value,predicate:$('predicate').value,mapBounds:bounds()};remember();job(async signal=>{[definition.referenceSnapshot]=await Promise.all([referenceSnapshot(definition,signal),prepare(signal)]);currentJob(signal);await spatial(signal,definition);});};
     $('operation').onchange=()=>{remember();updateOperation();};$('chart-kind').onchange=()=>{updateChartFields();remember();};
-    ['numeric-field','group-field','chart-field','chart-y','chart-group'].forEach(id=>$(id).onchange=()=>{remember();updateButtons();});
+    ['numeric-field','group-field','chart-field','chart-y','chart-group'].forEach(id=>$(id).onchange=()=>{if(id==='chart-field')$('chart-positive').checked=['height_m','height','height_roof','height_meters','height_metres'].includes($('chart-field').value);remember();updateButtons();});
     $('snapshot-download').onclick=()=>snapshot&&save('data-sources.json',JSON.stringify(snapshot.provenance,null,2),'application/json');
     $('stats-download').onclick=statsDownload;$('data-download').onclick=dataDownload;$('chart-csv').onclick=chartDownload;$('chart-svg').onclick=()=>lastChart&&save('building-chart.svg',lastChart.svg,'image/svg+xml');
     $('chart-png').onclick=()=>job(async signal=>{const image=await chartImage();currentJob(signal);save('building-chart.png',image.blob);});
     $('spatial-download').onclick=()=>lastResult&&save('analysis-result.geojson',JSON.stringify(lastResult),'application/geo+json');$('spatial-add').onclick=()=>job(addResult);
     dialog.addEventListener('click',e=>{if(e.target.closest('[data-analysis-add-result]'))job(addResult);if(e.target.closest('[data-analysis-download-result]'))$('spatial-download').click();});
     document.addEventListener('portal-layers-changed',refreshLayers);['portal-style-changed','portal-selection-changed','portal-bulk-selection-changed','portal-data-context-changed','portal-language-changed'].forEach(e=>document.addEventListener(e,()=>{updateScope();updateFreshness();if(!snapshot)populateFields();}));
+    document.addEventListener('portal-native-engine-changed',()=>{if(native(layer())){const engine=root.PortalNativeEngine.status(),workspace=engine.information?.workspace?.id||engine.information?.workspaceId;if(!engine.connected||workspace!==layer().cfg.nativeSource.workspaceId){clearSnapshot();message('Connect the workspace containing the full native result.',true);}updateScope();updateFreshness();}});
     root.portal?.map.on('moveend',updateFreshness);
     if(['histogram','category','scatter','grouped'].includes(preferences.chartKind))$('chart-kind').value=preferences.chartKind;
     if(Object.prototype.hasOwnProperty.call(operationLabels,preferences.operation))$('operation').value=preferences.operation;
@@ -332,13 +361,13 @@
     switchTab(tab);refreshLayers();updateOperation();updateButtons();
   }
   function open(name='stats',options={}){
-    const requested=options.layerId?root.PortalLayers.layers.get(options.layerId):root.PortalLayers.active;if(requested?.cfg.nativeSource){if(['chart','charts'].includes(name)){root.portal?.toast('Charts need a fixed browser workset. The bounded native preview is not the full analytical input.');return activeJob;}return root.PortalTasks.openProcessing(requested,'measure',{mode:options.scope||'all',name:requested.cfg.name+' · native measurements'}).catch(e=>root.portal?.toast(e.message));}if(!root.PortalDataWorkspace.ready(requested)){root.PortalDataWorkspace.open({layer:requested,intent:name});return activeJob;}
+    const requested=options.layerId?root.PortalLayers.layers.get(options.layerId):root.PortalLayers.active;if(native(requested)&&!['chart','charts'].includes(name))return root.PortalTaskGuides.open('count',{layerId:requested.id,mode:root.PortalDataWorkspace.normalize(options.scope||'all')});if(!native(requested)&&!root.PortalDataWorkspace.ready(requested)){root.PortalDataWorkspace.open({layer:requested,intent:name});return activeJob;}
     ensure();refreshLayers();
     if(options.layerId&&root.PortalLayers.layers.has(options.layerId)){$('layer').value=options.layerId;clearSnapshot();}
     else if(root.PortalLayers.active?.id&&$('layer').value!==root.PortalLayers.active.id){$('layer').value=root.PortalLayers.active.id;clearSnapshot();}
     if(options.studyAreaId&&root.PortalLayers.layers.has(options.studyAreaId))$('study-area').value=options.studyAreaId;
-    updateScope();$('scope').value=root.PortalDataWorkspace.defaultMode(layer())==='selection'?'selection':'layer';if(options.scope&&Array.from($('scope').options).some(o=>o.value===options.scope))$('scope').value=options.scope;updateScope();
-    populateFields();switchTab(name);if(!dialog.open)dialog.showModal();updateFreshness();
+    updateScope();$('scope').value=root.PortalDataWorkspace.defaultMode(layer())==='selection'?'selection':'layer';const selectedScope=options.scope==='all'?'layer':options.scope;if(selectedScope&&Array.from($('scope').options).some(o=>o.value===selectedScope))$('scope').value=selectedScope;updateScope();
+    populateFields();switchTab(name);if(!dialog.open)dialog.showModal();updateFreshness();if(native(requested))return job(async signal=>{await loadNativeSchema(requested,signal);currentJob(signal);populateFields();$('chart-positive').checked=['height_m','height','height_roof','height_meters','height_metres'].includes($('chart-field').value);});
     if(tab==='stats'&&options.auto!==false){autoPending=false;}
     return activeJob;
   }

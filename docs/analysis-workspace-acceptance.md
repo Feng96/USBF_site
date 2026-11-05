@@ -84,3 +84,23 @@ on Linux x64, Windows x64 and both macOS architectures before publication.
 
 The preview runtime remains isolated from system GDAL/DuckDB installations and
 has no publisher code signing or Apple notarization.
+
+## Verified release source
+
+[Native workflow 42078924920](https://github.com/Feng96/USBF_site/actions/runs/42078924920)
+verified source `ebc1d1927b5b956eb01a9a00b290417926df6a41`, tree
+`e67164e49cd4480ad09de103ad4f716c9dc1f533`. Linux x64, Windows x64, macOS
+Apple Silicon and macOS Intel each passed 24 installation-lifecycle tests,
+113 native tests and 33 actual installer/runtime/UI/uninstall checks.
+
+The [0.4 preview release](https://github.com/Feng96/USBF_site/releases/tag/engine-v0.4.0-preview.1-r1)
+contains those four tested packages. The website uses the actual published
+manifest after checking every package size and SHA256 against GitHub asset
+metadata. Installer self-test reports are retained with build artifacts.
+CI handles temporary Windows status-file sharing locks and bounded macOS DMG
+detach exit16 retries while preserving every installation/runtime assertion.
+
+Additional final frontend checks passed: 226 unit checks, 16 GIS browser workflow
+checks and 13 Chinese-interface/original-value checks. Provider benchmarking,
+chart and matching browser evidence described above remains separate from
+cross-platform installation acceptance and real-world completeness claims.
