@@ -102,6 +102,107 @@ class ProviderTests(unittest.TestCase):
         data=self.parquet(null_bbox=True);meta=pq.ParquetFile(io.BytesIO(data)).metadata
         self.assertEqual(candidate_row_groups(meta,BOX),[0,1,2])
 
+    def test_validator_bound_cache_reuses_identical_groups_for_adjacent_aoi(self):
+        self.files[providers.OSM]=self.parquet()
+        first=wait(self.engine,self.engine.create_job(self.spec("osm-buildings")))
+        self.assertEqual(first["status"],"completed",first["error"])
+        spec=self.spec("osm-buildings")
+        spec["scope"]={"geometry":{"type":"Polygon","coordinates":[[[0,-.1],[.2,-.1],[.2,.1],[0,.1],[0,-.1]]]}}
+        self.requests.clear()
+        second=wait(self.engine,self.engine.create_job(spec))
+        self.assertEqual(second["status"],"completed",second["error"])
+        self.assertTrue(second["parts"][0]["transport"]["materializationCacheHit"])
+        self.assertEqual(second["parts"][0]["transport"]["networkBytes"],8)
+        self.assertTrue(all((start,end)==(0,7) for _,start,end in self.requests))
+        self.assertEqual(pq.read_table(self.engine.result_path(first["id"])).to_pylist(),pq.read_table(self.engine.result_path(second["id"])).to_pylist())
+        status=self.engine.maintenance.status()["cache"]
+        self.assertGreater(status["providerMetadataBytes"],0)
+        self.assertGreater(status["providerMaterializationBytes"],0)
+        self.assertGreater(status["providerCacheHits"],0)
+
+    def test_changed_etag_does_not_reuse_old_footer_or_materialization(self):
+        self.files[providers.OSM]=self.parquet()
+        first=wait(self.engine,self.engine.create_job(self.spec("osm-buildings")))
+        self.assertEqual(first["status"],"completed",first["error"])
+        self.tag='"fixture-v2"';self.requests.clear()
+        second=wait(self.engine,self.engine.create_job(self.spec("osm-buildings")))
+        self.assertEqual(second["status"],"completed",second["error"])
+        self.assertFalse(second["parts"][0]["transport"]["materializationCacheHit"])
+        self.assertEqual(second["parts"][0]["transport"]["footerCacheHits"],1) # The same job's second metadata open.
+        self.assertGreater(second["parts"][0]["transport"]["networkBytes"],8)
+
+    def test_corrupt_cached_materialization_is_checked_and_refetched(self):
+        self.files[providers.OSM]=self.parquet()
+        first=wait(self.engine,self.engine.create_job(self.spec("osm-buildings")))
+        self.assertEqual(first["status"],"completed",first["error"])
+        root=self.engine.maintenance.root
+        target=root/(first["parts"][0]["providerCacheSha256"]+".source")
+        damaged=b"x"*target.stat().st_size;target.write_bytes(damaged)
+        second=wait(self.engine,self.engine.create_job(self.spec("osm-buildings")))
+        self.assertEqual(second["status"],"completed",second["error"])
+        self.assertFalse(second["parts"][0]["transport"]["materializationCacheHit"])
+        self.assertEqual(pq.read_table(self.engine.result_path(first["id"])).to_pylist(),pq.read_table(self.engine.result_path(second["id"])).to_pylist())
+        source=self.engine.workspace/"Cache"/"native-jobs"/first["id"]/(first["parts"][0]["id"]+".source.parquet")
+        self.assertTrue(source.exists())
+        cleaned=self.engine.maintenance.cleanup({"dryRun":False,"allUnused":True})
+        self.assertGreater(cleaned["skipped"],0)
+        self.assertEqual(target.read_bytes(),damaged)
+        self.assertFalse(source.exists())
+        self.assertTrue(self.engine.result_path(first["id"]).exists())
+        self.assertTrue(self.engine.result_path(second["id"]).exists())
+
+    def test_corrupt_cached_footer_is_checked_before_using_its_bounds(self):
+        self.files[providers.OSM]=self.parquet()
+        first=wait(self.engine,self.engine.create_job(self.spec("osm-buildings")))
+        self.assertEqual(first["status"],"completed",first["error"])
+        root=self.engine.maintenance.root
+        index=json.loads((root/"index.json").read_text())
+        digest=next(digest for digest,item in index["entries"].items() if "providerMetadata" in item.get("providerBindings",{}).values())
+        target=root/(digest+".source")
+        damaged=b"x"*target.stat().st_size;target.write_bytes(damaged)
+        second=wait(self.engine,self.engine.create_job(self.spec("osm-buildings")))
+        self.assertEqual(second["status"],"completed",second["error"])
+        self.assertGreater(second["parts"][0]["transport"]["networkBytes"],8)
+        self.assertEqual(second["parts"][0]["transport"]["footerCacheHits"],0)
+        self.assertEqual(pq.read_table(self.engine.result_path(first["id"])).to_pylist(),pq.read_table(self.engine.result_path(second["id"])).to_pylist())
+        self.assertEqual(target.read_bytes(),damaged)
+
+    def test_missing_or_weak_only_validators_refuse_cached_bytes(self):
+        self.files[providers.OSM]=self.parquet()
+        first=wait(self.engine,self.engine.create_job(self.spec("osm-buildings")))
+        self.assertEqual(first["status"],"completed",first["error"])
+        original=self.open
+        def no_validator(url,*,headers=None):
+            response=original(url,headers=headers)
+            response.headers.pop("Last-Modified",None);response.headers.pop("ETag",None)
+            return response
+        with mock.patch.object(providers,"provider_open",no_validator):
+            with self.assertRaisesRegex(ValueError,"no stable HTTP validator"):
+                self.engine.plan(self.spec("osm-buildings"))
+        def weak(url,*,headers=None):
+            response=no_validator(url,headers=headers);response.headers["ETag"]='W/"weak"'
+            return response
+        with mock.patch.object(providers,"provider_open",weak):
+            with self.assertRaisesRegex(ValueError,"weak HTTP validator"):
+                self.engine.plan(self.spec("osm-buildings"))
+
+    def test_cancelled_prefetch_cleans_ephemeral_state_without_publishing_result(self):
+        self.files[providers.OSM]=self.parquet()
+        self.engine.close();self.engine=Engine(self.directory.name,extension_path=self.extension,autostart=False)
+        job=self.engine.create_job(self.spec("osm-buildings"))
+        original=self.open
+        def cancel_on_footer(url,*,headers=None):
+            if headers["Range"]!="bytes=0-7":
+                self.engine.cancel_flags[job["id"]].set()
+            return original(url,headers=headers)
+        with mock.patch.object(providers,"provider_open",cancel_on_footer):
+            self.engine._execute(job)
+        stopped=self.engine.get_job(job["id"])
+        self.assertEqual(stopped["status"],"cancelled",stopped["error"])
+        self.assertIsNone(stopped["result"])
+        self.assertNotIn(job["id"],getattr(self.engine,"_provider_prepared",{}))
+        self.assertFalse(list(self.engine.maintenance.root.glob("*.writing")))
+
     def test_float32_bbox_rounding_cannot_exclude_a_touching_outline(self):
         # -77.07 rounded to float32 lies east of the actual geometry edge.
         # The AOI stops between those values: exact geometry still intersects.

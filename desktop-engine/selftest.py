@@ -121,6 +121,43 @@ def run(workspace: Path, report: Path) -> int:
            'Full native attribute queries preserve exact identifiers and original values')
         selected = request('POST', '/v1/jobs/' + job['id'] + '/selection', {'mode': 'replace', 'query': condition})
         ok(selected['count'] == 1, 'Native selection stores full-record query membership outside the preview')
+        schema = request('POST', '/v1/jobs/' + job['id'] + '/chart', {'kind': 'schema'})
+        ok(status['capabilities']['resultCharts'] and schema['records'] == 2,
+           'Installed chart schema describes the complete native result')
+        category = request('POST', '/v1/jobs/' + job['id'] + '/chart', {'kind': 'category', 'field': 'flag'})
+        ok(category['rows'][0]['value'] is False and category['rows'][0]['count'] == 2,
+           'Full-result native category charts preserve boolean values')
+        histogram = request('POST', '/v1/jobs/' + job['id'] + '/chart',
+                            {'kind': 'histogram', 'field': '$area_m2', 'selectionId': selected['selectionId'], 'bins': 4})
+        ok(histogram['records'] == 1 and histogram['valid'] == 1
+           and sum(row['count'] for row in histogram['rows']) == 1,
+           'Native geometry charts honor immutable complete-result selections')
+        other = request('POST', '/v1/jobs', spec)
+        deadline = time.monotonic() + 90
+        while time.monotonic() < deadline:
+            other = request('GET', '/v1/jobs/' + other['id'])
+            if other['status'] in ('completed', 'failed', 'partial', 'cancelled', 'interrupted'):
+                break
+            time.sleep(.1)
+        ok(other['status'] == 'completed', 'A second original workset is available for correspondence')
+        matched = request('POST', '/v1/matches', {'left': {'jobId': job['id']},
+            'right': {'jobId': other['id']}, 'studyArea': spec['scope'], 'recordMode': 'area'})
+        deadline = time.monotonic() + 90
+        while time.monotonic() < deadline:
+            matched = request('GET', '/v1/jobs/' + matched['id'])
+            if matched['status'] in ('completed', 'failed', 'partial', 'cancelled', 'interrupted'):
+                break
+            time.sleep(.1)
+        ok(status['capabilities']['resultMatching'] and matched['status'] == 'completed',
+           'The installed spatial runtime executes a durable building correspondence task')
+        pairs = request('POST', '/v1/jobs/' + matched['id'] + '/matches', {'limit': 10})
+        ok(pairs['total'] == 2 and pairs['summary']['categories']['one-to-one'] == 2,
+           'Matching reports retain both complete original footprint pairs')
+        subset = request('POST', '/v1/jobs/' + matched['id'] + '/match-selection',
+                         {'side': 'left', 'category': 'one-to-one'})
+        ok(subset['count'] == 2, 'Matched categories produce ordinary immutable native selections')
+        exported = request('GET', '/v1/jobs/' + matched['id'] + '/match-export?format=json')
+        ok(len(exported['rows']) == 2, 'Packaged correspondence reports export complete original pair references')
         tile = request('GET', '/v1/jobs/' + job['id'] + '/tiles/0/0/0.pbf')
         ok(isinstance(tile, bytes) and len(tile) > 0, 'The packaged engine produces real MapLibre MVT bytes')
         cleanup = request('POST', '/v1/maintenance/cleanup', {'dryRun': True, 'allUnused': True})

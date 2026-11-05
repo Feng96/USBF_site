@@ -42,7 +42,7 @@ from usbf_engine import Engine
 from usbf_engine.server import serve
 
 engine = Engine(workspace_parent, extension_path=bundled_signed_extension)
-engine.set_build_info({"packageVersion": "0.3.0-preview.1", "revision": revision,
+engine.set_build_info({"packageVersion": "0.4.0-preview.1", "revision": revision,
                        "platform": platform_name, "signed": False})
 engine.set_uninstall_handler(request_local_desktop_confirmation)
 pairing_code = engine.pairing_code()  # Display locally, never expose through HTTP.
@@ -338,3 +338,12 @@ complete original records rather than map previews, with ellipsoidal whole
 polygon area and supplied height availability. See
 [the shared workflow](../docs/unified-data-workflow.md) for exact scope,
 transport, source identity and comparison limitations.
+
+## Validated caches, charts and correspondence (0.4 preview)
+
+Original providers now reuse validator-bound footer and selected-row-group
+materializations through the shared maintenance cache. Complete native Charts
+and durable building correspondence reports use original results and immutable
+scopes, including records beyond the display preview. They advertise
+`resultCharts` and `resultMatching`; older runtimes remain capability guarded.
+See [API details, safeguards and acceptance](../docs/analysis-workspace-acceptance.md).

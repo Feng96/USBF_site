@@ -146,8 +146,61 @@ class EngineMaintenance:
                 if self.engine._hash_file(source, job_id) != digest:
                     raise ValueError("The source changed before entering the verified cache.")
                 os.replace(source, target)
-            index["entries"][digest] = {"bytes": target.stat().st_size, "lastUsed": time.time(),
+            index["entries"][digest] = {**index["entries"].get(digest, {}), "bytes": target.stat().st_size, "lastUsed": time.time(),
                                           "hits": int(index["entries"].get(digest, {}).get("hits", 0))}
+            _write(self.root / "index.json", index)
+            return target
+
+    def provider_hit(self, key, job_id):
+        """Only callers which freshly checked the remote identity supply keys."""
+        with self.lock:
+            index = self._index()
+            digest = index.get("providerBindings", {}).get(key)
+            if not digest:
+                return None
+            item = index["entries"].get(digest)
+            if not item or key not in item.get("providerBindings", {}):
+                return None
+            target = self._owned(digest)
+            if not target.is_file() or target.stat().st_size != item.get("bytes") or self.engine._hash_file(target, job_id) != digest:
+                return None
+            item["lastUsed"] = time.time()
+            item["hits"] = int(item.get("hits", 0)) + 1
+            _write(self.root / "index.json", index)
+            return target
+
+    def provider_store(self, key, kind, source, job_id):
+        """Publish bounded immutable bytes without moving job intermediates."""
+        from .provider_cache import MAX_FOOTER_BYTES, MAX_MATERIALIZATION_BYTES
+        limits = {"providerMetadata": MAX_FOOTER_BYTES, "providerMaterialization": MAX_MATERIALIZATION_BYTES}
+        if kind not in limits or not re.fullmatch(r"[a-f0-9]{64}", key):
+            raise ValueError("The provider cache binding is invalid.")
+        size = len(source) if isinstance(source, bytes) else source.stat().st_size
+        if self.settings["cacheQuotaMiB"] == 0 or size > min(limits[kind], self.settings["cacheQuotaMiB"] * MIB):
+            return None
+        with self.lock:
+            index = self._index(create=True)
+            digest = hashlib.sha256(source).hexdigest() if isinstance(source, bytes) else self.engine._hash_file(source, job_id)
+            target = self._owned(digest)
+            if target.exists():
+                if self.engine._hash_file(target, job_id) != digest:
+                    return None  # Keep changed/unknown bytes, never overwrite them.
+            else:
+                temporary = self.root / (uuid.uuid4().hex + ".writing")
+                try:
+                    if isinstance(source, bytes):
+                        temporary.write_bytes(source)
+                    else:
+                        shutil.copyfile(source, temporary)
+                    if self.engine._hash_file(temporary, job_id) != digest:
+                        raise ValueError("The provider bytes changed before cache publication.")
+                    os.replace(temporary, target)
+                finally:
+                    temporary.unlink(missing_ok=True)
+            item = index["entries"].setdefault(digest, {"bytes": size, "hits": 0})
+            item["lastUsed"] = time.time()
+            item.setdefault("providerBindings", {})[key] = kind
+            index.setdefault("providerBindings", {})[key] = digest
             _write(self.root / "index.json", index)
             return target
 
@@ -159,6 +212,7 @@ class EngineMaintenance:
         index = self._index()
         jobs = self._jobs()
         protected = {str(p.get("sha256", "")).lower() for j in jobs if j.get("status") != "completed" for p in j.get("parts", [])}
+        protected.update(str(p.get("providerCacheSha256", "")).lower() for j in jobs if j.get("status") != "completed" for p in j.get("parts", []))
         entries, skipped = [], 0
         for digest, value in index["entries"].items():
             try:
@@ -169,6 +223,7 @@ class EngineMaintenance:
                 entries.append({"sha256": digest, "path": str(target.relative_to(self.engine.workspace)),
                                 "bytes": target.stat().st_size, "lastUsed": value.get("lastUsed", 0),
                                 "hits": value.get("hits", 0), "protected": digest in protected})
+                entries[-1]["providerKinds"] = sorted(set(value.get("providerBindings", {}).values()))
             except (ValueError, OSError):
                 skipped += 1
         return index, entries, jobs, skipped
@@ -182,6 +237,9 @@ class EngineMaintenance:
                 "bytes": size, "files": len(entries), "quotaBytes": limit, "overQuota": size > limit,
                 "protectedBytes": sum(x["bytes"] for x in entries if x["protected"]),
                 "deduplicatedHits": sum(x["hits"] for x in entries), "unrecognizedEntries": skipped,
+                "providerMetadataBytes": sum(x["bytes"] for x in entries if "providerMetadata" in x["providerKinds"]),
+                "providerMaterializationBytes": sum(x["bytes"] for x in entries if "providerMaterialization" in x["providerKinds"]),
+                "providerCacheHits": sum(x["hits"] for x in entries if x["providerKinds"]),
                 "cleanupPolicy": "Verified source cache and completed-task intermediates only; unfinished tasks and all user data are kept.",
                 "quotaPolicy": "Soft target; explicit cleanup is required. Active and resumable data can exceed it."},
                 "activeJobs": self.engine._active_count(), "execution": "local", "automaticDeletion": False}
@@ -228,8 +286,9 @@ class EngineMaintenance:
                         skipped += 1
                         continue
                     for part in job.get("parts", []):
+                        provider = part.get("kind") in {"provider-parquet", "provider-api"}
                         candidates = [(str(part["id"]) + ".parquet", part.get("checkpointSha256")),
-                                      (str(part["id"]) + ".source." + part["format"], part.get("sha256"))]
+                                      (str(part["id"]) + ".source." + ("parquet" if provider else part["format"]), part.get("materializedSha256") if provider else part.get("sha256"))]
                         if part.get("kind") == "frozen":
                             frozen = self.engine.workspace / part.get("frozenPath", "")
                             if frozen.parent == directory:
@@ -250,6 +309,7 @@ class EngineMaintenance:
                     file.unlink()
                     if digest:
                         index["entries"].pop(digest, None)
+                        index["providerBindings"] = {key: value for key, value in index.get("providerBindings", {}).items() if value != digest}
                 if self.root.exists():
                     _write(self.root / "index.json", index)
             return {"dryRun": dry, "files": len(removable), "bytes": removed_bytes,

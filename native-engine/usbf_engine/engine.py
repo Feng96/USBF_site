@@ -28,6 +28,8 @@ from .runtime import Runtime, ident, sqlstr
 from .results import ResultsMixin
 from .providers import ProvidersMixin, PROVIDER_IDS
 from .comparison import ComparisonMixin
+from .matching import MatchingMixin
+from .charts import ChartsMixin
 from .maintenance import EngineMaintenance
 from .geometry_metadata import preserve_empty_geoparquet
 from .security import https_context
@@ -35,7 +37,7 @@ from .validation import (FOLDERS, FORMATS, OPERATIONS, MAX_SPEC_BYTES, bounds, c
                          intersects, json_exact, normalize_spec, public_url,
                          safe_name, scope_geometry, workspace_path)
 
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 GEOM = "__usbf_geometry"
 TERMINAL = {"completed", "partial", "failed", "cancelled", "interrupted"}
 PREVIEW_MAX_BYTES = 8 * 1024 * 1024
@@ -62,7 +64,7 @@ class CheckedRedirect(urllib.request.HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
-class Engine(ProvidersMixin, ResultsMixin, ComparisonMixin):
+class Engine(ProvidersMixin, ResultsMixin, ComparisonMixin, MatchingMixin, ChartsMixin):
     def __init__(self, workspace, *, extension_path=None, threads=2, memory_limit="1GB",
                  allow_install=True, autostart=True, downloader=None):
         self.workspace = Path(workspace).expanduser().resolve()
@@ -239,7 +241,7 @@ class Engine(ProvidersMixin, ResultsMixin, ComparisonMixin):
                                  "resultMap": True, "resultQuery": True, "resultSelection": True, "resultExport": True,
                                  "projectPackages": True, "maintenance": True, "resultSummary": True,
                                  "originalDataProviders": list(PROVIDER_IDS),
-                                 "resultComparisonSummary": True,
+                                 "resultComparisonSummary": True, "resultMatching": True, "resultCharts": True,
                                  "uninstallRequest": bool(self.uninstall_handler), "uninstall": False},
                 "activeJobs": self._active_count()}
 
@@ -830,6 +832,8 @@ class Engine(ProvidersMixin, ResultsMixin, ComparisonMixin):
                 "mtimeNs": target.stat().st_mtime_ns, "sha256": receipt["sha256"], "recovered": True}
 
     def _execute(self, job):
+        if job.get("operation") == "building-match":
+            return self._execute_matching(job)
         directory = self.workspace / "Cache" / "native-jobs" / job["id"]
         job.update(status="running", phase="reading", error=None)
         self._save(job)
@@ -844,6 +848,7 @@ class Engine(ProvidersMixin, ResultsMixin, ComparisonMixin):
                 job.update(status="completed", phase="finished", result=recovered, error=None)
                 job["capabilities"].update(cancel=False, resume=False, preview=True, table=True)
                 return
+            self._provider_prefetch(job["parts"], job["id"])
             for part in job["parts"]:
                 self._check(job["id"])
                 checkpoint = directory / (part["id"] + ".parquet")
@@ -881,6 +886,7 @@ class Engine(ProvidersMixin, ResultsMixin, ComparisonMixin):
             self._progress(job)
             job.update(status="failed", phase="failed", error=str(error)[:1000])
         finally:
+            self._provider_prefetch_cleanup(job["id"])
             self.active_connection = None
             self.active_job_id = None
             if connection:

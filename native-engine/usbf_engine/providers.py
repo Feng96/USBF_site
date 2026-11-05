@@ -11,11 +11,14 @@ import io
 import json
 import math
 import re
+import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from urllib.parse import urlencode, urlparse
 
 from .security import https_context
+from .provider_cache import ProviderCache, MAX_FOOTER_BYTES
 from .validation import bounds, digest_json, public_url, scope_geometry
 
 PROVIDER_IDS = ("overture-buildings", "osm-buildings", "gba-usa", "dc-government", "nyc-government")
@@ -52,7 +55,11 @@ class ProviderRedirect(urllib.request.HTTPRedirectHandler):
 def provider_open(url, *, headers=None):
     provider_url(url)
     opener = urllib.request.build_opener(ProviderRedirect(), urllib.request.HTTPSHandler(context=https_context()))
-    return opener.open(urllib.request.Request(url, headers={"User-Agent": "USBF-Local-Engine/0.3", "Accept-Encoding": "identity", **(headers or {})}), timeout=30)
+    try:
+        return opener.open(urllib.request.Request(url, headers={"User-Agent": "USBF-Local-Engine/0.4", "Accept-Encoding": "identity", **(headers or {})}), timeout=30)
+    except urllib.error.HTTPError as error:
+        error.close()
+        raise
 
 
 def read_json(url, maximum=MAX_METADATA):
@@ -72,13 +79,24 @@ class HTTPRangeFile(io.RawIOBase):
     Strong ETags use If-Match. Weak ETags additionally require Last-Modified.
     Every response must retain the pinned identity and exact Content-Range.
     """
-    def __init__(self, url, *, identity=None, check=None, opener=None):
+    def __init__(self, url, *, identity=None, check=None, opener=None, maintenance=None, job_id=None, release=None, validated_identity=None):
         super().__init__()
         self.url, self.position, self.network_bytes = url, 0, 0
         self.check = check or (lambda: None)
         self.opener = opener or provider_open
         self.identity = dict(identity or {})
-        self._request(0, 8, initial=True)
+        self.metadata_reads = True
+        self.metadata_bytes = 0
+        self.cache = None
+        if validated_identity is None:
+            self._request(0, 8, initial=True)
+        else:
+            # Internal prefetch results are fresh in this running job. No open
+            # response/socket survives prefetch, and every data range still
+            # sends the pinned conditional validator and checks its response.
+            self.identity = dict(validated_identity)
+        if maintenance is not None:
+            self.cache = ProviderCache(maintenance, url, self.identity, job_id, release)
 
     def readable(self): return True
     def seekable(self): return True
@@ -95,6 +113,14 @@ class HTTPRangeFile(io.RawIOBase):
         self.check()
         if size > 128 * 1024 * 1024:
             raise ValueError("A provider byte range exceeds the native memory budget.")
+        if not initial and self.metadata_reads:
+            self.metadata_bytes += size
+            if self.metadata_bytes > MAX_FOOTER_BYTES:
+                raise ValueError("The provider footer exceeds its metadata budget.")
+            cached = self.cache.range_hit(start, size) if self.cache else None
+            if cached is not None:
+                self.check()
+                return cached
         headers = {"Range": f"bytes={start}-{start + size - 1}"}
         tag = self.identity.get("etag")
         if tag and not tag.startswith("W/"): headers["If-Match"] = tag
@@ -120,6 +146,8 @@ class HTTPRangeFile(io.RawIOBase):
         self.network_bytes += len(raw)
         if initial and raw[:4] != b"PAR1":
             raise ValueError("The original-data source is not a Parquet file.")
+        if not initial and self.metadata_reads and self.cache:
+            self.cache.range_store(start, raw)
         return raw
 
     def read(self, size=-1):
@@ -192,6 +220,59 @@ def _api_url(provider, extra, box=None):
 
 
 class ProvidersMixin:
+    def _provider_remote(self, part, job_id, validated_identity=None):
+        remote = HTTPRangeFile(part["url"], identity=part.get("sourceIdentity"),
+            check=lambda: self._check(job_id), maintenance=self.maintenance,
+            job_id=job_id, release=part["sourceRelease"], validated_identity=validated_identity)
+        if part.get("originalBytes") is not None and part["originalBytes"] != remote.identity["bytes"]:
+            remote.close()
+            raise ValueError("The GBA publication file size changed; update its manifest before reading.")
+        return remote
+
+    def _provider_prefetch(self, parts, job_id):
+        """Bound cold footer I/O; warm runs still validate every mutable file.
+
+        All USA manifest entries participate. Cached bounds never replace a
+        fresh source-identity request, including files outside the current AOI.
+        Responses close inside each request; only identities/group IDs survive.
+        """
+        import pyarrow.parquet as pq
+        prepared = {}
+        if not hasattr(self, "_provider_prepared"):
+            self._provider_prepared = {}
+        self._provider_prepared[job_id] = prepared
+        candidates = [part for part in parts if part.get("kind") == "provider-parquet" and part.get("status") != "completed"]
+        if not candidates:
+            return
+        workers = min(6, len(candidates))
+        def prepare(part):
+            self._check(job_id)
+            with self._provider_remote(part, job_id) as remote:
+                parquet = pq.ParquetFile(remote, pre_buffer=False)
+                groups = [] if part.get("emptySource") else candidate_row_groups(parquet.metadata, part["scopeBounds"])
+                return {"identity": remote.identity, "groups": groups, "totalRowGroups": parquet.metadata.num_row_groups,
+                    "networkBytes": remote.network_bytes, "footerCacheHits": remote.cache.range_hits, "prefetchWorkers": workers}
+        # Source HTTP I/O is independent of DuckDB's thread count. Six bounded
+        # workers reduce first-run manifest latency without unbounded requests.
+        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="usbf-footer") as pool:
+            futures = {pool.submit(prepare, part): part["id"] for part in candidates}
+            try:
+                for future in as_completed(futures):
+                    self._check(job_id)
+                    try:
+                        prepared[futures[future]] = future.result()
+                    except Exception as error:
+                        self._check(job_id)
+                        # Preserve normal per-part failure/resume behavior.
+                        prepared[futures[future]] = {"error": error}
+            except BaseException:
+                for future in futures:
+                    future.cancel()
+                raise
+
+    def _provider_prefetch_cleanup(self, job_id):
+        getattr(self, "_provider_prepared", {}).pop(job_id, None)
+
     def _provider_json(self, url):
         return read_json(url)
 
@@ -311,20 +392,46 @@ class ProvidersMixin:
             if part["kind"] == "provider-api":
                 self._provider_api_materialize(part, temporary, job_id)
             else:
-                with HTTPRangeFile(part["url"], identity=part.get("sourceIdentity"), check=lambda: self._check(job_id)) as remote:
+                prepared = getattr(self, "_provider_prepared", {}).get(job_id, {}).pop(part["id"], None)
+                if prepared and "error" in prepared:
+                    raise prepared["error"]
+                with self._provider_remote(part, job_id, prepared["identity"] if prepared else None) as remote:
                     part["sourceIdentity"] = remote.identity
-                    if part.get("originalBytes") is not None and part["originalBytes"] != remote.identity["bytes"]:
-                        raise ValueError("The GBA publication file size changed; update its manifest before reading.")
-                    parquet = pq.ParquetFile(remote, pre_buffer=False)
-                    groups = [] if part.get("emptySource") else candidate_row_groups(parquet.metadata, part["scopeBounds"])
+                    parquet = None
+                    if prepared:
+                        groups, total_groups = prepared["groups"], prepared["totalRowGroups"]
+                    else:
+                        parquet = pq.ParquetFile(remote, pre_buffer=False)
+                        groups = [] if part.get("emptySource") else candidate_row_groups(parquet.metadata, part["scopeBounds"])
+                        total_groups = parquet.metadata.num_row_groups
+                    key = remote.cache.materialization_key(groups)
+                    hit = self.maintenance.provider_hit(key, job_id)
+                    transport = {"method": "checked-http-range", "networkBytes": remote.network_bytes + (prepared["networkBytes"] if prepared else 0),
+                        "sourceBytes": remote.identity["bytes"], "selectedRowGroups": len(groups), "totalRowGroups": total_groups,
+                        "wholeFileDownloaded": False, "footerCacheHits": remote.cache.range_hits + (prepared["footerCacheHits"] if prepared else 0),
+                        "materializationCacheHit": hit is not None, "sourceIdentityChecked": True, "prefetchWorkers": prepared["prefetchWorkers"] if prepared else 1}
+                    if hit is not None:
+                        part["transport"] = transport
+                        part["materializedSha256"] = part["providerCacheSha256"] = hit.stem
+                        self._check(job_id)
+                        return hit
+                    if parquet is None:
+                        parquet = pq.ParquetFile(remote, pre_buffer=False)
+                    remote.metadata_reads = False
                     with pq.ParquetWriter(temporary, parquet.schema_arrow, compression="zstd") as writer:
                         for batch in parquet.iter_batches(batch_size=8192, row_groups=groups, use_threads=False):
                             self._check(job_id)
                             writer.write_batch(batch)
-                    part["transport"] = {"method": "checked-http-range", "networkBytes": remote.network_bytes, "sourceBytes": remote.identity["bytes"], "selectedRowGroups": len(groups), "totalRowGroups": parquet.metadata.num_row_groups, "wholeFileDownloaded": False}
+                    transport["networkBytes"] = remote.network_bytes + (prepared["networkBytes"] if prepared else 0)
+                    transport["footerCacheHits"] = remote.cache.range_hits + (prepared["footerCacheHits"] if prepared else 0)
+                    part["transport"] = transport
             self._check(job_id)
             temporary.replace(destination)
             part["materializedSha256"] = self._hash_file(destination, job_id)
+            if part["kind"] == "provider-parquet":
+                cached = self.maintenance.provider_store(key, "providerMaterialization", destination, job_id)
+                if cached is not None:
+                    part["providerCacheSha256"] = cached.stem
             return destination
         finally:
             temporary.unlink(missing_ok=True)

@@ -1,5 +1,5 @@
 """USBF's isolated, loopback-only native analysis engine."""
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 from .engine import Engine
 

@@ -1,5 +1,12 @@
 # USBF Engine preview
 
+The 0.4 preview adds validated original-provider cache reuse, complete native
+histograms/category counts/grouped means, and saved-area building correspondence
+reports. Install the new package into the existing workspace to update its
+isolated runtime while keeping Projects, Results and Files. Existing system GIS
+environments remain separate. The website checks actual runtime capabilities
+before enabling these operations. See [methods and acceptance](../docs/analysis-workspace-acceptance.md).
+
 The installer contains an independent CPython runtime, DuckDB 2.0.0, its official
 signed Spatial extension (including GDAL), psutil and the desktop interface.
 Users do not need Python, GDAL or DuckDB installed. Existing GIS environments

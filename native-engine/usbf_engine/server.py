@@ -151,11 +151,23 @@ def serve(engine, port=52763, origins=None):
                 if path == "/v1/uninstall-request" and method == "POST":
                     if int(self.headers.get("Content-Length", "0")): self._body()
                     return self._json(202, engine.request_uninstall())
+                if path == "/v1/matches" and method == "POST":
+                    return self._json(201, engine.create_matching_job(self._body()))
+                matching = re.fullmatch(r"/v1/jobs/([a-f0-9-]{36})/(matches|match-selection|match-export)", path)
+                if matching:
+                    matching_id, matching_action = matching.groups()
+                    if matching_action == "matches" and method == "POST":
+                        return self._json(200, engine.matching_page(matching_id, self._body()))
+                    if matching_action == "match-selection" and method == "POST":
+                        return self._json(200, engine.matching_selection(matching_id, self._body()))
+                    if matching_action == "match-export" and method == "GET":
+                        file, mime = engine.matching_export(matching_id, query.get("format", ["csv"])[0])
+                        return self._file(file, mime)
                 if path == "/v1/plan" and method == "POST":
                     return self._json(200, engine.plan(self._body()))
                 if path == "/v1/jobs":
                     return self._json(201, engine.create_job(self._body())) if method == "POST" else self._json(200, {"jobs": engine.jobs(summaries=True)})
-                match = re.fullmatch(r"/v1/jobs/([a-f0-9-]{36})/(map|query|selection|summary|comparison-summary|export|features/([0-9]+)|tiles/([0-9]+)/([0-9]+)/([0-9]+)\.pbf)", path)
+                match = re.fullmatch(r"/v1/jobs/([a-f0-9-]{36})/(map|query|selection|summary|comparison-summary|chart|chart-cancel|export|features/([0-9]+)|tiles/([0-9]+)/([0-9]+)/([0-9]+)\.pbf)", path)
                 if match:
                     job_id, action, row_id, z, x, y = match.groups()
                     if action == "map" and method == "GET":
@@ -168,6 +180,10 @@ def serve(engine, port=52763, origins=None):
                         return self._json(200, engine.result_summary(job_id, self._body()))
                     if action == "comparison-summary" and method == "POST":
                         return self._json(200, engine.result_comparison_summary(job_id, self._body()))
+                    if action == "chart" and method == "POST":
+                        return self._json(200, engine.result_chart(job_id, self._body()))
+                    if action == "chart-cancel" and method == "POST":
+                        return self._json(200, engine.cancel_chart(job_id, self._body()))
                     if row_id is not None and method == "GET":
                         return self._json(200, engine.result_feature(job_id, row_id))
                     if z is not None and method == "GET":
