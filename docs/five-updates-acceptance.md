@@ -128,4 +128,21 @@ Pages deployment and final production acceptance are recorded in deployment hist
 
 The implementation commit `24225c3a26d7b5501c7a306de4eeafa1426539c7` deployed successfully in [Pages run 41937079448](https://github.com/Feng96/USBF_site/actions/runs/41937079448). The actual public site passed 39 checks, including real DC / New York / Los Angeles / Boston data, complete ordinary attributes, bounded range reads, readonly sharing and Chinese phone layout. Seven deployed resources matched the exact tested source SHA256.
 
-The unmodified production HTTPS page passed 14 real browser-to-loopback checks after explicit browser local-network permission, including pairing, original attributes, authenticated MVT and full tables. Chromium 141 correctly blocked this connection before permission was allowed. A narrow interface patch supplies English/Chinese instructions for prompt, denied and granted states without requesting or granting permission itself. That patch passed 10 tests using actual browser permission states with only the three local patch scripts substituted; native requests remained direct with normal Origin/CORS and mixed-content enforcement. Final unmodified patch deployment acceptance is recorded in the local publication receipt.
+The initial production HTTPS page passed 14 real browser-to-loopback checks after explicit browser local-network permission, including pairing, original attributes, authenticated MVT and full tables. Chromium 141 correctly blocked this connection before permission was allowed. A narrow interface patch supplies English/Chinese instructions for prompt, denied and granted states without requesting or granting permission itself. That patch passed 10 tests using actual browser permission states with only the three local patch scripts substituted; native requests remained direct with normal Origin/CORS and mixed-content enforcement.
+
+The deployed permission patch at `cfe910ff0a456fcba4a6565c9fcf38342bb75abe` passed 15 actual HTTPS-to-loopback browser checks with no script substitution or security bypass flags. Request interception used `route.continue` only, without changing content, headers or CORS. The public scripts matched the tested SHA256. Pairing, actual local processing, authenticated MVT rendering, exact original attributes in the full table, and UI disconnect with credential removal and saved-preview fallback all passed without page, console or network errors.
+
+## Maps from complete native results
+
+Map composition invalidates an old captured preview when the native result identity,
+connection state or selection changes, including a replacement selection with the
+same count. Workset framing uses the verified complete result bounds; a disconnected
+saved preview cannot supply the complete extent. Downloaded map details distinguish
+the full GeoParquet identity, generalized display tiles and saved bounded sample,
+without including native workspace/task identifiers or local result paths.
+
+The narrow composition regression passed 12 logic checks and 11 real browser
+checks with 25,001 complete native records and a 2,000-feature saved preview.
+The browser downloaded an actual PNG and map metadata and verified invalidation
+after reconnection and same-count selection replacement, complete-result framing,
+and disconnected-preview protection without uncaught browser errors.

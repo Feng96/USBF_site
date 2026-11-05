@@ -1,0 +1,35 @@
+/* Actual native tiles and PNG proof invalidation, independent of camera motion. */
+const fs=require('fs'),path=require('path');
+module.exports=async qa=>{
+ const p=qa.page,{ok}=qa;if(!qa.nativeEndpoint||!qa.nativeSpec)throw Error('Provide the actual native fixture service.');
+ await p.route(qa.base+'map-composer.js*',route=>route.fulfill({status:200,contentType:'text/javascript',body:fs.readFileSync(path.join(__dirname,'../map-composer.js'),'utf8')}));
+ await p.route(qa.nativeEndpoint+'/**',route=>route.continue());await qa.open('?empty=1&native-composer='+Date.now()+'#base=blank');await p.locator('#interface-language').selectOption('en');
+ await p.evaluate(({code,endpoint})=>PortalNativeEngine.pair(code,endpoint),{code:qa.nativePairingCode,endpoint:qa.nativeEndpoint});
+ const name='Native composer regression '+Date.now();await p.evaluate(({spec,name})=>PortalTasks.openPlan(spec,{name}),{spec:qa.nativeSpec,name});await p.locator('[data-task-action=start-native]').click();
+ const handle=await p.waitForFunction(name=>PortalTasks.list().find(row=>row.name===name&&['completed','failed','partial'].includes(row.status)),name,{timeout:180000}),job=await handle.jsonValue();if(job.status!=='completed')throw Error(JSON.stringify(job));
+ await p.evaluate(async id=>{await PortalTasks.preview(id);document.querySelector('#task-center-dialog')?.close();PortalSidebar.close();document.querySelector('#welcome-card').hidden=true;portal.setTool('explore');},job.id);await p.waitForFunction(()=>PortalNativeResults.live(PortalLayers.active));
+ const last=await p.evaluate(id=>PortalNativeEngine.resultFeature(id,25000),job.nativeId),point=[last.geometry.coordinates[0][0][0]+.000002,last.geometry.coordinates[0][0][1]+.000002];
+ await p.evaluate(point=>portal.map.jumpTo({center:point,zoom:21,pitch:0,bearing:0}),point);
+ await p.waitForFunction(point=>portal.map.queryRenderedFeatures(portal.map.project(point),{layers:PortalLayers.active.renderIds}).some(f=>f.properties.nativeId?.endsWith(':25000')),point,{timeout:120000});
+ ok(true,'The Composer fixture uses an actual native tile for a building beyond the bounded preview');
+ await p.evaluate(()=>PortalComposer.open('map'));
+ await p.locator('#composer-preview-button').click();await p.waitForFunction(()=>document.querySelector('#composer-map-message').textContent==='Preview ready.'&&!PortalComposer.previewStale,null,{timeout:60000});
+ ok(await p.evaluate(()=>{const s=PortalComposer.sources().layers.find(l=>l.fullData);return PortalNativeResults.live(PortalLayers.active)&&s.fullData.recordCount===25001&&s.savedPreview.featureCount===2000&&s.display.mode==='native-vector-tiles';}),'A real native capture reports its 25,001 full records separately from the 2,000-feature saved fallback');
+ await p.locator('[data-composer-back-design]').click();await p.locator('#composer-frame').selectOption('workset');
+ ok(await p.evaluate(()=>{const b=PortalLayers.active.nativeMap.bounds,frame=PortalComposer.frameSpec('workset').bounds;return frame[0][0]===b[0]&&frame[1][1]===b[3]&&document.querySelector('#composer-frame-info').textContent.includes('Analytical input records remain unchanged');}),'The workset frame uses the verified complete native geometry extent');
+ await p.locator('#composer-frame').selectOption('current');await p.evaluate(point=>portal.map.jumpTo({center:point,zoom:21,pitch:0,bearing:0}),point);
+ await p.locator('#composer-preview-button').click();await p.waitForFunction(()=>document.querySelector('#composer-map-message').textContent==='Preview ready.'&&!PortalComposer.previewStale,null,{timeout:60000});
+ await p.evaluate(id=>PortalNativeResults.select(PortalLayers.active,{mode:'replace',ids:[id+':25000']}),job.nativeId);await p.waitForFunction(()=>PortalComposer.previewStale);
+ ok(await p.locator('#composer-map-metadata').isDisabled(),'An actual native selection invalidates the captured proof even with unchanged camera and dataset size');
+ const png=await qa.download(()=>p.locator('#composer-download-png').click(),'native-composer-current.png');ok(fs.readFileSync(png).subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])),'PNG output renders the current native map successfully');
+ await p.waitForFunction(()=>!PortalComposer.previewStale);await p.locator('[data-composer-back-design]').click();const options=p.locator('details.composer-options').filter({has:p.locator('#composer-map-metadata')});await options.locator('summary').click();const metadataFile=await qa.download(()=>p.locator('#composer-map-metadata').click(),'native-composer-current.map.json'),metadata=JSON.parse(fs.readFileSync(metadataFile,'utf8')),native=metadata.sources.layers.find(l=>l.fullData);
+ ok(native.fullData.recordCount===25001&&native.display.mode==='native-vector-tiles'&&native.display.tiled&&native.display.analysisInput===false&&native.display.selectedRecordCount===1&&native.savedPreview.featureCount===2000,'Actual captured map details distinguish complete data, generalized tiles, selection and saved fallback preview');
+ ok(!JSON.stringify(metadata).includes(job.result.path)&&!JSON.stringify(metadata).includes(job.workspaceId)&&!JSON.stringify(metadata).includes(job.nativeId),'Downloaded map details exclude private native result paths and workspace/task identifiers');
+ await p.evaluate(id=>PortalNativeResults.select(PortalLayers.active,{mode:'replace',ids:[id+':24999']}),job.nativeId);await p.waitForFunction(()=>PortalComposer.previewStale);
+ ok(await p.evaluate(()=>PortalNativeResults.count(PortalLayers.active)===1),'A replacement selection with the same record count still invalidates the old rendered proof');
+ await p.evaluate(()=>PortalNativeEngine.unpair());await p.waitForFunction(()=>!PortalNativeResults.live(PortalLayers.active));await p.locator('#composer-frame').selectOption('workset');
+ ok((await p.locator('#composer-frame-info').textContent()).includes('bounded native preview'),'Disconnecting preserves the guard against framing a partial saved preview as a full workset');
+ ok(await p.evaluate(()=>{const s=PortalComposer.sources().layers.find(l=>l.fullData);return s.display.mode==='bounded-native-preview'&&!s.display.tiled&&s.limited&&s.fullData.recordCount===25001&&s.savedPreview.featureCount===2000;}),'After disconnect map details retain the full-data identity while clearly labeling the limited saved preview');
+ ok(!qa.errors.length,'Native composition, selection changes and disconnect have no uncaught browser errors');
+ fs.writeFileSync(qa.out+'/composer-native-workflow.json',JSON.stringify({passed:true,checks:qa.checks,metadata},null,2));await qa.screenshot('composer-native-final.png');
+};

@@ -46,6 +46,9 @@ Copy this source to the local Files folder and select it in a native task. Inlin
 This provider has no native original-data adapter yet. Use its bounded browser adapter or a regional file in Files.|此来源尚未提供本地原始数据读取器，请使用受限的浏览器读取器或 Files 中的区域文件。
 Preview extent unavailable|无法使用预览范围
 A bounded native preview cannot define the full result extent. Choose a saved study area.|限量本地预览不能代表完整结果范围，请选择已保存的研究区域。
+Choose an analysis workset first.|请先选择分析数据集。
+This layer has no known extent.|此图层没有已知的地理范围。
+Choose a map frame.|请选择地图出图范围。
 Browse result folder|浏览结果文件夹
 Choose the parent folder containing this native result. Its Engine workspace marker must match the task workspace.|请选择包含此本地结果的母文件夹，其 Engine 工作区标记必须与任务工作区匹配。
 Source parts with unknown row counts|记录数未知的来源分块
