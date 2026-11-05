@@ -15,6 +15,11 @@ one complete geometry by their exact result-row identity, including records
 beyond the preview. Stale requests and records without usable geometry cannot
 move the map. The Map action column is separate from original data and exports.
 
+New workspaces start without automatically adding a dataset. Place and address
+search changes the map location without adding, unhiding or activating USBF.
+Datasets remain available through Add Data, and saved Projects and explicit
+layer links retain their saved layer choices.
+
 Adding or importing data preserves the current map center, zoom, bearing and
 pitch, including asynchronous loads and original-data worksets. Use **Zoom to
 layer**, **Locate** or a model card’s **View** action to navigate explicitly.

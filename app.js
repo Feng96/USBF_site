@@ -336,7 +336,6 @@
     window.portal.resetWorkspace=function(){['footprints','original','height','lod2'].forEach(function(k){$('#layer-'+k).checked=false;});syncLayers();clearSelection();clearMeasure();setTool('explore');$('#attribute-table').hidden=true;$('#table-toggle').setAttribute('aria-expanded','false');$('#welcome-card').hidden=true;$('#research-model-controls').open=false;PortalSidebar.open('layers');};window.portal.cancelPlaceSearch=cancelPlaceSearch;window.portal.setTool=setTool;window.portal.getTool=function(){return tool;};window.portal.toast=toast;window.portal.clearSelection=clearSelection;window.portal.saveView=saveView;window.portal.setViewMode=setViewMode;window.portal.setBasemap=setBasemap;window.portal.getBasemap=function(){return activeBasemap;};window.portal.initialHash=initialHash;
     if(window.PortalLayers)await PortalLayers.init(window.portal,initialHash);
     window.PortalInventory?.init(window.portal);window.portal.ready=true;document.dispatchEvent(new CustomEvent('portal-ready'));
-    if(!initialHash&&!new URLSearchParams(location.search).has('empty')){PortalLayers.add(PortalLayers.catalog[0],{restore:true});}
     new ResizeObserver(function(){map.resize();}).observe($('#map-column'));
   }
   init().catch(function(e){$('#map-failure').hidden=false;status('Workspace could not initialize');console.error(e);});

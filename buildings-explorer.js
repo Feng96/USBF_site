@@ -99,15 +99,11 @@
     const promise=(async()=>{const results=parseAddress(await jsonpAddress(text),text);addressCache.set(key,results);while(addressCache.size>30)addressCache.delete(addressCache.keys().next().value);return results.map(r=>({...r}));})();pendingAddress={key,promise};try{return await promise;}finally{pendingAddress=null;}
   }
   function notify(message){root.portal?.toast?.(message);}
-  async function ensureUSBF(){
-    if(!root.PortalLayers)return;let l=Array.from(PortalLayers.layers.values()).find(l=>l.cfg.id==='usbf-live');if(!l){const entry=PortalLayers.catalog.find(c=>c.id==='usbf-live');if(entry)l=await PortalLayers.add(entry,{restore:true});}if(l){if(!l.visible){l.visible=true;PortalLayers.setStyle(l.id,{visible:true});l.reload?.();}PortalLayers.selectLayer(l.id);}
-  }
   function go(place){
     if(!map){notify('The map is still loading. Please choose this place again shortly.');return true;}root.PortalModels?.hide();root.portal.setViewMode(false,false);const coords=place.viewCenter||place.coords;
     if(place.bounds)map.fitBounds([[place.bounds[0],place.bounds[1]],[place.bounds[2],place.bounds[3]]],{padding:55,maxZoom:place.kind==='state'?10:5,duration:0,pitch:0,bearing:0});else map.jumpTo({center:coords,zoom:16.5,pitch:0,bearing:0});
     const label=$('#map-place-name');if(label)label.textContent=place.label;selection=place.source?{role:'address-location',approximate:true,label:place.label,coordinates:place.coords.slice(),source:place.source,sourceURL:place.sourceURL,quality:place.quality}:null;
     map.getSource('explorer-address-location')?.setData({type:'FeatureCollection',features:selection?[{type:'Feature',properties:{role:'address-location',label:selection.label,approximate:true},geometry:{type:'Point',coordinates:selection.coordinates}}]:[]});
-    if(place.covered!==false)ensureUSBF().catch(()=>notify('The building layer could not be opened. Use Add data to try again.'));else notify('USBF currently covers the contiguous states and Washington, DC.');
     $('#search-results').hidden=true;picker?.close();if(innerWidth<=700){$('#sidebar')?.classList.remove('is-open');const b=$('[data-action=layers]');if(b)b.setAttribute('aria-expanded','false');}schedule();return true;
   }
   function navigate(action){const value=String(action||'');if(value.startsWith('explore-place:')){const p=byID.get(value.slice(14));if(p)return go(p);notify('Choose the place again.');return true;}if(value.startsWith('explore-address:')){const p=addressResults.get(value.slice(16));if(p)return go(p);notify('Search this address again to reopen its location.');return true;}return false;}
