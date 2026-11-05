@@ -7,7 +7,7 @@ if(!out||!path.resolve(out).startsWith('/lustre/isaac24/scratch/yfeng21/usbf_tab
 if(fs.existsSync(out))throw Error('Preserve prior evidence and choose a fresh output directory.');
 fs.mkdirSync(out,{recursive:true});process.env.TMPDIR=process.env.PORTAL_BROWSER_TMPDIR||'/tmp';
 const checks=[],errors=[],consoleErrors=[],requestFailures=[],requests=[],responses=[],navigationAttempts=[];
-const result={site,expectedRevision:process.env.PORTAL_EXPECTED_REVISION||null,appScriptOverrides:false,requestHeaderOverrides:false,routePolicy:'continue unchanged only',checks,errors,consoleErrors,requestFailures,requests,responses,navigationAttempts};
+const result={site,expectedRevision:process.env.PORTAL_EXPECTED_REVISION||null,appScriptOverrides:false,requestHeaderOverrides:false,routePolicy:'continue unchanged only',highlightReadMethod:'Public GeoJSONSource.getData(); geometry equality independent of object and coordinate ordering',checks,errors,consoleErrors,requestFailures,requests,responses,navigationAttempts};
 let browser,page,service,fixture,recording=true,success=false;
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms)),digest=file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const ok=(value,label)=>{assert(value,label);checks.push(label);console.log('PASS',label);};
@@ -17,15 +17,15 @@ async function startService(){
  const deadline=Date.now()+45000;while(!fs.existsSync(receipt)){if(service.exitCode!==null)throw Error('Isolated completed-fixture service failed: '+fs.readFileSync(path.join(out,'service.log'),'utf8'));if(Date.now()>deadline)throw Error('Isolated native service startup timed out.');await delay(100);}return JSON.parse(fs.readFileSync(receipt,'utf8'));
 }
 async function boundedState(){if(!page)return {};return Promise.race([page.evaluate(()=>({href:location.href,ready:!!window.portal?.ready,dialogs:Array.from(document.querySelectorAll('dialog[open]')).map(e=>e.id),nativeTable:document.querySelector('[data-native-table-summary]')?.textContent,nativeMessage:document.querySelector('[data-native-table-message]')?.textContent,browserRows:document.querySelectorAll('[data-table-record]').length,selected:window.PortalLayers?.selection?.feature?.id})).catch(error=>({inspectionError:error.message})),delay(5000).then(()=>({inspectionError:'Browser inspection timed out'}))]);}
-async function originalState(layerId,index){return page.evaluate(({layerId,index})=>{
- const l=PortalLayers.layers.get(layerId),f=l.data.features[index],actual=PortalLayers.selection?.feature,h=portal.map.getSource('inventory-selection')?._data?.features?.[0];
+async function originalState(layerId,index){return page.evaluate(async({layerId,index})=>{
+ const l=PortalLayers.layers.get(layerId),f=l.data.features[index],actual=PortalLayers.selection?.feature,highlightData=await portal.map.getSource('inventory-selection').getData(),h=highlightData?.features?.[0];
  const b=turf.bbox({type:'Feature',properties:{},geometry:f.geometry}),view=portal.map.getBounds(),center=[(b[0]+b[2])/2,(b[1]+b[3])/2],q=portal.map.project(center),v=portal.map.getContainer().getBoundingClientRect();
  const table=document.querySelector('#attribute-table'),properties=document.querySelector('#properties'),sidebar=document.querySelector('#sidebar');
  let visible=q.x>=0&&q.x<v.width&&q.y>=0&&q.y<v.height;
  if(!table.hidden)visible=visible&&q.y<table.getBoundingClientRect().top-v.top;
  if(!properties.hidden)visible=visible&&q.x<properties.getBoundingClientRect().left-v.left;
  if(sidebar?.getClientRects().length){const r=sidebar.getBoundingClientRect();if(r.right>v.left&&r.left<v.right)visible=visible&&q.x>r.right-v.left;}
- return {correctOriginal:actual===f,highlight:JSON.stringify(h?.geometry)===JSON.stringify(f.geometry),contains:view.contains([b[0],b[1]])&&view.contains([b[2],b[3]]),visible,rawUnchanged:JSON.stringify(l.data)===window.__productionLocateOriginal,record:f.properties.record,sourceId:f.id,bounds:b,projectedCenter:{x:q.x,y:q.y},batchCount:PortalGISSelection.count(l)};
+ return {correctOriginal:actual===f,highlight:!!h&&turf.booleanEqual(h.geometry,f.geometry,{precision:9}),highlightGeometry:h?.geometry,contains:view.contains([b[0],b[1]])&&view.contains([b[2],b[3]]),visible,rawUnchanged:JSON.stringify(l.data)===window.__productionLocateOriginal,record:f.properties.record,sourceId:f.id,bounds:b,projectedCenter:{x:q.x,y:q.y},batchCount:PortalGISSelection.count(l)};
  },{layerId,index});}
 (async()=>{
  fixture=await startService();result.fixture={chartJob:fixture.chartJob,copied:fixture.copied,allowedOrigins:fixture.allowedOrigins};
@@ -67,9 +67,9 @@ async function originalState(layerId,index){return page.evaluate(({layerId,index
  ok(result.browserChineseLabel==='定位'&&result.nativeChineseLabel==='定位'&&await page.locator('[data-native-query-field] option:checked').textContent()===result.sourceRowField,'Chinese translates browser and native Locate controls while the original source-row field name stays unchanged');
  const beforeFeatures=requests.filter(r=>r.path.includes('/features/')).length,requestStart=requests.length;
  await page.locator('[data-native-locate-row]').click();await page.waitForFunction(jobId=>!document.querySelector('#native-result-table').open&&PortalLayers.selection?.feature?.id===jobId+':2500',fixture.chartJob.id);
- result.nativeLocated=await page.evaluate(({id,rowField})=>{
-  const f=PortalLayers.selection.feature,h=portal.map.getSource('inventory-selection')?._data?.features?.[0],b=turf.bbox({type:'Feature',properties:{},geometry:f.geometry}),v=portal.map.getBounds(),center=[(b[0]+b[2])/2,(b[1]+b[3])/2],q=portal.map.project(center),container=portal.map.getContainer().getBoundingClientRect(),props=document.querySelector('#properties'),batch=PortalNativeResults.selection(PortalLayers.layers.get(id));
-  return {feature:f,highlight:JSON.stringify(h?.geometry)===JSON.stringify(f.geometry),bounds:b,contains:v.contains([b[0],b[1]])&&v.contains([b[2],b[3]]),visible:q.x>=0&&q.y>=0&&q.x<container.width&&q.y<container.height&&(props.hidden||q.x<props.getBoundingClientRect().left-container.left),sourceRow:f.properties[rowField],batchUnchanged:batch.selectionId===window.__productionNativeBatch.selectionId&&batch.count===2,previewCount:PortalLayers.layers.get(id).data.features.length};
+ result.nativeLocated=await page.evaluate(async({id,rowField})=>{
+  const f=PortalLayers.selection.feature,highlightData=await portal.map.getSource('inventory-selection').getData(),h=highlightData?.features?.[0],b=turf.bbox({type:'Feature',properties:{},geometry:f.geometry}),v=portal.map.getBounds(),center=[(b[0]+b[2])/2,(b[1]+b[3])/2],q=portal.map.project(center),container=portal.map.getContainer().getBoundingClientRect(),props=document.querySelector('#properties'),batch=PortalNativeResults.selection(PortalLayers.layers.get(id));
+  return {feature:f,highlight:!!h&&turf.booleanEqual(h.geometry,f.geometry,{precision:9}),highlightGeometry:h?.geometry,bounds:b,contains:v.contains([b[0],b[1]])&&v.contains([b[2],b[3]]),visible:q.x>=0&&q.y>=0&&q.x<container.width&&q.y<container.height&&(props.hidden||q.x<props.getBoundingClientRect().left-container.left),sourceRow:f.properties[rowField],batchUnchanged:batch.selectionId===window.__productionNativeBatch.selectionId&&batch.count===2,previewCount:PortalLayers.layers.get(id).data.features.length};
  },{id:nativeId,rowField:result.sourceRowField});
  const expectedBounds=[-77,39.005,-76.9999,39.0051],expectedOriginalId=String(9007199254740993123n+2500n);
  ok(result.nativeLocated.sourceRow===2500&&result.nativeLocated.feature.properties.original_id===expectedOriginalId&&result.nativeLocated.bounds.every((n,i)=>Math.abs(n-expectedBounds[i])<1e-9)&&result.nativeLocated.highlight&&result.nativeLocated.contains&&result.nativeLocated.visible&&result.nativeLocated.previewCount===1,'Locate fetches row 2500 complete geometry beyond the preview and highlights its exact building in the map viewport');
