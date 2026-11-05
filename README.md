@@ -8,6 +8,13 @@ remain direct shortcuts. Menus close on Escape/outside click, restore focus and
 fit narrow English and Chinese layouts. Layer actions still use the shared
 capability registry and target the explicit active layer.
 
+Attribute tables provide a **Locate** button for each record and a double-click
+shortcut. Browser originals and full native results use the same map focus and
+highlight action. The Locate button preserves the batch selection. Native rows fetch
+one complete geometry by their exact result-row identity, including records
+beyond the preview. Stale requests and records without usable geometry cannot
+move the map. The Map action column is separate from original data and exports.
+
 Native **Charts** now summarizes complete results or immutable selected/saved-area
 records, including records beyond the map preview. Histograms, category counts
 and grouped means transfer bounded aggregates; original fields and typed values

@@ -1,0 +1,58 @@
+/* Actual browser table actions on unchanged original source objects. */
+const fs=require('fs'),path=require('path');
+module.exports=async qa=>{
+ const {page:p,ok}=qa;
+ await qa.open('?empty=1&table-locate='+Date.now());
+ const regression=await require('./inventory-table-workflow-checks.cjs').runInventoryTableWorkflowChecks(p,qa.out);
+ for(const name of regression.checks)ok(true,'Inventory regression: '+name);
+ const id=await p.evaluate(async()=>{
+  const features=Array.from({length:65},(_,i)=>{const x=-77.08+(i<2?0:i)*.0003,y=38.91;
+   return {type:'Feature',id:'duplicate',properties:{record:i,raw_id:'900719925474099312'+i,flag:false,missing:null,label:'Building '+i},geometry:{type:'Polygon',coordinates:[[[x,y],[x+.0001,y],[x+.0001,y+.0001],[x,y+.0001],[x,y]]]}};});
+  features[0].bbox=[90,30,91,31];
+  const l=await PortalLayers.addGeoJSON('Locate original buildings',{type:'FeatureCollection',features},{dataRole:'buildings'});
+  window.__locateSource=JSON.stringify(l.data);window.__locateCalls=[];window.__locateFit=portal.map.fitBounds;
+  portal.map.fitBounds=function(bounds,options){window.__locateCalls.push({bounds,options});return window.__locateFit.call(this,bounds,options);};
+  PortalInventory.openTable(l.id,{scope:'loaded'});return l.id;
+ });
+ await p.waitForFunction(()=>document.querySelectorAll('[data-table-record]').length===50);
+ ok(await p.locator('[data-table-locate]').count()===50,'Every displayed record has an explicit map-location action');
+ await p.evaluate(id=>{const l=PortalLayers.layers.get(id);PortalGISSelection.set(l,[l.data.features[1],l.data.features[4]],'replace');portal.map.jumpTo({center:[0,0],zoom:3});},id);
+ await p.locator('#table-sort').selectOption('field:record');
+ await p.locator('#table-next').click();
+ await p.locator('[data-source-row="53"] [data-table-locate]').click();
+ ok(await p.evaluate(id=>{const l=PortalLayers.layers.get(id),call=__locateCalls.at(-1),b=turf.bbox(l.data.features[52]);return PortalLayers.selection.feature===l.data.features[52]&&JSON.stringify(call.bounds)===JSON.stringify([[b[0],b[1]],[b[2],b[3]]]);},id),'A later-page action locates its exact original record after the camera moved away');
+ ok(await p.evaluate(id=>{const l=PortalLayers.layers.get(id),set=PortalGISSelection.features(l);return set.length===2&&set[0]===l.data.features[1]&&set[1]===l.data.features[4];},id),'Locating another record preserves the complete existing batch selection');
+ ok(await p.evaluate(id=>{const l=PortalLayers.layers.get(id),c=turf.center(l.data.features[52]).geometry.coordinates,q=portal.map.project(c),v=portal.map.getContainer().getBoundingClientRect(),table=document.querySelector('#attribute-table').getBoundingClientRect(),props=document.querySelector('#properties');return q.x>=0&&q.x<v.width&&q.y>=0&&q.y<table.top-v.top&& (props.hidden||q.x<props.getBoundingClientRect().left-v.left);},id),'The building is actually visible above the table and outside the properties panel');
+ await p.locator('#table-search').fill('Building 1');
+ await p.locator('[data-source-row="2"] [data-table-locate]').click();
+ ok(await p.evaluate(id=>PortalLayers.selection.feature===PortalLayers.layers.get(id).data.features[1],id),'Search-filtered rows with duplicate IDs and identical geometry keep exact source identity');
+ await p.locator('[data-source-row="2"] [data-table-locate]').focus();await p.locator('[data-source-row="2"] [data-table-locate]').press('Enter');
+ ok(await p.evaluate(id=>PortalLayers.selection.feature===PortalLayers.layers.get(id).data.features[1],id),'A focused location button works with Enter');
+ await p.locator('[data-source-row="2"] [data-table-locate]').press('Space');
+ ok(await p.evaluate(id=>PortalLayers.selection.feature===PortalLayers.layers.get(id).data.features[1],id),'A focused location button works with Space');
+ await p.locator('#table-search').fill('');await p.locator('#table-sort').selectOption('@id');
+ await p.locator('[data-source-row="4"] [data-column-id]').first().dblclick();
+ ok(await p.evaluate(id=>PortalLayers.selection.feature===PortalLayers.layers.get(id).data.features[3]&&JSON.stringify(__locateCalls.at(-1).bounds)===JSON.stringify((()=>{const b=turf.bbox(PortalLayers.layers.get(id).data.features[3]);return [[b[0],b[1]],[b[2],b[3]]];})()),id),'Double-clicking a data cell locates the same record using the common map action');
+ await p.locator('[data-source-row="1"] [data-table-locate]').click();
+ ok(await p.evaluate(()=>__locateCalls.at(-1).bounds[0][0]<0),'A stale supplied feature bbox cannot override its actual geometry');
+ const geometry=await p.evaluate(()=>{
+  const before=__locateCalls.length,invalid=[null,{type:'Polygon',coordinates:[]},{type:'Point',coordinates:[NaN,39]},{type:'LineString',coordinates:[[-77,39],[Infinity,39]]},{type:'Point',coordinates:[-181,39]}];
+  const outcomes=invalid.map(geometry=>{try{PortalLayers.locateFeature(null,{type:'Feature',properties:{},geometry});return false;}catch(e){return e.message==='This record has no usable map geometry.';}});
+  const badDidNotMove=__locateCalls.length===before,gc={type:'Feature',properties:{flag:false},geometry:{type:'GeometryCollection',geometries:[{type:'Point',coordinates:[-77,39]},{type:'LineString',coordinates:[[-77.01,38.99],[-76.99,39.01]]}]}};
+  PortalLayers.locateFeature(null,gc);const collection=JSON.stringify(__locateCalls.at(-1).bounds)===JSON.stringify([[-77.01,38.99],[-76.99,39.01]]);
+  PortalLayers.locateFeature(null,{type:'Feature',properties:{},geometry:{type:'Point',coordinates:[-77,39]}});
+  return {outcomes,badDidNotMove,collection,point:JSON.stringify(__locateCalls.at(-1).bounds)===JSON.stringify([[-77,39],[-77,39]])};
+ });
+ ok(geometry.outcomes.every(Boolean)&&geometry.badDidNotMove,'Null, empty, non-finite and out-of-range geometries show an error without moving the camera');
+ ok(geometry.collection&&geometry.point,'GeometryCollection and Point records use valid complete coordinate bounds');
+ await p.setViewportSize({width:390,height:844});await p.locator('#interface-language').selectOption('zh-CN');
+ await p.evaluate(()=>{document.querySelector('#properties').hidden=true;document.querySelector('#sidebar').classList.remove('is-open');});
+ await p.locator('[data-source-row="1"] [data-table-locate]').click();
+ ok((await p.locator('[data-source-row="1"] [data-table-locate]').innerText()).trim()==='定位'&&await p.locator('[data-source-row="1"] [data-column-id="@id"]').count()===1,'The phone table translates the location control while preserving its record data');
+ ok(await p.evaluate(()=>{const s=document.querySelector('#attribute-table .table-scroll');s.scrollLeft=500;const a=document.querySelector('[data-table-locate]').getBoundingClientRect(),t=s.getBoundingClientRect();return a.left>=t.left&&a.right<=innerWidth&&document.documentElement.scrollWidth<=innerWidth;}),'The location action stays visible as attribute columns scroll on a 390px phone');
+ await p.screenshot({path:path.join(qa.out,'table-locate-phone-zh.png')});
+ ok(await p.evaluate(id=>JSON.stringify(PortalLayers.layers.get(id).data)===window.__locateSource,id),'Map navigation leaves original attributes, geometry and source metadata unchanged');
+ await p.evaluate(()=>{portal.map.fitBounds=window.__locateFit;delete window.__locateFit;delete window.__locateCalls;delete window.__locateSource;});
+ ok(!qa.errors.length,'Table location actions have no uncaught browser errors');
+ fs.writeFileSync(path.join(qa.out,'table-locate-browser.json'),JSON.stringify({passed:true,checks:qa.checks,errors:qa.errors,consoleErrors:qa.consoleErrors},null,2));
+};

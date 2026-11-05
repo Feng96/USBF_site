@@ -1,5 +1,14 @@
 /* GIS interface only; raw field names, formats and place names stay unchanged. */
 Object.assign(window.PortalTranslations['zh-CN'], Object.fromEntries(`
+Locate|定位
+Locate on map|定位
+Locate this record on the map|在地图上定位此记录
+This record has no usable map geometry.|此记录没有可用于地图定位的几何信息。
+The map is not ready.|地图尚未就绪。
+Update the local engine to locate complete result records.|请更新本地引擎，以定位完整结果中的记录。
+This table record does not have a native row identity.|此表格记录缺少本地结果行标识。
+Locating record on map…|正在地图上定位记录…
+Reload this page to locate table records.|请刷新页面以定位表格记录。
 Preview connections read original records in the current view unless a range is chosen.|未指定范围时，预览图层连接会读取当前地图视野内的原始记录。
 Reopen the original PMTiles file to create an independent connection.|请重新打开原始 PMTiles 文件以创建独立连接。
 Workspace options|工作区选项

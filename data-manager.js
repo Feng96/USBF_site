@@ -138,6 +138,32 @@
     finally{if(pending.get(key)===request)pending.delete(key);renderCatalog();}
   }
   function zoom(l){if(l.bounds)map.fitBounds(l.bounds,{padding:55,maxZoom:17,duration:0});else message('This source does not provide an extent.');}
+  function featureBounds(f){
+    let bounds;
+    try{if(!f?.geometry)throw Error();const value={type:'Feature',properties:{},geometry:f.geometry};turf.coordEach(value,c=>{if(!Number.isFinite(c[0])||!Number.isFinite(c[1])||Math.abs(c[0])>180||Math.abs(c[1])>90)throw Error();});bounds=turf.bbox(value);}catch{throw Error('This record has no usable map geometry.');}
+    if(bounds.length!==4||!bounds.every(Number.isFinite)||bounds[0]>bounds[2]||bounds[1]>bounds[3]||bounds[0]<-180||bounds[2]>180||bounds[1]<-90||bounds[3]>90)throw Error('This record has no usable map geometry.');
+    return bounds;
+  }
+  function locateFeature(l,f){
+    if(!map)throw Error('The map is not ready.');
+    if(l&&layers.get(l.id)!==l)throw Error('Data changed. Select the feature again.');
+    const feature=l?sourceFeature(l,f):f,b=featureBounds(feature),properties=$('#properties'),wasHidden=properties.hidden;
+    if(l){if(!l.visible)setStyle(l.id,{visible:true});inspect(l,feature);}else{clearExternalSelection();map.getSource('inventory-selection')?.setData({type:'FeatureCollection',features:[{type:'Feature',properties:{},geometry:feature.geometry}]});}
+    if(!l||wasHidden||map.getContainer().clientWidth<650)properties.hidden=true;
+    map.resize();
+    const viewport=map.getContainer().getBoundingClientRect(),padding={top:35,right:35,bottom:35,left:35};
+    const table=$('#attribute-table'),panels=[[properties,'right'],[table,'bottom'],[$('#sidebar'),'left']];
+    for(const [panel,edge]of panels){if(!panel||panel.hidden||!panel.getClientRects().length)continue;const r=panel.getBoundingClientRect();if(r.right<=viewport.left||r.left>=viewport.right||r.bottom<=viewport.top||r.top>=viewport.bottom)continue;
+      if(edge==='bottom')padding.bottom=Math.max(padding.bottom,viewport.bottom-r.top+20);
+      else if(edge==='right')padding.right=Math.max(padding.right,viewport.right-r.left+20);
+      else padding.left=Math.max(padding.left,r.right-viewport.left+20);
+    }
+    const width=Math.max(1,viewport.width-80),height=Math.max(1,viewport.height-80),horizontal=padding.left+padding.right,vertical=padding.top+padding.bottom;
+    if(horizontal>width){padding.left*=width/horizontal;padding.right*=width/horizontal;}
+    if(vertical>height){padding.top*=height/vertical;padding.bottom*=height/vertical;}
+    map.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding,maxZoom:19,duration:0});
+    return true;
+  }
   function remove(id){const l=layers.get(id);if(!l)return;l.stop?.();if(selected&&selected.layer===id){selected=null;api.clearSelection();}l.renderIds.forEach(k=>map.removeLayer(k));map.removeSource(id);layers.delete(id);refresh();api.saveView();}
   function opacity(l,v){l.opacity=v;if(l.syncNativeStyle){l.syncNativeStyle();api.saveView();return;}l.renderIds.forEach(id=>{const type=map.getLayer(id).type;map.setPaintProperty(id,type+'-opacity',v);});l.syncCoverageStyle?.();PortalLegend.render(Array.from(layers.values()).reverse().filter(l=>l.visible),$('.legend-body'));api.saveView();}
   function clearExternalSelection(){selected=null;if(map?.getSource('inventory-selection'))map.getSource('inventory-selection').setData({type:'FeatureCollection',features:[]});document.dispatchEvent(new CustomEvent('portal-selection-changed'));}
@@ -173,7 +199,7 @@
     if(b.hasAttribute('data-add-data'))open();
     if(b.dataset.sourceTab)sourceTab(b.dataset.sourceTab);
     if(b.dataset.catalogAdd){const c=catalog.find(c=>c.id===b.dataset.catalogAdd);open();if(c)add(c);}
-    if(b.hasAttribute('data-feature-zoom')&&selected){const pts=[];const walk=c=>{if(Array.isArray(c)&&typeof c[0]==='number')pts.push(c);else if(Array.isArray(c))c.forEach(walk);};walk(selected.feature.geometry?.coordinates);if(pts.length)map.fitBounds([[Math.min(...pts.map(p=>p[0])),Math.min(...pts.map(p=>p[1]))],[Math.max(...pts.map(p=>p[0])),Math.max(...pts.map(p=>p[1]))]],{padding:70,maxZoom:19,duration:0});return;}
+    if(b.hasAttribute('data-feature-zoom')&&selected){try{locateFeature(layers.get(selected.layer),selected.feature);}catch(error){api.toast(error.message);}return;}
     if(b.dataset.layerUp||b.dataset.layerDown){reorder(b.dataset.layerUp||b.dataset.layerDown,b.dataset.layerUp?'up':'down');return;}
     if(b.dataset.layerActivate){active=b.dataset.layerActivate;refresh();return;}
     if(b.dataset.addedRemove)remove(b.dataset.addedRemove);
@@ -205,5 +231,5 @@
     let savedStyles=[];try{savedStyles=JSON.parse(q.get('styles')||'[]');if(!Array.isArray(savedStyles))savedStyles=[];}catch(e){}
     for(const saved of (q.get('data')||'').split(',').slice(0,20)){const [id,op,on]=saved.split(':'),c=catalog.find(c=>c.id===id);if(c){const n=Number(op);const st=savedStyles.find(x=>x[0]===id)||[];await add(c,{restore:true,colorMode:['uniform','source','height','change'].includes(st[1])?st[1]:'uniform',sourceFilter:typeof st[2]==='string'?st[2]:'',minArea:Number.isFinite(st[3])?Math.max(0,st[3]):0,opacity:Number.isFinite(n)?Math.max(0,Math.min(1,n)):.75,visible:on!=='0'});$('#welcome-card').hidden=true;}}
   }
-  window.PortalLayers={zoom,details,exportLayer,sourceFeature,syncOrder,reorder,invalidatePending:()=>{generation++;pending.clear();renderCatalog();},validateGeoJSON:geojson,remove,clear:()=>{for(const id of Array.from(layers.keys()))remove(id);},init,open,refresh,fullExtent,identify,setStyle,set3D,inspect,get active(){return layers.get(active);},get selection(){return selected;},selectLayer(id){active=id;refresh();},writeShare,handleExport,clearExternalSelection,catalog,get layers(){return layers;},add,addGeoJSON:(name,data,meta={},options={})=>add({...meta,id:meta.id||'import-'+(++seq),name,type:'geojson',data,sourceKind:'vector',analysisQuality:meta.analysisQuality||'complete-geometry'}, {...options,throwOnError:true}),isRaster};
+  window.PortalLayers={zoom,featureBounds,locateFeature,details,exportLayer,sourceFeature,syncOrder,reorder,invalidatePending:()=>{generation++;pending.clear();renderCatalog();},validateGeoJSON:geojson,remove,clear:()=>{for(const id of Array.from(layers.keys()))remove(id);},init,open,refresh,fullExtent,identify,setStyle,set3D,inspect,get active(){return layers.get(active);},get selection(){return selected;},selectLayer(id){active=id;refresh();},writeShare,handleExport,clearExternalSelection,catalog,get layers(){return layers;},add,addGeoJSON:(name,data,meta={},options={})=>add({...meta,id:meta.id||'import-'+(++seq),name,type:'geojson',data,sourceKind:'vector',analysisQuality:meta.analysisQuality||'complete-geometry'}, {...options,throwOnError:true}),isRaster};
 })();

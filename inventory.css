@@ -47,3 +47,10 @@
  .attribute-table .selected-filter{font-size:10px;white-space:nowrap}
  .attribute-table .table-scroll th>button,.attribute-table .table-scroll td{padding:9px;font-size:11px}
 }
+
+/* A map action is separate from raw data fields and record selection. */
+.attribute-table .inventory-map-action{width:112px;min-width:112px!important;max-width:112px;padding:6px 9px!important}
+.attribute-table .inventory-map-action button{white-space:nowrap;font-size:11px;padding:6px 8px;border:1px solid #bcd3c5;border-radius:4px;color:#246d53;background:#f4faf5}
+.attribute-table .inventory-map-action button:hover{background:#e6f2e9}
+.attribute-table .inventory-map-action button:disabled{opacity:.45;cursor:not-allowed}
+.attribute-table .inventory-map-action button:focus-visible{outline:2px solid #34896e;outline-offset:2px}
