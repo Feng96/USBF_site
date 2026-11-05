@@ -1,0 +1,28 @@
+/* Reopen durable real provider results after the acquisition acceptance. */
+const fs=require('fs');
+module.exports=async qa=>{
+ const p=qa.page,{ok}=qa,n=JSON.parse(fs.readFileSync(process.env.PORTAL_UNIFIED_NATIVE,'utf8')),verified=[],plans=[];
+ p.on('request',r=>{if(r.url()===n.endpoint+'/v1/plan'&&r.method()==='POST')plans.push({body:r.postDataJSON(),authorized:!!r.headers().authorization});});
+ await p.route(n.endpoint+'/**',r=>r.continue());await qa.open('?empty=1&unified-results='+Date.now()+'#base=blank');await p.locator('#interface-language').selectOption('en');
+ await p.evaluate(async n=>{await PortalNativeEngine.pair(n.code,n.endpoint);await PortalTasks.refreshNative();await PortalDataWorkspace.saveArea({mask:turf.bboxPolygon([-77.0713,38.9117,-77.0707,38.9123]),label:'Frozen tiny DC AOI',meta:{label:'Frozen tiny DC AOI',kind:'rectangle',crs:'EPSG:4326'}},'Frozen tiny DC AOI');},n);
+ for(const provider of ['osm-buildings','overture-buildings']){
+  const row=await p.evaluate(id=>PortalTasks.list().find(t=>t.status==='completed'&&t.name.startsWith(id==='osm-buildings'?'OpenStreetMap buildings':'Overture Maps')),provider);ok(!!row,'The real '+provider+' task remains completed after clean Engine restart');
+  const detail=await p.evaluate(id=>PortalNativeEngine.job(id),row.nativeId);await p.evaluate(id=>PortalTasks.preview(id),row.id);const layerId=await p.evaluate(()=>PortalLayers.active.id);
+  const identity=await p.evaluate(id=>{const l=PortalLayers.layers.get(id);return {license:l.cfg.license,provider:l.cfg.provider,release:l.cfg.nativeSource.release,coverage:l.data.provenance.coverage};},layerId);
+  ok(/ODbL/.test(identity.license)&&!!identity.provider&&identity.release.providerId===provider&&identity.release.releaseId===(provider==='overture-buildings'?'2026-10-21.0':'latest'),provider+' result retains ODbL attribution, provider and matching source release');
+  ok(identity.coverage.sourceReleases?.[0]?.providerId===provider&&!!(identity.coverage.sourceReleases[0].catalogIdentity||identity.coverage.sourceReleases[0].identity),provider+' result keeps original source HTTP validators in provenance');
+  await p.locator('#data-scope-bar [data-data-workspace]').click();await p.locator('[data-dw-workset]').selectOption(layerId);await p.locator('[data-dw-mode]').selectOption('all');await p.locator('[data-dw-go=table]').click();
+  await p.waitForFunction(id=>{const panel=document.querySelector('#native-result-table');return panel?.open&&panel.nativeRow?.nativeId===id&&panel.querySelector('[data-native-table-body] tbody tr');},row.nativeId);
+  const table=await p.evaluate(()=>({summary:document.querySelector('[data-native-table-summary]').textContent,columns:[...document.querySelectorAll('[data-native-sort]')].map(e=>e.dataset.nativeSort),body:document.querySelector('[data-native-table-body]').textContent}));
+  const original=await p.evaluate(id=>PortalNativeEngine.table(id,0,1),row.nativeId);
+  ok(table.summary.includes(detail.result.rows+' matching result records')&&table.columns.length===original.columns.length&&original.columns.every(c=>table.columns.includes(c.name)),provider+' common Attribute table shows all '+original.columns.length+' original published columns and full result count');
+  ok(provider==='osm-buildings'?table.columns.includes('building:levels')&&table.columns.includes('roof:shape')&&original.rows[0].properties.bbox:Array.isArray(original.rows[0].properties.sources)&&table.body.includes('record_id'),provider+' native attributes retain original fields and structured values');
+  await qa.screenshot(provider+'-native-table-final.png');await p.locator('[data-native-table-close]').click();
+  const scope=await p.evaluate(async id=>{const layer=PortalLayers.layers.get(id);await PortalTasks.openProcessing(layer,'measure',{mode:'area'});return document.querySelector('.task-plan').textContent;},layerId),plan=plans.at(-1);
+  ok(scope.includes('Frozen tiny DC AOI')&&plan.authorized&&JSON.stringify(plan.body.scope.geometry)===JSON.stringify(detail.scope.geometry),'The '+provider+' authenticated area processing plan reuses the exact saved loading geometry');await p.evaluate(()=>document.querySelector('#task-center-dialog').close());
+  verified.push({provider,id:detail.id,nativeTaskSeconds:(Date.parse(detail.updatedAt)-Date.parse(detail.createdAt))/1000,result:detail.result,coverage:detail.coverage,transport:detail.parts.map(p=>p.transport),identity,table:{summary:table.summary,columns:table.columns}});
+  fs.writeFileSync(qa.out+'/'+provider+'-native-final.json',JSON.stringify({detail,identity,table,original},null,2));
+ }
+ const shared=await qa.context.newPage();let nativeRequests=0;shared.on('request',r=>{if(r.url().startsWith(n.endpoint))nativeRequests++;});try{await shared.goto(qa.base+'?empty=1&readonly=1#base=blank');await shared.waitForFunction(()=>window.PortalTasks&&window.PortalNativeEngine);const blocked=await shared.evaluate(()=>{const checks=[];for(const fn of [()=>PortalNativeEngine.plan({}),()=>PortalNativeEngine.create({}),()=>PortalTasks.planNativeLoad({},{}),()=>PortalTasks.openProcessing({},'measure',{})]){try{fn();checks.push(false);}catch(e){checks.push(/read-only/.test(e.message));}}return checks;});ok(blocked.every(Boolean)&&nativeRequests===0,'Readonly shared maps refuse provider plans, execution and processing with zero private Engine requests');}finally{await shared.close();}
+ ok(!qa.errors.length,'Both durable provider result/table workflows have zero uncaught browser errors');fs.writeFileSync(qa.out+'/unified-source-final-report.json',JSON.stringify({passed:true,checks:qa.checks,verified,plans,errors:qa.errors},null,2));
+};

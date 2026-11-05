@@ -1,50 +1,50 @@
 {
   "schema": 1,
   "status": "preview",
-  "version": "0.2.0-preview.1",
-  "revision": "0eba0ab46f0017a4760428d97f4f6df3de1d7d41",
-  "tag": "engine-v0.2.0-preview.1-r5",
+  "version": "0.3.0-preview.1",
+  "revision": "4a7819c890547047a429bfcc6066dcbe6f1005ae",
+  "tag": "engine-v0.3.0-preview.1-r1",
   "message": "Independent preview runtime. No publisher code signing or Apple notarization.",
   "platforms": {
     "linux-x64": {
       "label": "Linux x64",
-      "url": "https://github.com/Feng96/USBF_site/releases/download/engine-v0.2.0-preview.1-r5/usbf-engine-0.2.0-preview.1-linux-x86_64.run",
-      "sha256": "1bd8da38724db51e37e3ead2a02a47f839f5408511440436b8ff32b16f15cf25",
-      "bytes": 88893450,
+      "url": "https://github.com/Feng96/USBF_site/releases/download/engine-v0.3.0-preview.1-r1/usbf-engine-0.3.0-preview.1-linux-x86_64.run",
+      "sha256": "3934bac84d146e46f84066dfec7c275886d23ce473ab2719494615607a16fc22",
+      "bytes": 138998493,
       "signed": false,
       "signatureKind": "none",
       "minimumOS": "Linux x64, glibc 2.35 or newer",
-      "testedChecks": 22
+      "testedChecks": 25
     },
     "macos-arm64": {
       "label": "macOS Apple Silicon",
-      "url": "https://github.com/Feng96/USBF_site/releases/download/engine-v0.2.0-preview.1-r5/usbf-engine-0.2.0-preview.1-darwin-arm64.dmg",
-      "sha256": "48b09f75c6b4336430a524906f5b076fcdb1c1b3834b3c4ee008f0ce25737356",
-      "bytes": 62492031,
+      "url": "https://github.com/Feng96/USBF_site/releases/download/engine-v0.3.0-preview.1-r1/usbf-engine-0.3.0-preview.1-darwin-arm64.dmg",
+      "sha256": "f7cbb5baf298a9bcfadfc4f7c5fe940bc2dab1b9d2dc73e7f31bd138590acd67",
+      "bytes": 112842915,
       "signed": false,
       "signatureKind": "ad-hoc",
       "minimumOS": "macOS 15.8.2 or newer",
-      "testedChecks": 22
+      "testedChecks": 25
     },
     "macos-x64": {
       "label": "macOS Intel",
-      "url": "https://github.com/Feng96/USBF_site/releases/download/engine-v0.2.0-preview.1-r5/usbf-engine-0.2.0-preview.1-darwin-x86_64.dmg",
-      "sha256": "2a8e424a892a485b4c4c4e2796dc65cab92fb8f95a9ca208bada647399978bd4",
-      "bytes": 66795008,
+      "url": "https://github.com/Feng96/USBF_site/releases/download/engine-v0.3.0-preview.1-r1/usbf-engine-0.3.0-preview.1-darwin-x86_64.dmg",
+      "sha256": "d8cf3d500bdba7e469ac32542c68a073b666761df1849fc2d76be668c16a3eb6",
+      "bytes": 124234888,
       "signed": false,
       "signatureKind": "ad-hoc",
       "minimumOS": "macOS 15.7.9 or newer",
-      "testedChecks": 22
+      "testedChecks": 25
     },
     "windows-x64": {
       "label": "Windows x64",
-      "url": "https://github.com/Feng96/USBF_site/releases/download/engine-v0.2.0-preview.1-r5/usbf-engine-0.2.0-preview.1-windows-x86_64.exe",
-      "sha256": "6596eaeb5bff356d3418c9d134ccb9f845c9bfb57e11f86a26e223795043afb4",
-      "bytes": 50649167,
+      "url": "https://github.com/Feng96/USBF_site/releases/download/engine-v0.3.0-preview.1-r1/usbf-engine-0.3.0-preview.1-windows-x86_64.exe",
+      "sha256": "63e64bfdf4643ce3fc2e6b39f87b57640c4762cabd77b038bf0e05dc8ce69d46",
+      "bytes": 71409654,
       "signed": false,
       "signatureKind": "none",
       "minimumOS": "Windows 10/11 x64; tested on Windows Server 2025",
-      "testedChecks": 22
+      "testedChecks": 25
     }
   }
 }

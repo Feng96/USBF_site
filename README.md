@@ -1,5 +1,28 @@
 # US Buildings
 
+## Unified layers and original-data connections (1.13)
+
+Layer rows, the active-layer ribbon and Data & scope share one capability-aware
+operation registry. Each action targets an explicit layer; unavailable actions
+explain the required data or runtime. Browser originals and complete native
+results retain the same all / selected / saved-area input contract.
+
+OSM Layercake and Overture originals load directly through the updated local
+engine. Overture analytical GeoParquet matches the display release. GBA USA and
+DC/NYC official APIs also have native readers using the same task/checkpoint/result
+pipeline. Existing browser readers remain available. Microsoft/Esri and VIDA
+remain display connections with provider links and original-file import.
+
+**Compare sources** summarizes two original polygon worksets for one saved area,
+including complete native records beyond the preview, whole-polygon area and
+supplied height availability. Exported receipts preserve exact input scopes,
+source identities and measurement methods. This release does not perform
+one-to-one footprint matching or claim independent accuracy validation.
+
+See [the unified workflow and source contract](docs/unified-data-workflow.md).
+[Acceptance evidence and practical limits](docs/unified-data-acceptance.md).
+
+
 ## Complete results and portable Projects (workspace 1.12 / engine 0.2)
 
 - A local GeoParquet result has one layer with authenticated MapLibre MVT,

@@ -1,0 +1,14 @@
+.added-actions .layer-action-reason,
+.tools-popover .layer-action-reason {
+  flex-basis: 100%;
+  margin: 0 0 3px;
+  color: var(--muted, #66736f);
+  font-size: 11px;
+  line-height: 1.45;
+}
+.added-actions [data-layer-action]:disabled { cursor: default; }
+.tools-popover:has([data-layer-actions-menu]) {
+  max-height: min(72vh, 650px);
+  overflow-y: auto;
+}
+[data-layer-actions-menu] { display: grid; gap: 3px; }

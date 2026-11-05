@@ -7,7 +7,7 @@ module.exports=async qa=>{
   const features=[f('a',-77.072,10),f('b',-77.0716,20),f('c',-77.0712,30)];const l=await PortalLayers.addGeoJSON('GIS source buildings',{type:'FeatureCollection',features},{dataRole:'buildings',heightField:'height_m'});portal.map.jumpTo({center:[-77.0716,38.9121],zoom:18,pitch:0,bearing:0});return l.id;
  });
  await p.waitForFunction(id=>portal.map.isSourceLoaded(id),dataset);
- ok(await p.locator('.gis-tool-group').count()===6,'The toolbar separates data, map, selection, processing, layers and output');
+ ok(await p.locator('.gis-group-caption').evaluateAll(elements=>['DATA','MAP','INTERFACE','SELECTION','PROCESSING','LAYERS','PROJECT & OUTPUT'].every(name=>elements.some(el=>el.textContent.trim()===name))),'The toolbar separates data, map, interface, selection, processing, layers and output');
  await p.evaluate(id=>{const l=PortalLayers.layers.get(id);PortalGISSelection.set(l,[l.data.features[0],l.data.features[1]],'replace');},dataset);
  ok(await p.evaluate(()=>PortalGISSelection.count()===2),'Bulk selection keeps two distinct source records with duplicate feature IDs');
  await p.evaluate(()=>PortalGIS.action('selection-table'));

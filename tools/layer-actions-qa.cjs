@@ -1,0 +1,55 @@
+/* Exercise operation parity, capability boundaries and explicit target routing. */
+const fs=require('fs'),path=require('path'),vm=require('vm'),assert=require('assert');
+const listeners=new Map(),calls=[],layers=new Map(),ctx={console,setTimeout,URL,document:{addEventListener(name,fn,capture){listeners.set(name+(capture?':capture':''),fn);},querySelector(){return null;},querySelectorAll(){return [];}}};ctx.window=ctx;ctx.globalThis=ctx;
+let active=null,nativeLive=false,engine={connected:false},ready=layer=>layer?.cfg.type==='geojson'&&!layer.cfg.nativeSource&&ctx.PortalAnalysisData.capabilities(layer).geometryAnalysis&&!layer.data?.provenance?.workspaceArea;
+ctx.PortalLayers={layers,isRaster:l=>['raster','image','raster-pmtiles'].includes(l.cfg.type),get active(){return active;},selectLayer(id){active=layers.get(id);calls.push(['activate',id]);},zoom:l=>calls.push(['zoom',l.id]),details:l=>calls.push(['details',l.id]),remove:id=>{layers.delete(id);calls.push(['remove',id]);},reorder:(id,direction)=>calls.push(['order',id,direction])};
+ctx.PortalDataWorkspace={ready,layerFacts:()=>'',isArea:l=>!!l?.data?.provenance?.workspaceArea,open:options=>calls.push(['load',options.layer.id])};
+ctx.PortalInventory={openTable:(id,options)=>{calls.push(['browser-table',id,options.scope]);return true;}};
+ctx.PortalNativeEngine={status:()=>engine,download:async(id,format)=>calls.push(['native-export',id,format])};ctx.PortalTasks={openNativeTable:async l=>calls.push(['native-table',l.id])};
+ctx.PortalGIS={open:op=>calls.push(['processing',active.id,op]),add:(data,name)=>({data,name})};ctx.PortalAnalysis={open:(tab,options)=>calls.push(['analysis',options.layerId,tab])};ctx.PortalSourceComparison={open:options=>calls.push(['compare',options.layer.id])};ctx.PortalNativeResults={live:()=>nativeLive};
+ctx.PortalTaskGuides={open:(intent,options)=>calls.push(['native-summary',options.layerId,options.mode])};
+ctx.PortalComposer={open:tab=>calls.push(['browser-export',active.id,tab])};
+vm.createContext(ctx);for(const file of ['vendor/turf-7.2.0.min.js','analysis-data.js','layer-actions.js','layer-purpose.js','data-sources.js'])vm.runInContext(fs.readFileSync(path.resolve(__dirname,'..',file),'utf8'),ctx,{filename:file});
+const A=ctx.PortalLayerActions,checks=[],ok=(v,label)=>{assert(v,label);checks.push(label);console.log('PASS',label);};
+function add(id,cfg={},provenance={}){const l={id,cfg:{name:id,type:'geojson',...cfg},bounds:[[-77,39],[-76,40]],data:{type:'FeatureCollection',features:[],provenance}};layers.set(id,l);return l;}
+const first=add('first',{sourceFormat:'shapefile'}),second=add('second',{sourceFormat:'geoparquet'}),tile=add('tiles',{type:'pmtiles'}),raster=add('image',{type:'image'}),preview=add('shared-preview',{}, {geometryQuality:'bounded-native-preview',spatialEligible:false}),native=add('native',{nativeSource:{workspaceId:'one',jobId:'native-task',format:'GeoParquet'}}),area=add('area',{}, {workspaceArea:{version:1}});
+active=second;
+(async()=>{
+ const same=id=>JSON.stringify(A.describe(id).actions.filter(a=>!['up','down'].includes(a.id)));
+ ok(same(first)===same(second),'Imported source formats share the same operations and capability decisions');
+ for(const l of [tile,raster,preview,native,area])ok(JSON.stringify(A.describe(l).actions.map(a=>a.id))===JSON.stringify(A.ids),'Every layer kind uses the same operation vocabulary: '+l.id);
+ for(const l of [tile,raster,preview])for(const id of ['processing','statistics','chart','export'])ok(!A.get(l,id).enabled&&!!A.get(l,id).reason,l.id+' explains why '+id+' cannot use display records');
+ ok(A.get(tile,'table').enabled&&A.get(tile,'table').scope==='display-preview','Tile tables remain explicitly display previews');
+ ok(!A.get(raster,'table').enabled&&!A.get(area,'processing').enabled,'Raster displays have no record table and saved boundaries are not worksets');
+ ok(!A.get(preview,'extent').enabled&&!A.get(native,'extent').enabled,'Neither detached nor connected native previews can define a full-result extent');
+ ok(!A.get(native,'table').enabled&&!A.get(native,'processing').enabled,'Native table and processing explain the missing connection');
+ engine={connected:true,information:{workspace:{id:'other'}}};ok(!A.get(native,'table').enabled,'A different connected workspace cannot open the native result');
+ engine={connected:true,information:{workspace:{id:'one'},capabilities:{resultMap:true}}};ok(!A.get(native,'statistics').enabled&&A.get(native,'statistics').reason.includes('summarize full results'),'An older engine explains why complete native summaries are unavailable');engine.information.capabilities.resultSummary=true;ok(A.get(native,'table').enabled&&A.get(native,'processing').enabled&&!A.get(native,'chart').enabled,'A native result uses its full file while charts retain the browser workset boundary');
+ nativeLive=true;native.nativeMap={bounds:[-77,39,-76,40]};native.data.features=[ctx.turf.point([0,0])];native.bounds=[[0,0],[0,0]];
+ ok(A.get(native,'extent').enabled&&A.get(native,'extent').scope==='native-result-extent','A connected live native map exposes its verified full-result extent');
+ const fullExtent=await A.run('extent',native);ok(JSON.stringify(ctx.turf.bbox(fullExtent.data))===JSON.stringify(native.nativeMap.bounds),'Native extent creation uses full-result metadata instead of preview records or saved display bounds');
+ native.nativeMap.bounds=null;ok(!A.get(native,'extent').enabled&&A.get(native,'extent').reason.includes('no known extent'),'An empty live native result has no extent to create');
+ for(const bounds of [[-77,39,Infinity,40],[-76,39,-77,40]]){native.nativeMap.bounds=bounds;ok(!A.get(native,'extent').enabled,'Malformed native full-result bounds never enable extent creation');}
+ native.nativeMap.bounds=[-77,39,-76,40];nativeLive=false;ok(!A.get(native,'extent').enabled,'Saved full bounds cannot enable extent creation while the native map is not live');
+ nativeLive=true;engine.connected=false;ok(!A.get(native,'extent').enabled,'A disconnected result cannot reuse stale live-map bounds as a verified extent');engine.connected=true;nativeLive=false;
+ await A.run('table',native);await A.run('table',first);await A.run('zoom-layer',first);await A.run('processing',first);await A.run('statistics',first);await A.run('statistics',native,{mode:'selection'});await A.run('compare',second);await A.run('export',native);
+ ok(calls.some(c=>c[0]==='native-table'&&c[1]===native.id)&&calls.some(c=>c[0]==='browser-table'&&c[1]===first.id),'One table operation routes to the native file or original browser rows');
+ ok(calls.some(c=>c[0]==='zoom'&&c[1]===first.id)&&calls.some(c=>c[0]==='processing'&&c[1]===first.id),'Actions target the passed layer even when another layer was active');
+ ok(calls.some(c=>c[0]==='analysis'&&c[1]===first.id)&&calls.some(c=>c[0]==='compare'&&c[1]===second.id),'Analysis and comparison preserve the explicit layer target');
+ ok(calls.some(c=>c[0]==='native-export'&&c[1]==='native-task'&&c[2]==='parquet'),'Native download exports the complete local file through the engine');
+ ok(calls.some(c=>c[0]==='native-summary'&&c[1]===native.id&&c[2]==='selection'),'Native statistics use the complete result and preserve the requested record scope');
+ first.cfg.originalFile={name:'original-shapefile.zip'};await A.run('export',first);await A.run('export',second);ok(calls.filter(c=>c[0]==='browser-export').length===2,'Imported vector formats use the same scoped export workflow even when original file bytes are retained');
+ const osm=add('osm',{id:'osm-buildings',type:'vector'}),overture=add('overture',{id:'overture-buildings',type:'pmtiles',analysisSource:{releaseId:'2026-10-21.0'}});
+ ok(A.get(osm,'load-data').enabled&&A.get(overture,'load-data').enabled&&!A.get(tile,'load-data').enabled,'Native-only providers can open the common loading workflow without granting an adapter to arbitrary tiles');
+ ok(ctx.PortalLayerPurpose.describe(osm).note.includes('desktop computer')&&ctx.PortalLayerPurpose.describe(overture).note.includes('local engine'),'Native-only providers explain the desktop reader before opening the common loading workflow');
+ await A.run('load-data',osm);ok(calls[calls.length-1][0]==='load'&&calls[calls.length-1][1]===osm.id,'Provider loading uses the same explicit Data and scope entrypoint');
+ await assert.rejects(()=>A.run('processing',preview),/display records/);await assert.rejects(()=>A.run('extent',native),/bounded native preview/);
+ const markup=A.markup(preview,{ids:['processing'],explainDisabled:true});ok(markup.includes('disabled')&&markup.includes('layer-action-reason')&&markup.includes('display records'),'Disabled operations expose a reason in markup and reject direct invocation');
+ const untrusted=add('untrusted',{});untrusted.id='\"><img src=x>';layers.set(untrusted.id,untrusted);ok(!A.markup(untrusted).includes('<img'),'Action targets cannot inject markup');
+ const purpose=ctx.PortalLayerPurpose.markup(native);ok(purpose.includes('data-layer-action="table"')&&!purpose.includes('data-purpose-action="native-table"')&&!purpose.includes('data-purpose-action="native-process"'),'Native purpose shortcuts use the same table operation without duplicate native-specific commands');
+ const before=calls.length,button={dataset:{layerAction:'zoom',layerId:second.id},disabled:false};let stopped=false;listeners.get('click:capture')({target:{closest:()=>button},preventDefault(){},stopImmediatePropagation(){stopped=true;}});await Promise.resolve();ok(stopped&&calls.length===before+1&&calls[calls.length-1][1]===second.id,'Delegated actions stop legacy handlers and execute once on the clicked row');
+ button.dataset.layerActionOwned='workspace';stopped=false;listeners.get('click:capture')({target:{closest:()=>button},preventDefault(){},stopImmediatePropagation(){stopped=true;}});ok(!stopped,'Workspace scope handlers retain ownership of their explicit record contract');
+ layers.delete(first.id);await assert.rejects(()=>A.run('table',first),/Choose a layer/);ok(true,'Removed or replaced layers cannot execute stale commands');
+ ctx.PortalReadOnlyMode=true;ok(!A.get(second,'remove').enabled&&A.get(second,'zoom').enabled,'Read-only maps cannot mutate the project through the shared dispatcher');
+ console.log(JSON.stringify({passed:true,checks:checks.length}));
+})().catch(e=>{console.error(e.stack);process.exitCode=1;});

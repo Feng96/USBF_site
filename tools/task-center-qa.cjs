@@ -17,6 +17,14 @@ ok(T.normalize({...row,progress:{completedParts:0,plannedParts:0,actualRows:0}})
 ok(T.normalize({...row,progress:{actualRows:NaN}}).progress.actualRows===null,'Unknown record estimates remain unknown instead of becoming zero');
 const native=T.nativeRow({id:'job-1',operation:'load',status:'partial',token:'never-store',endpoint:'http://127.0.0.1:52763',progress:{completedParts:2,plannedParts:3,failedParts:1,actualRows:123},scope:{label:'County',geometry:{type:'Polygon',coordinates:[]},crs:'EPSG:4326'},parts:[{id:'part-3',error:'Failed part'}],capabilities:{resume:true}},'workspace-1');
 ok(native.id==='native:workspace-1:job-1'&&native.workspaceId==='workspace-1'&&native.capabilities.resume,'Native task identities are scoped to the actual workspace and retain real resume capability');
+const sourceRelease={providerId:'osm-buildings',releaseId:'latest',immutable:false,license:'ODbL 1.0',identity:{etag:'"source-validator"',bytes:46201191041}};
+const sourceJob={id:'original-osm',operation:'load',status:'completed',progress:{completedParts:1,plannedParts:1},coverage:{sourceReleases:[sourceRelease]}};
+const fromCoverage=T.nativeRow(sourceJob,'workspace-1');
+ok(fromCoverage.release.providerId==='osm-buildings'&&fromCoverage.release.license==='ODbL 1.0'&&fromCoverage.release.immutable===false,'Native task history retains actual provider release, terms and mutable identity from its completion receipt');
+fromCoverage.release.identity.etag='edited';
+ok(sourceRelease.identity.etag==='"source-validator"','Native source metadata is detached from the server receipt before client edits');
+ok(T.nativeRelease({coverage:{sourceReleases:[sourceRelease,{providerId:'gba-usa',releaseId:'2025-09'}]}}).inputs.length===2,'Mixed-source native results retain each release instead of labelling them as one dataset');
+ok(T.nativeRelease({release:{releaseId:'2026-10-21.0'},coverage:{sourceReleases:[sourceRelease]}}).releaseId==='2026-10-21.0'&&T.nativeRelease({})===null,'Explicit release contracts remain intact and missing source identities are not invented');
 ok(!JSON.stringify(native).includes('never-store')&&!JSON.stringify(native).includes('127.0.0.1')&&!native.scope.geometry,'Task history excludes native credentials and endpoint details and avoids copying large scope geometry');
 ok(T.estimatedLabel({estimatedRows:100000,estimatedBytes:5000,partCount:3}).exact===false,'Source estimates remain explicitly upper bounds before spatial filtering');
 ok(T.estimatedLabel({estimatedRows:0,estimatedBytes:1024,estimatedRowsComplete:false,estimatedBytesComplete:false}).rows===null&&T.estimatedLabel({estimatedRows:0,estimatedBytes:1024,estimatedRowsComplete:false,estimatedBytesComplete:false}).bytes===null,'Missing source counts cannot become a zero estimate or a false upper bound');

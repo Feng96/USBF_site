@@ -20,6 +20,8 @@
   if(c.nativeSource)return {kind:'native',label:'Native result · bounded map preview',format:fileFormat,note:'Complete records stay in the local Results file. The map shows a bounded preview; tables and processing use the full native result.'};
   if(cap.kind==='native-preview')return {kind:'preview',label:'Bounded native preview',format:fileFormat,note:'This shared preview contains display records only. The full native result is a separate local dependency.'};
   if(root.PortalDataWorkspace?.isArea(layer))return {kind:'original',label:'Saved study area',format:fileFormat,note:'Saved boundary · not building records'};
+  const source=root.PortalDataSources?.describe?.(layer);
+  if(source?.kind==='provider'&&source.nativeLoad&&!source.browserLoad)return {kind:'preview',label:'Map preview',format:fileFormat,note:'Load original building records for a saved area with the local engine on a desktop computer.',action:'load',actionLabel:'Load analyzable data'};
   if(c.type==='viewport'&&!demand)return {kind:!catalog&&(layer.viewLoading||layer.error||layer.loaded===false)?'pending':layer.viewLimited?'partial':'preview',label:!catalog&&(layer.viewLoading||layer.error||layer.loaded===false)?'Live cache loading or unavailable':layer.viewLimited?'Partial live cache':'Live source cache',format:fileFormat,note:'Display scope follows the map; create a fixed analysis workset before analysis.',action:'load',actionLabel:'Create analysis workset'};
   if(demand)return {kind:'preview',label:'Map preview',format:layer?.renderTiled||catalog?'PMTiles':fileFormat,note:'For building counts, areas and spatial tools, load original records for an area.',action:'load',actionLabel:'Load area & analyze'};
   if(cap.attributePreview||['pmtiles','vector'].includes(c.type)&&!['raster'].includes(c.sourceKind))return {kind:'preview',label:'Map preview',format:fileFormat,note:'Display outlines may be cut or simplified. Add original data before counting buildings or measuring areas.',action:'original',actionLabel:'Find original data'};
@@ -38,10 +40,17 @@
   const button=(action,label,disabled=false)=>'<button type="button" class="layer-purpose-action" data-purpose-action="'+action+'" data-purpose-layer="'+esc(id)+'" '+(disabled?'disabled':'')+' data-i18n>'+esc(label)+'</button>';
   let actions='';
   if(id&&options.actions!==false){
+   if(root.PortalLayerActions){
+    const primary=state.action?['load-data']:['table'];
+    actions=root.PortalLayerActions.markup(layer,{ids:primary,legacyPurpose:{'load-data':'data',table:'table'}});
+    // Keep legacy selectors callable without presenting duplicate operations.
+    if(state.action)actions+=root.PortalLayerActions.markup(layer,{ids:['load-data'],legacyPurpose:{'load-data':state.action}}).replace('<button ','<button hidden ');
+   }else{
    if(layer.cfg.nativeSource)actions=button('native-table','View full result table')+button('native-process','Process full native result');
    if(state.action)actions=button('data','Load analyzable data',loading)+button(state.action,state.actionLabel,loading);
    if(cap.geometryAnalysis&&cap.kind!=='on-demand'&&layer.cfg.type==='viewport')actions+=button('data','Load another range',loading);
    if(cap.geometryAnalysis&&cap.kind!=='on-demand'&&['geojson','viewport'].includes(layer.cfg.type))actions+=button('table','View attribute table',layer.cfg.type==='viewport'&&(layer.viewLoading||!layer.loaded||layer.error));
+   }
    if(loading)actions+=button('cancel-data','Cancel loading');
   }
   return '<div class="layer-purpose" data-purpose-kind="'+state.kind+'">'+badges(state)+(root.PortalDataWorkspace?.layerFacts(layer)||'')+'<p data-i18n>'+esc(state.note)+'</p>'+(actions?'<div class="layer-purpose-actions">'+actions+'</div>':'')+(message?'<p class="layer-analysis-message '+(message.error?'error':'')+'" role="status" data-i18n-system>'+esc(message.text)+'</p>':'')+'</div>';
@@ -57,6 +66,7 @@
  }
  function act(layer,action){
   if(!layer||root.PortalLayers?.layers.get(layer.id)!==layer)return;
+  if(root.PortalLayerActions&&action!=='cancel-data')return root.PortalLayerActions.run(action,layer).catch(e=>root.portal?.toast(e.message));
   if(['data','load','original'].includes(action)&&root.PortalDataWorkspace){root.PortalDataWorkspace.open({layer});return;}
   if(action==='native-table'){root.PortalTasks.openNativeTable(layer).catch(e=>root.portal?.toast(e.message));return;}
   if(action==='native-process'){root.PortalLayers.selectLayer(layer.id);root.PortalGIS.open('extract-mask');return;}
