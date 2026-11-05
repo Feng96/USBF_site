@@ -53,6 +53,7 @@ jobs:
           name: engine-${{ matrix.target }}
           path: ${{ runner.temp }}/engine-assets/
           retention-days: 7
+          overwrite: true
   publish:
     needs: build
     runs-on: ubuntu-22.04

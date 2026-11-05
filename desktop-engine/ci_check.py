@@ -10,6 +10,33 @@ import subprocess
 import time
 
 
+def detach_image(path, timeout=30, log_path=None):
+    command = ['hdiutil', 'detach', str(path), '-quiet']
+    deadline = time.monotonic() + timeout
+    result = None
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            if result is not None:
+                result.check_returncode()
+            raise subprocess.TimeoutExpired(command, timeout)
+        result = subprocess.run(command, check=False, capture_output=True, text=True, timeout=remaining)
+        if result.returncode == 0:
+            return
+        detail = json.dumps({'command': command, 'returncode': result.returncode,
+                             'stdout': result.stdout, 'stderr': result.stderr}, ensure_ascii=False)
+        if log_path is not None:
+            with Path(log_path).open('a', encoding='utf-8') as output:
+                output.write(detail + '\n')
+        print(detail, flush=True)
+        if result.returncode != 16:
+            result.check_returncode()
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            result.check_returncode()
+        time.sleep(min(1, remaining))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--assets', type=Path, required=True)
@@ -42,7 +69,7 @@ def main():
         subprocess.run(command, check=True, timeout=300)
     finally:
         if platform.system() == 'Darwin':
-            subprocess.run(['hdiutil', 'detach', str(mount), '-quiet'], check=True)
+            detach_image(mount, log_path=args.assets / 'hdiutil-detach.log')
     receipt_path = workspace / 'Engine' / 'install-receipt.json'
     receipt = json.loads(receipt_path.read_text(encoding='utf-8'))
     assert receipt['installed'] is True
