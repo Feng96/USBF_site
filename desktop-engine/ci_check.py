@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import shutil
 import subprocess
 import time
 
@@ -56,8 +57,16 @@ def main():
     tls_environment = {**os.environ,
                        'SSL_CERT_FILE': str(args.work / 'missing-host-cert.pem'),
                        'SSL_CERT_DIR': str(args.work / 'missing-host-certificates')}
-    subprocess.run([str(installed), '--self-test', '--workspace', str(workspace),
-                    '--report', str(report)], check=True, timeout=180, env=tls_environment)
+    selftest = None
+    try:
+        selftest = subprocess.run([str(installed), '--self-test', '--workspace', str(workspace),
+                                  '--report', str(report)], check=False, timeout=180, env=tls_environment)
+    finally:
+        if report.is_file():
+            shutil.copyfile(report, args.assets / report.name)
+            if selftest is None or selftest.returncode:
+                print(report.read_text(encoding='utf-8-sig', errors='replace'), flush=True)
+    selftest.check_returncode()
     result = json.loads(report.read_text(encoding='utf-8'))
     assert result['passed'], result
     markers = []

@@ -162,21 +162,29 @@ class InstallationTests(unittest.TestCase):
                        check=True, timeout=15)
         deadline = time.monotonic() + 40
         status_path = self.workspace / 'Engine' / 'uninstall-status.json'
-        while time.monotonic() < deadline:
-            status = json.loads(status_path.read_text())
-            if status['state'] in {'complete', 'error'}: break
-            time.sleep(.1)
-        # A terminal receipt is written before the PowerShell process returns.
-        # Wait for that owned helper to release its redirected log handle before
-        # TemporaryDirectory cleanup, rather than ignoring a Windows file lock.
-        cleanup_pid = status.get('cleanupPid')
-        if cleanup_pid:
-            try:
-                psutil.Process(cleanup_pid).wait(timeout=15)
-            except psutil.NoSuchProcess:
-                pass
-        self.assertEqual(status['state'], 'complete', status)
-        self.assertFalse(runtime.exists())
+        status = {}
+        try:
+            while time.monotonic() < deadline:
+                try:
+                    status = json.loads(status_path.read_text())
+                except (PermissionError, FileNotFoundError, json.JSONDecodeError):
+                    time.sleep(.1)
+                    continue
+                if status['state'] in {'complete', 'error'}: break
+                time.sleep(.1)
+            else:
+                self.fail('Timed out waiting for runtime self-removal: ' + str(status))
+            self.assertEqual(status['state'], 'complete', status)
+            self.assertFalse(runtime.exists())
+        finally:
+            # A terminal receipt is written before the PowerShell process returns.
+            # Release its log handle even when polling or an assertion fails.
+            cleanup_pid = status.get('cleanupPid')
+            if cleanup_pid:
+                try:
+                    psutil.Process(cleanup_pid).wait(timeout=15)
+                except psutil.NoSuchProcess:
+                    pass
 
 
 if __name__ == '__main__':
