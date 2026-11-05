@@ -75,7 +75,7 @@ and interface text while fields, layer names, paths, IDs and data remain opaque.
 | Full-result browser interactions | 46 passed, no browser errors |
 | Real Project package browser workflow, separate workspaces | 20 passed |
 | Actual empty-result browser workflow, schemas and safe attribution rendering | 10 passed |
-| Frontend regression groups for native authority, scope, Projects and UI | 15 suites / 351 checks passed |
+| Frontend regression groups for native authority, scope, Projects and UI | 15 suites / 357 checks passed |
 | Actual GeoParquet worker including crossing geometries and safe row-group pruning | 31 passed |
 | Geometry index registry and exact-source binding | 8 passed |
 | Original-data no-overwrite publication and geometry generator | 10 passed |
@@ -109,8 +109,10 @@ last. Existing different bytes are refused rather than overwritten. Credentials
 are discovered from normal AWS environment/profile configuration and never enter
 the website, a Project, a CLI argument or a receipt.
 
-No usable Source Cooperative upload credentials were configured in this session.
-The real original-data archive has therefore not been published, and the release
+The earlier private Source Cooperative session was checked using a signed
+read-only request and returned HTTP 403. No archive writes were attempted. A
+usable upload session is still needed; the original-data archive has not been
+published, and the release
 registry explicitly reports `immutable: false` / `pending-upload-credentials`.
 Existing data remain accessible through their current source keys with identity
 checks. Publisher code signing and Apple notarization also require external
@@ -121,3 +123,9 @@ publisher credentials and are not claimed.
 Native release [`engine-v0.2.0-preview.1-r5`](https://github.com/Feng96/USBF_site/releases/tag/engine-v0.2.0-preview.1-r5), built from `0eba0ab46f0017a4760428d97f4f6df3de1d7d41`, passed all four target builds in [workflow 41935868427](https://github.com/Feng96/USBF_site/actions/runs/41935868427). Each platform passed 22 actual installer/runtime/UI/uninstall checks, plus its source test suites. All four public package sizes and SHA256 values match GitHub release asset digests. Public manifest SHA256: `4804b4648c9ac87905dc4f13acf68643ec9aa9cbe3572189f9659f89a979f939`.
 
 Pages deployment and final production acceptance are recorded in deployment history and the local publication receipt after publication.
+
+## Production website and browser connection
+
+The implementation commit `24225c3a26d7b5501c7a306de4eeafa1426539c7` deployed successfully in [Pages run 41937079448](https://github.com/Feng96/USBF_site/actions/runs/41937079448). The actual public site passed 39 checks, including real DC / New York / Los Angeles / Boston data, complete ordinary attributes, bounded range reads, readonly sharing and Chinese phone layout. Seven deployed resources matched the exact tested source SHA256.
+
+The unmodified production HTTPS page passed 14 real browser-to-loopback checks after explicit browser local-network permission, including pairing, original attributes, authenticated MVT and full tables. Chromium 141 correctly blocked this connection before permission was allowed. A narrow interface patch supplies English/Chinese instructions for prompt, denied and granted states without requesting or granting permission itself. That patch passed 10 tests using actual browser permission states with only the three local patch scripts substituted; native requests remained direct with normal Origin/CORS and mixed-content enforcement. Final unmodified patch deployment acceptance is recorded in the local publication receipt.

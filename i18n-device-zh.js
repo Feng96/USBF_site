@@ -1,5 +1,10 @@
 /* Device/files interface only. Filenames, data values and format names remain opaque. */
 Object.assign(window.PortalTranslations['zh-CN'], Object.fromEntries(`
+Local network access is blocked. Open this site's browser permissions, allow local network access, keep USBF Engine running and retry.|浏览器已阻止本地网络访问。请在此网站的浏览器权限中允许本地网络访问，保持 USBF Engine 运行后重试。
+Allow local network access when the browser asks. If you blocked it, open this site's browser permissions to allow it. Keep USBF Engine running and retry.|浏览器请求本地网络访问时请选择“允许”。如果之前已阻止，请在此网站的浏览器权限中重新允许，并保持 USBF Engine 运行后重试。
+Could not connect to USBF Engine. Start the desktop program and check its local address. If your browser asks for local network access, allow it; if you blocked it, enable it in this site's browser permissions.|无法连接 USBF Engine。请启动桌面程序并检查本地地址；浏览器请求本地网络访问时请选择“允许”，如果之前已阻止，请在此网站的浏览器权限中重新启用。
+Your browser may ask to let this site access devices on your local network. Choose Allow to connect to USBF Engine on this computer.|浏览器可能请求允许此网站访问本地网络中的设备。请选择“允许”，以连接当前计算机上的 USBF Engine。
+If you chose Block, use the site information icon beside the address bar to open this site's browser permissions and allow local network access. Keep USBF Engine running, then retry.|如果之前选择了“阻止”，请点击地址栏旁的站点信息图标，在此网站的浏览器权限中允许本地网络访问。请保持 USBF Engine 运行，然后重试。
 Local resources and verified cache|本地资源和已验证缓存
 Execution location|执行位置
 Verified source-cache size|已验证源数据缓存大小

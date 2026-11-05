@@ -31,6 +31,11 @@ release and never overwrites an existing object. Actual Source Cooperative
 publication requires configured upload credentials. Publisher signing and Apple
 notarization are not supplied by this preview.
 
+For the first desktop connection, allow the browser's **Local network access**
+request. If it was blocked, use the site information control beside the address
+bar to restore that permission, start USBF Engine and reconnect in **Files & device**.
+The website explains permission and desktop-start failures in English and Chinese.
+
 See [the implementation acceptance record](docs/five-updates-acceptance.md) for
 verification, benchmark limits and publication receipts.
 
