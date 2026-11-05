@@ -11,6 +11,22 @@ const result={site,expectedRevision:process.env.PORTAL_EXPECTED_REVISION||null,a
 let browser,page,service,fixture,recording=true,success=false;
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms)),digest=file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const ok=(value,label)=>{assert(value,label);checks.push(label);console.log('PASS',label);};
+function expectedTileCancellation(failure){
+ try{
+  const url=new URL(failure.url),match=/^\/v1\/jobs\/([a-f0-9-]{36})\/tiles\/(\d+)\/(\d+)\/(\d+)\.pbf$/.exec(url.pathname);
+  if(failure.error!=='net::ERR_ABORTED'||failure.mainFrame||url.origin!==fixture.endpoint||!match||match[1]!==fixture.chartJob.id)return null;
+  const request=requests.find(r=>r.path===url.pathname&&r.query===url.search&&r.method==='GET');if(!request||failure.method&&failure.method!=='GET')return null;
+  const z=Number(match[2]),x=Number(match[3]),y=Number(match[4]),n=2**z;if(z<0||z>22||x<0||x>=n||y<0||y>=n)return null;
+  const latitude=row=>Math.atan(Math.sinh(Math.PI*(1-2*row/n)))*180/Math.PI,tileBounds=[x/n*360-180,latitude(y+1),(x+1)/n*360-180,latitude(y)];
+  const old=result.browserFirst?.viewportBounds||result.browserFirst?.bounds,target=result.nativeLocated?.viewportBounds||result.nativeLocated?.bounds;if(!old||!target)return null;
+  // Retain the normal tile buffer around the previously observed map view.
+  // With legacy receipts, the observed old building plus two tiles bounds it.
+  const margin=result.browserFirst.viewportBounds?1:2,dx=(tileBounds[2]-tileBounds[0])*margin,dy=(tileBounds[3]-tileBounds[1])*margin,oldView=[old[0]-dx,old[1]-dy,old[2]+dx,old[3]+dy];
+  const intersects=(a,b)=>a[0]<=b[2]&&a[2]>=b[0]&&a[1]<=b[3]&&a[3]>=b[1];
+  if(!intersects(tileBounds,oldView)||intersects(tileBounds,target))return null;
+  return {...failure,method:'GET',requestEvidence:request,tileBounds,previousObservedBounds:old,locatedNativeBounds:target,reason:'Cancelled superseded tile from the previous map view during normal record navigation'};
+ }catch(_){return null;}
+}
 async function startService(){
  const receipt=path.join(out,'service.json'),log=fs.openSync(path.join(out,'service.log'),'w');
  service=spawn(process.env.USBF_PYTHON||'/lustre/isaac24/scratch/yfeng21/usbf_engine_20261104/venv/bin/python',[path.join(repo,'tools','production-analysis-native-service.py'),path.join(out,'workspace'),receipt,'--origin',origin,'--chart-receipt',process.env.PORTAL_CHART_FIXTURE||'/lustre/isaac24/scratch/yfeng21/usbf_analysis_20261105/native-charts-browser/native-chart-fixture-1793899198551.json','--matching-workspace',process.env.PORTAL_MATCH_FIXTURE||'/lustre/isaac24/scratch/yfeng21/usbf_analysis_20261105/matching-browser-qa-final/workspace-1793899171489'],{env:{...process.env,PYTHONDONTWRITEBYTECODE:'1',USBF_SPATIAL_EXTENSION:process.env.USBF_SPATIAL_EXTENSION||'/lustre/isaac24/scratch/yfeng21/usbf_engine_20261104/runtime-probe/Cache/duckdb-extensions/v2.0.0/linux_amd64/spatial.duckdb_extension'},stdio:['ignore',log,log]});
@@ -25,13 +41,13 @@ async function originalState(layerId,index){return page.evaluate(async({layerId,
  if(!table.hidden)visible=visible&&q.y<table.getBoundingClientRect().top-v.top;
  if(!properties.hidden)visible=visible&&q.x<properties.getBoundingClientRect().left-v.left;
  if(sidebar?.getClientRects().length){const r=sidebar.getBoundingClientRect();if(r.right>v.left&&r.left<v.right)visible=visible&&q.x>r.right-v.left;}
- return {correctOriginal:actual===f,highlight:!!h&&turf.booleanEqual(h.geometry,f.geometry,{precision:9}),highlightGeometry:h?.geometry,contains:view.contains([b[0],b[1]])&&view.contains([b[2],b[3]]),visible,rawUnchanged:JSON.stringify(l.data)===window.__productionLocateOriginal,record:f.properties.record,sourceId:f.id,bounds:b,projectedCenter:{x:q.x,y:q.y},batchCount:PortalGISSelection.count(l)};
+ return {correctOriginal:actual===f,highlight:!!h&&turf.booleanEqual(h.geometry,f.geometry,{precision:9}),highlightGeometry:h?.geometry,contains:view.contains([b[0],b[1]])&&view.contains([b[2],b[3]]),visible,rawUnchanged:JSON.stringify(l.data)===window.__productionLocateOriginal,record:f.properties.record,sourceId:f.id,bounds:b,viewportBounds:view.toArray().flat(),projectedCenter:{x:q.x,y:q.y},batchCount:PortalGISSelection.count(l)};
  },{layerId,index});}
 (async()=>{
  fixture=await startService();result.fixture={chartJob:fixture.chartJob,copied:fixture.copied,allowedOrigins:fixture.allowedOrigins};
  browser=await chromium.launch({env:{...process.env,XDG_CACHE_HOME:path.join(out,'runtime-cache')},executablePath:process.env.PORTAL_CHROMIUM_PATH||'/lustre/isaac24/scratch/yfeng21/us_buildings_portal_20261028/runtime/chrome/headless_shell',headless:true,ignoreDefaultArgs:['--disable-dev-shm-usage'],args:['--no-sandbox','--disk-cache-size=1','--media-cache-size=1','--disable-gpu-shader-disk-cache','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
  const context=await browser.newContext({viewport:{width:1440,height:960}});await context.grantPermissions(['local-network-access'],{origin});page=await context.newPage();page.setDefaultTimeout(45000);await page.route('**/*',route=>route.continue());
- page.on('pageerror',error=>{if(recording)errors.push(error.message);});page.on('console',message=>{if(recording&&message.type()==='error')consoleErrors.push(message.text());});page.on('requestfailed',request=>{if(recording)requestFailures.push({url:request.url(),error:request.failure()?.errorText,mainFrame:request.isNavigationRequest()&&request.frame()===page.mainFrame()});});
+ page.on('pageerror',error=>{if(recording)errors.push(error.message);});page.on('console',message=>{if(recording&&message.type()==='error')consoleErrors.push(message.text());});page.on('requestfailed',request=>{if(recording)requestFailures.push({url:request.url(),method:request.method(),error:request.failure()?.errorText,mainFrame:request.isNavigationRequest()&&request.frame()===page.mainFrame()});});
  page.on('request',async request=>{if(!recording||!request.url().startsWith(fixture.endpoint))return;try{const headers=await request.allHeaders();let body;try{body=request.postDataJSON();}catch(_){}requests.push({path:new URL(request.url()).pathname,query:new URL(request.url()).search,method:request.method(),origin:headers.origin||null,authorized:!!headers.authorization,...(body?{body}:{})});}catch(error){requestFailures.push({url:request.url(),error:error.message});}});
  page.on('response',response=>{if(recording&&response.url().startsWith(fixture.endpoint)){const headers=response.headers();responses.push({path:new URL(response.url()).pathname,status:response.status(),allowOrigin:headers['access-control-allow-origin']||null});}});
  const cdp=await browser.newBrowserCDPSession(),command=(await cdp.send('Browser.getBrowserCommandLine')).arguments;
@@ -69,7 +85,7 @@ async function originalState(layerId,index){return page.evaluate(async({layerId,
  await page.locator('[data-native-locate-row]').click();await page.waitForFunction(jobId=>!document.querySelector('#native-result-table').open&&PortalLayers.selection?.feature?.id===jobId+':2500',fixture.chartJob.id);
  result.nativeLocated=await page.evaluate(async({id,rowField})=>{
   const f=PortalLayers.selection.feature,highlightData=await portal.map.getSource('inventory-selection').getData(),h=highlightData?.features?.[0],b=turf.bbox({type:'Feature',properties:{},geometry:f.geometry}),v=portal.map.getBounds(),center=[(b[0]+b[2])/2,(b[1]+b[3])/2],q=portal.map.project(center),container=portal.map.getContainer().getBoundingClientRect(),props=document.querySelector('#properties'),batch=PortalNativeResults.selection(PortalLayers.layers.get(id));
-  return {feature:f,highlight:!!h&&turf.booleanEqual(h.geometry,f.geometry,{precision:9}),highlightGeometry:h?.geometry,bounds:b,contains:v.contains([b[0],b[1]])&&v.contains([b[2],b[3]]),visible:q.x>=0&&q.y>=0&&q.x<container.width&&q.y<container.height&&(props.hidden||q.x<props.getBoundingClientRect().left-container.left),sourceRow:f.properties[rowField],batchUnchanged:batch.selectionId===window.__productionNativeBatch.selectionId&&batch.count===2,previewCount:PortalLayers.layers.get(id).data.features.length};
+  return {feature:f,highlight:!!h&&turf.booleanEqual(h.geometry,f.geometry,{precision:9}),highlightGeometry:h?.geometry,bounds:b,viewportBounds:v.toArray().flat(),contains:v.contains([b[0],b[1]])&&v.contains([b[2],b[3]]),visible:q.x>=0&&q.y>=0&&q.x<container.width&&q.y<container.height&&(props.hidden||q.x<props.getBoundingClientRect().left-container.left),sourceRow:f.properties[rowField],batchUnchanged:batch.selectionId===window.__productionNativeBatch.selectionId&&batch.count===2,previewCount:PortalLayers.layers.get(id).data.features.length};
  },{id:nativeId,rowField:result.sourceRowField});
  const expectedBounds=[-77,39.005,-76.9999,39.0051],expectedOriginalId=String(9007199254740993123n+2500n);
  ok(result.nativeLocated.sourceRow===2500&&result.nativeLocated.feature.properties.original_id===expectedOriginalId&&result.nativeLocated.bounds.every((n,i)=>Math.abs(n-expectedBounds[i])<1e-9)&&result.nativeLocated.highlight&&result.nativeLocated.contains&&result.nativeLocated.visible&&result.nativeLocated.previewCount===1,'Locate fetches row 2500 complete geometry beyond the preview and highlights its exact building in the map viewport');
@@ -78,7 +94,8 @@ async function originalState(layerId,index){return page.evaluate(async({layerId,
  ok(result.nativeLocated.batchUnchanged,'Locating an unselected native record preserves the existing immutable two-record batch selection');
  await page.waitForFunction(()=>portal.map.areTilesLoaded());await page.screenshot({path:path.join(out,'production-native-row2500-locate-zh.png')});
  const originalsUnchanged=fixture.copied.every(file=>digest(file.original)===file.sha256&&digest(file.copy)===file.sha256);
- const badNative=responses.filter(r=>r.status>=400),unexpectedFailures=requestFailures.filter(r=>!r.mainFrame||!result.navigationRetry);
+ result.expectedTileCancellations=requestFailures.map(expectedTileCancellation).filter(Boolean);
+ const badNative=responses.filter(r=>r.status>=400),unexpectedFailures=requestFailures.filter(r=>!expectedTileCancellation(r)&&(!r.mainFrame||!result.navigationRetry));result.unexpectedRequestFailures=unexpectedFailures;
  assert(originalsUnchanged,'Copied original and complete-result SHA256 must remain unchanged.');assert(!requests.some(r=>r.path==='/v1/plan'||r.path==='/v1/jobs'&&r.method==='POST'),'Record location must not plan tasks or acquire provider data.');
  assert(requests.filter(r=>!['/v1/health','/v1/pair'].includes(r.path)).every(r=>r.authorized&&r.origin===origin)&&responses.filter(r=>r.status<400).every(r=>r.allowOrigin===origin),'Native requests must preserve exact-origin authentication and CORS.');
  assert(errors.length===0&&consoleErrors.length===0&&badNative.length===0&&unexpectedFailures.length===0,'Production location must have no uncaught, console or unexpected native/network errors.');
