@@ -24,21 +24,48 @@
  const copy=value=>JSON.parse(JSON.stringify(value));
  const raster=l=>['raster','image','raster-pmtiles'].includes(l?.cfg?.type)||l?.cfg?.sourceKind==='raster';
  function sourceField(l){return fields.find(field=>(l?.nativeMap?.displayFields||l?.fields)?.includes(field))||null;}
- function mode(l){if(raster(l))return 'raster';if(l?.colorMode==='source'&&sourceField(l))return 'source';if(l?.colorMode==='change'&&(l.nativeMap?.displayFields||l.fields)?.includes('modified'))return 'change';if(l?.colorMode==='height'&&l.heightField&&(!l.nativeMap||l.nativeMap.displayFields?.includes(l.heightField)))return 'height';return 'uniform';}
+ const metricCache=new WeakMap(),metricPalette=['#d5e5ca','#6ba98d','#287c80','#56519b'];
+ function metricInfo(l){
+  if(l?.cfg?.type!=='geojson'||l.cfg.nativeSource||l.renderTiled||l.data?.provenance?.geometryQuality==='bounded-native-preview'||!Array.isArray(l.data?.features))return new Map();
+  const data=l.data,old=metricCache.get(data);if(old&&old.features===data.features&&old.length===data.features.length)return old.fields;
+  const info=new Map();for(const f of data.features)for(const [key,value]of Object.entries(f.properties||{}))if(typeof value==='number'&&Number.isFinite(value)){const item=info.get(key);if(item){item.min=Math.min(item.min,value);item.max=Math.max(item.max,value);}else info.set(key,{min:value,max:value});}
+  metricCache.set(data,{features:data.features,length:data.features.length,fields:info});return info;
+ }
+ function metricFields(l){return Array.from(metricInfo(l).keys());}
+ function metricUnit(l,field){
+  if(field===l?.colorField&&typeof l.colorUnit==='string'&&l.colorUnit)return l.colorUnit;
+  const p=l?.data?.provenance||{},z=p.zonalReport||{},f=z.fields||{},s=p.zonalStyle||{};
+  if(field===(s.colorField||s.field)&&typeof(s.colorUnit||s.unit)==='string')return s.colorUnit||s.unit;
+  if([z.densityField,f.buildings_per_km2].includes(field))return 'buildings/km²';
+  if([z.countField,f.building_records].includes(field))return 'records';
+  if([z.heightField,f.mean_height].includes(field))return typeof z.heightUnit==='string'?z.heightUnit:'';
+  if(field===f.zone_area_km2)return 'km²';return '';
+ }
+ function validMetricStops(stops){return Array.isArray(stops)&&stops.length>=2&&stops.length<=7&&stops.every((s,i)=>s&&Number.isFinite(s.value)&&/^#[a-f0-9]{6}$/i.test(s.color)&&(!i||s.value>stops[i-1].value))&&Number.isFinite(stops.at(-1).value-stops[0].value);}
+ function metricStyle(l){
+  const fields=metricInfo(l),p=l?.data?.provenance||{},field=l?.colorField||p.zonalStyle?.colorField||p.zonalStyle?.field||p.zonalReport?.defaultMetricField||fields.keys().next().value;
+  const info=fields.get(field);if(!info)return null;let stops=l.colorStops;
+  if(!validMetricStops(stops)){let min=Math.min(0,info.min),max=Math.max(0,info.max);if(min===max)max=min+1;if(!Number.isFinite(max-min))return null;stops=metricPalette.map((color,i)=>({value:min+(max-min)*i/(metricPalette.length-1),color}));}
+  return {colorMode:'metric',colorField:field,colorStops:copy(stops),colorUnit:metricUnit(l,field)};
+ }
+ function mode(l){if(raster(l))return 'raster';if(l?.colorMode==='metric'&&metricStyle(l))return 'metric';if(l?.colorMode==='source'&&sourceField(l))return 'source';if(l?.colorMode==='change'&&(l.nativeMap?.displayFields||l.fields)?.includes('modified'))return 'change';if(l?.colorMode==='height'&&l.heightField&&(!l.nativeMap||l.nativeMap.displayFields?.includes(l.heightField)))return 'height';return 'uniform';}
  function colorExpression(l){
   const effective=mode(l);if(effective==='raster')return null;
   if(effective==='source')return ['match',['downcase',['to-string',['get',sourceField(l)]]],...palettes.source.filter(e=>e.values).flatMap(e=>[e.values.slice(),e.color]),palettes.source.at(-1).color];
   if(effective==='change')return ['case',['==',['get','modified'],true],palettes.change[0].color,['==',['get','modified'],false],palettes.change[1].color,palettes.change[2].color];
   if(effective==='height')return ['case',['>',['coalesce',['to-number',['get',l.heightField]],0],0],['interpolate',['linear'],['to-number',['get',l.heightField]],...palettes.height.stops.flatMap(s=>[s.value,s.color])],palettes.height.missing.color];
+  if(effective==='metric'){const style=metricStyle(l);return ['case',['==',['typeof',['get',style.colorField]],'number'],['interpolate',['linear'],['number',['get',style.colorField],0],...style.colorStops.flatMap(s=>[s.value,s.color])],'#abb2b0'];}
   return l?.color||'#4b78a1';
  }
  function forLayer(l){
-  if(!l)return null;const effective=mode(l),title=String(l.cfg?.name||'Data layer'),field=effective==='source'?sourceField(l):effective==='change'?'modified':effective==='height'?l.heightField:null,opacity=Number.isFinite(l.opacity)?Math.max(0,Math.min(1,l.opacity)):1;
-  const descriptor={version:1,layerId:l.id===undefined?null:String(l.id),title,kind:effective==='height'?'continuous':effective==='source'||effective==='change'?'categorical':effective,mode:effective,requestedMode:l.colorMode||'uniform',field,opacity,visible:l.visible!==false,entries:[],stops:[],unit:null,missing:null,caption:'',details:{sourceField:field,source:l.cfg?.provider||l.cfg?.sourceName||null,sourceUrl:l.cfg?.page||l.cfg?.sourceUrl||l.cfg?.url||null,license:l.cfg?.license||null,filters:{source:l.sourceFilter||null,fixedSource:l.cfg?.fixedSource||null,minimumAreaM2:Number.isFinite(l.minArea)&&l.minArea>0?l.minArea:null},geometryRole:raster(l)?'Raster display':l.cfg?.type==='viewport'?'Loaded source area':['pmtiles','vector'].includes(l.cfg?.type)?'Viewing tiles':'Loaded vector data'}};
+  if(!l)return null;const effective=mode(l),title=String(l.cfg?.name||'Data layer'),field=effective==='source'?sourceField(l):effective==='change'?'modified':effective==='height'?l.heightField:effective==='metric'?metricStyle(l).colorField:null,opacity=Number.isFinite(l.opacity)?Math.max(0,Math.min(1,l.opacity)):1;
+  const descriptor={version:1,layerId:l.id===undefined?null:String(l.id),title,kind:effective==='height'||effective==='metric'?'continuous':effective==='source'||effective==='change'?'categorical':effective,mode:effective,requestedMode:l.colorMode||'uniform',field,opacity,visible:l.visible!==false,entries:[],stops:[],unit:null,missing:null,caption:'',details:{sourceField:field,source:l.cfg?.provider||l.cfg?.sourceName||null,sourceUrl:l.cfg?.page||l.cfg?.sourceUrl||l.cfg?.url||null,license:l.cfg?.license||null,filters:{source:l.sourceFilter||null,fixedSource:l.cfg?.fixedSource||null,minimumAreaM2:Number.isFinite(l.minArea)&&l.minArea>0?l.minArea:null},geometryRole:raster(l)?'Raster display':l.cfg?.type==='viewport'?'Loaded source area':['pmtiles','vector'].includes(l.cfg?.type)?'Viewing tiles':'Loaded vector data'}};
   if(effective==='source'){descriptor.caption='Footprint source';descriptor.entries=copy(palettes.source);descriptor.normalization='Lowercase the renderer-selected source field. Whitespace is significant.';}
   else if(effective==='change'){descriptor.caption='Recorded changes';descriptor.entries=copy(palettes.change);descriptor.comparison='Strict booleans. Only true and false have recorded-state colors; null, absent fields and other values are unknown.';}
   else if(effective==='height'){
    descriptor.caption='Height · m';descriptor.unit='m';descriptor.stops=copy(palettes.height.stops).map((s,i)=>({...s,label:i===palettes.height.stops.length-1?String(s.value)+'+':String(s.value)}));descriptor.missing=copy(palettes.height.missing);descriptor.interpolation='linear';descriptor.colorSpace='rgb';descriptor.domain=[0,100];descriptor.rule='Positive source heights only. Colors vary continuously between the stops; values at or above 100 m use the final color. Missing and non-positive values use the separate missing-height color.';
+  }else if(effective==='metric'){
+   const style=metricStyle(l);descriptor.caption=style.colorField+(style.colorUnit?' · '+style.colorUnit:'');descriptor.unit=style.colorUnit||null;descriptor.stops=style.colorStops.map(s=>({...s,label:s.value.toLocaleString('en-US',{maximumSignificantDigits:4})}));descriptor.domain=[descriptor.stops[0].value,descriptor.stops.at(-1).value];descriptor.missing={key:'missing-numeric',label:'No numeric value',color:'#abb2b0'};descriptor.interpolation='linear';descriptor.colorSpace='rgb';descriptor.rule='Display scale for finite numeric attributes. Zero and negative values are valid. Missing values and text use the separate gray color; values outside the scale use the nearest endpoint color.';
   }else if(effective==='raster')descriptor.caption=l.cfg?.type==='image'?'Georeferenced image':l.cfg?.type==='raster-pmtiles'?'Raster tiles':'Raster imagery';
   else descriptor.entries=[{key:'uniform',label:title,values:null,color:l.color||'#4b78a1'}];
   return freeze(descriptor);
@@ -50,6 +77,7 @@
   if(!legend||legend.kind==='raster')return null;
   if(legend.mode==='source'){const normalized=stringValue(value).toLowerCase();return legend.entries.find(e=>e.values?.includes(normalized))?.color||legend.entries.at(-1).color;}
   if(legend.mode==='change')return legend.entries.find(e=>e.values?.some(v=>v===value))?.color||legend.entries.at(-1).color;
+  if(legend.mode==='metric'){if(typeof value!=='number'||!Number.isFinite(value))return legend.missing.color;const stops=legend.stops;if(value<=stops[0].value)return stops[0].color;if(value>=stops.at(-1).value)return stops.at(-1).color;const upper=stops.findIndex(s=>s.value>=value),a=stops[upper-1],b=stops[upper];return mix(a.color,b.color,(value-a.value)/(b.value-a.value));}
   if(legend.kind==='continuous'){const number=Number(value===undefined?null:value);if(Number.isNaN(number))throw Error('The renderer cannot convert this height to a number.');if(number<=0)return legend.missing.color;const stops=legend.stops;if(number>=stops.at(-1).value)return stops.at(-1).color;const upper=stops.findIndex(s=>s.value>=number),a=stops[upper-1],b=stops[upper];return mix(a.color,b.color,(number-a.value)/(b.value-a.value));}
   return legend.entries[0]?.color||null;
  }
@@ -64,7 +92,7 @@
    else if(l.kind==='raster')body='<div class="map-layer-legend-title"><i class="map-layer-legend-raster" aria-hidden="true"></i><h3>'+esc(l.title)+'</h3></div><p class="map-layer-legend-caption">'+esc(l.caption)+'</p>';
    else{
     body='<div class="map-layer-legend-title"><h3>'+esc(l.title)+'</h3></div><p class="map-layer-legend-caption">'+esc(l.caption)+'</p>';
-    if(l.kind==='continuous'){const [min,max]=l.domain;body+='<div class="map-layer-legend-ramp" role="img" aria-label="Continuous height colors from '+min+' to '+max+' metres, with '+max+' metres and above using the final color" style="--legend-gradient:'+esc(gradientCSS(l))+';--legend-gradient-srgb:'+esc(gradientCSS(l,true))+';--legend-opacity:'+l.opacity+'"></div><div class="map-layer-legend-ticks">'+l.stops.map((s,i)=>'<span class="'+(i===0?'first':i===l.stops.length-1?'last':'')+'" style="left:'+(100*(s.value-min)/(max-min))+'%">'+esc(s.label)+'</span>').join('')+'</div><div class="map-layer-legend-missing">'+swatch(l.missing.color)+'<span>'+esc(l.missing.label)+'</span></div>';}
+    if(l.kind==='continuous'){const [min,max]=l.domain;body+='<div class="map-layer-legend-ramp" role="img" aria-label="'+esc(l.mode==='metric'?'Continuous numeric colors for '+l.field+' from '+min+' to '+max+(l.unit?' '+l.unit:''):'Continuous height colors from '+min+' to '+max+' metres, with '+max+' metres and above using the final color')+'" style="--legend-gradient:'+esc(gradientCSS(l))+';--legend-gradient-srgb:'+esc(gradientCSS(l,true))+';--legend-opacity:'+l.opacity+'"></div><div class="map-layer-legend-ticks">'+l.stops.map((s,i)=>'<span class="'+(i===0?'first':i===l.stops.length-1?'last':'')+'" style="left:'+(100*(s.value-min)/(max-min))+'%">'+esc(s.label)+'</span>').join('')+'</div><div class="map-layer-legend-missing">'+swatch(l.missing.color)+'<span data-i18n>'+esc(l.missing.label)+'</span></div>';}
     else body+='<div class="map-layer-legend-entries">'+l.entries.map(e=>'<div data-legend-entry="'+esc(e.key)+'">'+swatch(e.color)+'<span>'+esc(e.label)+'</span></div>').join('')+'</div>';
    }
    return '<section class="map-layer-legend" data-legend-layer="'+esc(l.layerId)+'" data-legend-kind="'+esc(l.kind)+'" data-legend-mode="'+esc(l.mode)+'">'+body+(options.details===false?'':detailsHTML(l))+'</section>';
@@ -105,5 +133,5 @@
    else if(item.type==='ramp'){const ramp=ctx.createLinearGradient(item.x,item.y,item.x+item.width,item.y),[min,max]=item.domain;for(const s of item.stops)ramp.addColorStop((s.value-min)/(max-min),s.color);ctx.save();ctx.globalAlpha=item.opacity;ctx.fillStyle=ramp;ctx.fillRect(item.x,item.y,item.width,item.height);ctx.restore();}
   }ctx.restore();return layout.height;
  }
- root.PortalLegend={forLayer,forLayers,colorExpression,sourceField,colorAt,gradientCSS,html,render,bind,plan,paintCanvas,palettes};
+ root.PortalLegend={metricFields,metricStyle,metricUnit,validMetricStops,forLayer,forLayers,colorExpression,sourceField,colorAt,gradientCSS,html,render,bind,plan,paintCanvas,palettes};
 })(globalThis);

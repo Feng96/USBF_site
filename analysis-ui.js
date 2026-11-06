@@ -1,7 +1,7 @@
 /* User-facing statistics and charts; each action binds an independent source input. */
 (function(root){
   'use strict';
-  const A=()=>root.PortalAnalysisData,$=id=>document.getElementById('analysis-'+id),nativeSchemas=new WeakMap();
+  const A=()=>root.PortalAnalysisData,$=id=>document.getElementById('analysis-'+id),nativeSchemas=new WeakMap(),inputOrigins=new WeakMap(),chartOrigins=new WeakMap();
   const native=l=>!!l?.cfg?.nativeSource;
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmt=(v,d=1)=>v===null||v===undefined?'—':Number(v).toLocaleString('en-US',{maximumFractionDigits:d});
@@ -167,13 +167,13 @@
   }
   async function prepare(signal){
     const l=layer();if(!l)throw Error('Create a fixed analysis workset in Data & scope first.');
-    const start=inputBinding();let captured;
+    const start=inputBinding(),sourceData=l.data,nativeSource=l.cfg.nativeSource?JSON.parse(JSON.stringify(l.cfg.nativeSource)):null,areaData=$('scope').value==='area'?root.PortalDataWorkspace.area()?.data:null,projectId=root.PortalProjects?.current?.id||null;let captured;
     if(native(l)){
       await loadNativeSchema(l,signal);const kind=root.PortalDataWorkspace.normalize($('scope').value),selected=await root.PortalDataWorkspace.nativeScope(l,kind),schema=nativeSchemas.get(l),area=kind==='area'?root.PortalDataWorkspace.range():null;
       if(signal.aborted||inputBinding()!==start)throw aborted();
       captured={features:[],fields:schema.columns.filter(c=>c.scalar).map(c=>c.name),nativeInput:{jobId:l.cfg.nativeSource.jobId,selectionId:selected.selectionId,sourceSha256:schema.sourceSha256},capabilities:{supported:true,nativeFull:true,geometryAnalysis:false,attributePreview:false},provenance:{name:l.cfg.name,capturedAt:new Date().toISOString(),scope:'native-full-result-aggregate',scopeLabel:root.PortalI18n.t(root.PortalDataWorkspace.recordLabel(kind)),featureCount:kind==='all'?schema.records:selected.count,spatialEligible:false,featureRole:l.cfg.dataRole==='buildings'?'buildings':'features',heightField:l.heightField||null,sourceSha256:schema.sourceSha256,execution:'native',limited:l.data?.provenance?.nativeJobStatus==='partial'||l.data?.provenance?.coverage?.requestComplete===false,licenses:Array.from(new Set([l.cfg.license,...(l.data?.provenance?.licenses||[])].filter(Boolean))),release:l.cfg.nativeSource.release||null,inputContract:{version:1,recordMode:kind,recordCount:kind==='all'?schema.records:selected.count,sourceRecordCount:schema.records,sourceSha256:schema.sourceSha256,...(area?{processingArea:area.meta}:{})}}};
     }else captured=await root.PortalDataWorkspace.capture(l,{mode:$('scope').value,signal});
-    const own=currentJob(signal);if(binding!==start)clearProducts();own.snapshot=captured;own.binding=start;snapshot=captured;binding=start;renderSnapshot();return captured;
+    inputOrigins.set(captured,{projectId,layerId:l.id,sourceData,nativeSource,areaData,mode:root.PortalDataWorkspace.normalize($('scope').value),selectionId:captured.nativeInput?.selectionId||null});const own=currentJob(signal);if(binding!==start)clearProducts();own.snapshot=captured;own.binding=start;snapshot=captured;binding=start;renderSnapshot();return captured;
   }
   function metric(value,label,detail=''){return '<div class="analysis-metric"><strong>'+esc(value)+'</strong><span>'+esc(label)+'</span>'+(detail?'<small>'+esc(detail)+'</small>':'')+'</div>';}
   async function renderOverview(signal){
@@ -254,7 +254,7 @@
     }else if(def.kind==='scatter'){validateField(def.y,data);result=await A().scatter(data,def.field,def.y,{signal,onProgress:progress});}
     else if(def.kind==='grouped'){validateField(def.group,data);let groupData=data,valueField=def.field;if(def.positiveOnly){const vals=await A().valuesAsync(data,def.field,{signal,onProgress:progress});valueField='_usbf_chart_value';while(data.fields.includes(valueField))valueField+='_';groupData={...data,fields:[...data.fields,valueField],features:data.features.map((f,i)=>({...f,properties:{...f.properties,[valueField]:vals[i]>0?vals[i]:null}}))};}result=await A().groupedStatistics(groupData,def.group,valueField,{signal,onProgress:progress,maxGroups:10});result.valueField=def.field;result.provenance=data.provenance;if(!result.rows.some(r=>r.valid))throw Error('No numeric values are available in these groups. Choose another field.');}
     else{const rows=def.kind==='category'?A().frequencies(data,def.field,10):A().histogram((await A().valuesAsync(data,def.field,{signal,onProgress:progress})).map(v=>def.positiveOnly&&!(v>0)?null:v),def.bins);if(!rows.length)throw Error('No numeric values are available. Choose another field.');result={kind:def.kind,field:def.field,rows,provenance:data.provenance};}
-    currentJob(signal);lastChart=result;lastChart.svg=chartSVG(lastChart,data);$('chart-result').innerHTML=lastChart.svg+(data.nativeInput?nativeChartFacts(result):'');updateButtons();
+    currentJob(signal);lastChart=result;chartOrigins.set(result,inputOrigins.get(data));lastChart.svg=chartSVG(lastChart,data);$('chart-result').innerHTML=lastChart.svg+(data.nativeInput?nativeChartFacts(result):'');updateButtons();chartOutput('generated');
   }
   function nativeChartFacts(result){
     const t=root.PortalI18n.t,category=result.kind==='category';
@@ -295,12 +295,13 @@
     const name=snapshot.provenance.studyArea.name.replace(/[^\p{L}\p{N}_.-]+/gu,'-').replace(/^[.-]+/,'').slice(0,80)||'study-area';
     save(name+'-buildings.geojson',JSON.stringify(A().sourceGeoJSON(snapshot)),'application/geo+json');
   }
+  function chartOutput(phase,format){if(!lastChart)return;document.dispatchEvent(new CustomEvent('portal-workflow-output',{detail:{kind:'chart',phase,format,...chartOrigins.get(lastChart),inputContract:lastChart.provenance?.inputContract,result:lastChart}}));}
   function chartDownload(){
     if(!lastChart)return;const c=lastChart,p=c.provenance;let rows;
     if(c.kind==='scatter')rows=[['x','y'],...(c.pairs||c.points).map(point=>[point.x,point.y])];
     else if(c.kind==='grouped')rows=[['category','records','with_value','average','median','total','lowest','highest'],...c.rows.map(r=>[r.label,r.observations,r.valid,r.mean,r.median,r.sum,r.min,r.max])];
     else rows=c.kind==='category'?[['category','count'],...c.rows.map(r=>[r.label,r.count])]:[['bin_low','bin_high','count'],...c.rows.map(r=>[r.low,r.high,r.count])];
-    rows=rows.map((r,i)=>r.concat(i===0?['field','source','area','data_time','licenses','sampling']:[c.kind==='scatter'?[c.xField,c.yField].join(' / '):c.field||c.valueField,p.name,p.scopeLabel,p.capturedAt,p.licenses,c.kind==='scatter'?'All '+c.valid+' paired values; the plot shows '+c.drawn+'.':'']));save('chart-data.csv',csv(rows),'text/csv;charset=utf-8');
+    rows=rows.map((r,i)=>r.concat(i===0?['field','source','area','data_time','licenses','sampling']:[c.kind==='scatter'?[c.xField,c.yField].join(' / '):c.field||c.valueField,p.name,p.scopeLabel,p.capturedAt,p.licenses,c.kind==='scatter'?'All '+c.valid+' paired values; the plot shows '+c.drawn+'.':'']));save('chart-data.csv',csv(rows),'text/csv;charset=utf-8');chartOutput('downloaded','csv');
   }
   function crc32(data){let crc=0xffffffff;for(const value of data){crc^=value;for(let i=0;i<8;i++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}return (crc^0xffffffff)>>>0;}
   function pngWithMetadata(bytes,metadata){
@@ -348,8 +349,8 @@
     $('operation').onchange=()=>{remember();updateOperation();};$('chart-kind').onchange=()=>{updateChartFields();remember();};
     ['numeric-field','group-field','chart-field','chart-y','chart-group'].forEach(id=>$(id).onchange=()=>{if(id==='chart-field')$('chart-positive').checked=['height_m','height','height_roof','height_meters','height_metres'].includes($('chart-field').value);remember();updateButtons();});
     $('snapshot-download').onclick=()=>snapshot&&save('data-sources.json',JSON.stringify(snapshot.provenance,null,2),'application/json');
-    $('stats-download').onclick=statsDownload;$('data-download').onclick=dataDownload;$('chart-csv').onclick=chartDownload;$('chart-svg').onclick=()=>lastChart&&save('building-chart.svg',lastChart.svg,'image/svg+xml');
-    $('chart-png').onclick=()=>job(async signal=>{const image=await chartImage();currentJob(signal);save('building-chart.png',image.blob);});
+    $('stats-download').onclick=statsDownload;$('data-download').onclick=dataDownload;$('chart-csv').onclick=chartDownload;$('chart-svg').onclick=()=>{if(lastChart){save('building-chart.svg',lastChart.svg,'image/svg+xml');chartOutput('downloaded','svg');}};
+    $('chart-png').onclick=()=>job(async signal=>{const image=await chartImage();currentJob(signal);save('building-chart.png',image.blob);chartOutput('downloaded','png');});
     $('spatial-download').onclick=()=>lastResult&&save('analysis-result.geojson',JSON.stringify(lastResult),'application/geo+json');$('spatial-add').onclick=()=>job(addResult);
     dialog.addEventListener('click',e=>{if(e.target.closest('[data-analysis-add-result]'))job(addResult);if(e.target.closest('[data-analysis-download-result]'))$('spatial-download').click();});
     document.addEventListener('portal-layers-changed',refreshLayers);['portal-style-changed','portal-selection-changed','portal-bulk-selection-changed','portal-data-context-changed','portal-language-changed'].forEach(e=>document.addEventListener(e,()=>{updateScope();updateFreshness();if(!snapshot)populateFields();}));
@@ -361,7 +362,7 @@
     switchTab(tab);refreshLayers();updateOperation();updateButtons();
   }
   function open(name='stats',options={}){
-    const requested=options.layerId?root.PortalLayers.layers.get(options.layerId):root.PortalLayers.active;if(native(requested)&&!['chart','charts'].includes(name))return root.PortalTaskGuides.open('count',{layerId:requested.id,mode:root.PortalDataWorkspace.normalize(options.scope||'all')});if(!native(requested)&&!root.PortalDataWorkspace.ready(requested)){root.PortalDataWorkspace.open({layer:requested,intent:name});return activeJob;}
+    const requested=options.layerId?root.PortalLayers.layers.get(options.layerId):root.PortalLayers.active;if(options.resume&&dialog&&lastChart&&requested===layer()&&snapshot&&binding===inputBinding()&&(!options.scope||root.PortalDataWorkspace.normalize(options.scope)===root.PortalDataWorkspace.normalize($('scope').value))){switchTab(name);if(!dialog.open)dialog.showModal();updateFreshness();return activeJob;}if(native(requested)&&!['chart','charts'].includes(name))return root.PortalTaskGuides.open('count',{layerId:requested.id,mode:root.PortalDataWorkspace.normalize(options.scope||'all')});if(!native(requested)&&!root.PortalDataWorkspace.ready(requested)){root.PortalDataWorkspace.open({layer:requested,intent:name});return activeJob;}
     ensure();refreshLayers();
     if(options.layerId&&root.PortalLayers.layers.has(options.layerId)){$('layer').value=options.layerId;clearSnapshot();}
     else if(root.PortalLayers.active?.id&&$('layer').value!==root.PortalLayers.active.id){$('layer').value=root.PortalLayers.active.id;clearSnapshot();}

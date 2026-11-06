@@ -15,7 +15,7 @@
     if(applyBasemap){if(v.basemap==='custom'){const config=clone(v.customBasemap),file=customFile||files?.get(config.asset);delete config.asset;if(!root.PortalBasemaps)throw Error('The basemap tools are still loading.');await PortalBasemaps.restore(config,file);}else portal.setBasemap(v.basemap);}
     portal.setViewMode(v.view3d,false);PortalCRS.set(v.crs);portal.map.jumpTo({center:v.center,zoom:v.zoom,pitch:v.pitch,bearing:v.bearing});
   }
-  function layerStyle(l){return {color:l.color,opacity:l.opacity,visible:l.visible,colorMode:l.colorMode,sourceFilter:l.sourceFilter||'',minArea:l.minArea||0,heightField:l.heightField||null};}
+  function layerStyle(l){return {color:l.color,opacity:l.opacity,visible:l.visible,colorMode:l.colorMode,sourceFilter:l.sourceFilter||'',minArea:l.minArea||0,heightField:l.heightField||null,...(l.colorField?{colorField:l.colorField,colorStops:clone(l.colorStops),colorUnit:l.colorUnit||''}:{})};}
   function currentResearch(){const m=root.PortalModels;if(!m?.enabled||!m.current)return null;return {id:m.current.id,method:m.method,roofOnly:$('#model-roof-only').checked,edges:$('#model-edges').checked,visible:$('#model-visible').checked};}
   function projectName(){return $('#project-name')?.value.trim()||$('#workspace-document')?.textContent||'My building map';}
   async function collect(name=projectName(),options={}){

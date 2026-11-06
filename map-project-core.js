@@ -6,7 +6,10 @@
   const string=(v,max=1000)=>typeof v==='string'&&v.length<=max;
   function https(v){let u;try{u=new URL(v);}catch(e){fail('A saved source has an invalid web address.');}if(u.protocol!=='https:'||u.username||u.password)fail('Saved sources need public HTTPS addresses without credentials.');return u.href;}
   function style(v){
-    if(!object(v)||!/^#[a-f0-9]{6}$/i.test(v.color)||!Number.isFinite(v.opacity)||v.opacity<0||v.opacity>1||typeof v.visible!=='boolean'||!['uniform','source','height','change'].includes(v.colorMode)||!string(v.sourceFilter,500)||!Number.isFinite(v.minArea)||v.minArea<0||v.minArea>1e12||!(v.heightField===null||string(v.heightField,200)))fail('A saved layer has invalid display settings.');
+    if(!object(v)||!/^#[a-f0-9]{6}$/i.test(v.color)||!Number.isFinite(v.opacity)||v.opacity<0||v.opacity>1||typeof v.visible!=='boolean'||!['uniform','source','height','change','metric'].includes(v.colorMode)||!string(v.sourceFilter,500)||!Number.isFinite(v.minArea)||v.minArea<0||v.minArea>1e12||!(v.heightField===null||string(v.heightField,200)))fail('A saved layer has invalid display settings.');
+    if(v.colorField!==undefined&&v.colorField!==null&&(!string(v.colorField,500)||!v.colorField)||v.colorUnit!==undefined&&!string(v.colorUnit,60))fail('A saved layer has invalid display settings.');
+    if(v.colorStops!==undefined&&v.colorStops!==null&&(!Array.isArray(v.colorStops)||v.colorStops.length<2||v.colorStops.length>7||!v.colorStops.every((s,i)=>object(s)&&Number.isFinite(s.value)&&/^#[a-f0-9]{6}$/i.test(s.color)&&(!i||s.value>v.colorStops[i-1].value))||!Number.isFinite(v.colorStops.at(-1).value-v.colorStops[0].value)))fail('A saved layer has invalid display settings.');
+    if(v.colorMode==='metric'&&(!v.colorField||!Array.isArray(v.colorStops)))fail('A saved layer has invalid display settings.');
   }
   const basemapIDs=['light','streets','satellite','dark','topo','terrain','blank','custom'];
   const interfacePanels=['sidebar','attributes','properties','legend','search','navigation','viewMode','scope','dataWorkspace','draw','measure','selection','nativeResults','placeShortcuts','neighborhood','modelCaption','location','welcome','statusbar','mapHints'];

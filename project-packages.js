@@ -23,9 +23,9 @@
  async function exportFull(){return run(async()=>{
   if(!supported())throw Error('Update and pair the local engine to use Project packages.');
   message('Packaging complete native results…');
-  const snapshot=await root.PortalProject.collect(root.PortalProjects.current.name),value=await root.PortalNativeEngine.projectExport(snapshot.project);
+  const project=root.PortalProjects.current,snapshot=await root.PortalProject.collect(project.name),value=await root.PortalNativeEngine.projectExport(snapshot.project);
   message('Project package saved in Results/Packages.',false,' '+value.path);
-  $('[data-package-download]').hidden=false;$('[data-package-download]').dataset.path=value.path;await renderDependencies();return value;
+  $('[data-package-download]').hidden=false;$('[data-package-download]').dataset.path=value.path;await renderDependencies();document.dispatchEvent(new CustomEvent('portal-workflow-output',{detail:{kind:'package',phase:'created',projectId:project.id,revision:project.revision,project:snapshot.project,path:value.path,result:value}}));return value;
  });}
  async function importFull(){return run(async signal=>{
   if(!supported())throw Error('Update and pair the local engine to use Project packages.');

@@ -165,5 +165,90 @@ Summary downloaded. Keep it with your Project.|统计结果已下载，请与 Pr
 The input changed. Repeat the result step before finishing.|输入已发生变化，请重新生成结果后再完成任务。
 Map exported|地图已导出
 Map exported. Return to the guide to review it.|地图已导出，请返回引导检查结果。
+Download buildings for an area|下载指定区域的建筑
+Choose a boundary, load original records and download the exact input.|选择边界、加载原始记录，并下载明确范围内的数据。
+Find buildings that match your needs|查找符合条件的建筑
+Select records by attributes or on the map, then save the selection.|按属性或在地图上选择记录，再保存选择集。
+Explore height and area distributions|查看建筑高度与面积分布
+Create a chart from original fields and download its underlying values.|使用原始字段制作图表，并下载图表使用的数据。
+Compare building data sources|比较建筑数据来源
+Compare two original datasets for the same saved area.|在同一个已保存区域内比较两个原始数据集。
+Check whether your data is suitable|检查数据是否适合使用
+Review missing heights, geometry checks and coverage in a quality report.|通过质量报告检查高度缺失、几何和覆盖情况。
+Summarize buildings by area|按区域汇总建筑
+Count buildings and summarize supplied heights for each boundary.|为每个边界区域统计建筑数量和已有高度。
+Combine building files|合并建筑文件
+Merge original datasets, review fields and keep duplicates visible.|合并原始数据集、核对字段，并明确保留重复记录。
+Hand a Project to a teammate|将 Project 交接给同事
+Check dependencies and export a Project file or a complete local package.|检查数据依赖，并导出 Project 文件或完整的本地数据包。
+All goals|全部目标
+Get data|获取数据
+Analyze buildings|分析建筑
+Check & compare|检查与比较
+Map & share|制图与分享
+Data quality report|数据质量报告
+Choose the Project|选择 Project
+Check dependencies|检查数据依赖
+Export a handoff|导出交接成果
+Review the handoff|检查交接成果
+Select and save records|选择并保存记录
+Choose files and merge|选择文件并合并
+Choose zones and summarize|选择分区并汇总
+Choose the records you want to download. Open the normal Download data tool, choose a format, and save the file.|选择要下载的记录。打开常用的“下载数据”工具，选择格式，然后保存文件。
+Open the attribute table to verify the original fields and record count. Keep the download together with its coverage notes.|打开属性表，核对原始字段和记录数。请将下载的数据与覆盖说明一起保存。
+Open Select by attribute, Box selection or Polygon selection. These normal tools search the complete fixed workset. Save matching records to a new layer or download the selection.|打开“按属性选择”“框选”或“多边形选择”。这些常用工具使用完整的固定分析数据集。将符合条件的记录保存为新图层，或下载选择集。
+Inspect the selected records and their original attributes. Single-feature focus and batch selection remain separate.|检查选中记录及其原始属性。单个要素高亮与批量选择集分别管理。
+Open the normal Charts tool. Choose an original field and chart type, then generate the chart. Missing values remain missing.|打开常用的“图表”工具。选择原始字段和图表类型，然后生成图表。缺失值保持缺失。
+Read the axis labels, units, input count and missing values. Download the chart image or underlying values from the same Charts tool.|检查坐标轴标签、单位、输入记录数和缺失值。使用同一个“图表”工具下载图片或图表数据。
+Open Compare sources. Choose a second original workset and the same saved study area, then run the comparison.|打开“比较来源”。选择第二个原始分析数据集和同一个已保存研究区域，然后执行比较。
+Review the actual input identities, record counts, source dates, measurement methods and coverage. Download the comparison receipt.|检查实际输入数据、记录数、来源日期、测量方法和覆盖情况。下载比较记录。
+Open Merge layers, select at least two original inputs, review their fields and record scope, then run. Browser and local tasks use the normal processing tool.|打开“合并图层”，选择至少两个原始输入，核对字段和记录范围，然后执行。浏览器和本地任务使用同一个常用处理工具。
+Choose the completed Merge task and inspect its result. Merge appends records; overlapping or duplicate buildings remain unless you explicitly run a separate check.|选择已完成的 Merge 任务并检查结果。Merge 会追加记录；重叠或重复建筑会保留，需要另行检查。
+Open Data quality report. Choose the ID and height fields and run the available checks on the original records.|打开“数据质量报告”。选择 ID 和高度字段，并对原始记录执行可用检查。
+Review each check and its method. Not checked is different from zero problems. Download the report and keep the source coverage notes.|逐项检查结果及其方法。“未检查”不表示没有问题。请下载报告，并保留来源覆盖说明。
+Open Summarize by area. Choose a polygon boundary layer and run the summary. Whole buildings intersecting a zone are counted in that zone.|打开“按区域汇总”。选择多边形边界图层并执行汇总。与某分区相交的完整建筑会计入该分区。
+Inspect the new boundary layer and table. Buildings crossing boundaries can count in more than one zone; summed zone counts can exceed the unique input count.|检查新的边界图层和属性表。跨界建筑可能计入多个分区，因此各分区数量之和可能超过输入中的独立建筑数。
+Use the normal Project dependencies tool to verify native files and package complete results. With no native dependencies, downloading a Project file is enough.|使用常用的“Project 数据依赖”工具校验本地文件，并打包完整结果。如果没有本地引擎数据依赖，可直接下载 Project 文件。
+Check the exported Project or package, its source dependencies, and the instructions for opening it on the receiving computer. Public basemaps and remote data still need internet access.|检查导出的 Project 或数据包、来源依赖，以及在接收电脑上打开的说明。公共底图和远程数据仍然需要联网访问。
+Open Projects and confirm the map you want to hand over. Use the current Project when you are ready.|打开 Projects，确认要交接的地图。准备好后，选择使用当前 Project。
+The handoff belongs to this Project and its current map settings.|交接成果对应此 Project 和当前地图设置。
+Open Project dependencies. Check which original files are local and which sources remain online.|打开“Project 数据依赖”，检查哪些原始文件保存在本地，哪些来源仍需联网访问。
+A preview does not contain the full native result. A complete package carries local result files.|预览不包含完整的本地结果。完整数据包会包含本地结果文件。
+A Project file preserves an editable map. Native dependencies need a full package or verified files on the receiving computer.|Project 文件保留可继续编辑的地图。本地引擎数据依赖需要完整数据包，或接收电脑上经过校验的文件。
+Creating a package is confirmed only after the complete files have been verified and written.|完整文件经过校验并写入后，才会确认数据包已创建。
+Save the editable Project and keep the exported handoff with its source notes.|保存可编辑的 Project，并将导出的交接成果与来源说明一起保留。
+Guide progress is separate from the Project. The receiving computer can open the Project file or verify and restore the package.|引导进度与 Project 分别管理。接收电脑可以打开 Project 文件，或校验并恢复数据包。
+Save one study area for both sources before comparing them.|比较前，请为两个来源保存同一个研究区域。
+Current Project|当前 Project
+I have checked the dependencies|我已检查数据依赖
+Use current Project|使用当前 Project
+Opening processing or creating a plan does not create a result. Run the task, then choose its completed result.|打开处理工具或创建计划并不会生成结果。请执行任务，然后选择已完成的结果。
+Use the tool to produce a result before continuing.|请先使用工具生成结果，再继续。
+Merge result|Merge 结果
+Choose the completed Merge result|选择已完成的 Merge 结果
+This processing task used a different input. Choose the task for this workset and record scope.|此处理任务使用了不同的输入。请选择与当前分析数据集和记录范围相符的任务。
+Choose an analysis workset.|请选择固定分析数据集。
+Result ready. Return to the guide to review it.|结果已生成，请返回引导检查。
+Download selected records|下载选中记录
+Inspect result records|检查结果记录
+Open result tool|打开结果工具
+Download result data|下载结果数据
+Use a complete Project package for native result files.|包含本地引擎结果文件时，请使用完整的 Project 数据包。
+Complete Project package created|完整 Project 数据包已创建
+Project file downloaded|Project 文件已下载
+Data file downloaded|数据文件已下载
+Selected records downloaded|选中记录已下载
+Chart generated|图表已生成
+Source comparison complete|来源比较已完成
+Data quality report ready|数据质量报告已生成
+Area summary layer created|区域汇总图层已创建
+These buttons open the same tools used by the toolbar and layer menus.|这些按钮与工具栏、图层菜单中的功能使用同一个入口。
+Goal categories|目标类别
+Back|返回
+Saved selection result|已保存的选择集结果
+Choose the completed selection result|选择已完成的选择集结果
+Numeric field|数值字段
+No numeric value|没有可用数值
+Colors show the selected numeric field. Missing or text values use gray.|颜色表示所选数值字段；缺失值或文本值显示为灰色。
 `.trim().split('\n')){const i=line.indexOf('|');if(i>0)dictionary[line.slice(0,i)]=line.slice(i+1);}
 })();

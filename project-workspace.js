@@ -18,7 +18,7 @@
     const map = portal.map, center = map.getCenter(), round = value => Number(value.toFixed(7));
     return JSON.stringify({ name, camera: [center.lng, center.lat, map.getZoom(), map.getPitch(), map.getBearing()].map(round), basemap: portal.getBasemap(), customBasemap: root.PortalBasemaps?.current().config || null, basemapFile: root.PortalBasemaps?.current().file ? objectID(PortalBasemaps.current().file) : null, interface: root.PortalInterface?.getState() || null, view3d: portal.view3d, crs: PortalCRS.get(),
       active: PortalLayers.active?.id || null,
-      layers: Array.from(PortalLayers.layers.values(), l => ({ id: l.id, name: l.cfg.name, visible: l.visible, color: l.color, opacity: l.opacity, mode: l.colorMode, filter: l.sourceFilter || '', area: l.minArea || 0, height: l.heightField || null, releaseRef:l.cfg.releaseRef||null,sourceRelease:releaseIdentity(l),data: l.cfg.type === 'geojson' ? objectID(l.data) : null, dataScope: l.cfg.type === 'geojson' ? [l.data?.provenance?.workspaceArea?.active||false,l.data?.provenance?.workspaceActiveWorkset||false] : null })),
+      layers: Array.from(PortalLayers.layers.values(), l => ({ id: l.id, name: l.cfg.name, visible: l.visible, color: l.color, opacity: l.opacity, mode: l.colorMode, filter: l.sourceFilter || '', area: l.minArea || 0, height: l.heightField || null, metric:l.colorField?[l.colorField,l.colorStops,l.colorUnit]:null, releaseRef:l.cfg.releaseRef||null,sourceRelease:releaseIdentity(l),data: l.cfg.type === 'geojson' ? objectID(l.data) : null, dataScope: l.cfg.type === 'geojson' ? [l.data?.provenance?.workspaceArea?.active||false,l.data?.provenance?.workspaceActiveWorkset||false] : null })),
       models: root.PortalLocalModels?.serializeModelEntries() || [],
       research: root.PortalModels?.enabled && PortalModels.current ? { id: PortalModels.current.id, method: PortalModels.method, edges: $('#model-edges').checked, roof: $('#model-roof-only').checked, visible: $('#model-visible').checked } : null,
       legend: document.body.classList.contains('legend-visible'), layout: PortalComposer.projectOptions(), dataPolicy: root.PortalProject?.getDataPolicy?.() || 'latest'
@@ -89,7 +89,7 @@
   async function exportCurrent() {
     if (root.PortalReadOnlyMode || busy || !ready) return false;
     setBusy(true); message('Preparing project file…');
-    try { update(); const result = await capture(active, active.revision, dirty || active.revision === 0); saveFile(active.name, result.json); message('Project file downloaded. Send it to a teammate to open the same map.'); return result; }
+    try { update(); const result = await capture(active, active.revision, dirty || active.revision === 0); saveFile(active.name, result.json); message('Project file downloaded. Send it to a teammate to open the same map.');document.dispatchEvent(new CustomEvent('portal-workflow-output',{detail:{kind:'project-file',phase:'downloaded',projectId:result.project.projectInfo?.id||active.id,revision:result.project.projectInfo?.revision||active.revision,name:active.name,project:result.project}})); return result; }
     catch (error) { message(error.message, true); return false; }
     finally { setBusy(false); }
   }

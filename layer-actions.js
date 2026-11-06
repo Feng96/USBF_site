@@ -2,7 +2,7 @@
    never grant original-data capabilities. Actions always receive a layer ID. */
 (function(root){
  'use strict';
- const labels={table:'Attribute table',processing:'Geoprocessing',statistics:'Statistics',chart:'Charts',export:'Download data','load-data':'Load analyzable data',compare:'Compare sources',style:'Layer style',rename:'Rename layer',zoom:'Zoom to layer',up:'Move up',down:'Move down',duplicate:'Duplicate layer',extent:'Create layer extent',remove:'Remove layer',details:'Details',retry:'Retry',refresh:'Refresh data'};
+ const labels={quality:'Data quality report',zones:'Summarize by area',table:'Attribute table',processing:'Geoprocessing',statistics:'Statistics',chart:'Charts',export:'Download data','load-data':'Load analyzable data',compare:'Compare sources',style:'Layer style',rename:'Rename layer',zoom:'Zoom to layer',up:'Move up',down:'Move down',duplicate:'Duplicate layer',extent:'Create layer extent',remove:'Remove layer',details:'Details',retry:'Retry',refresh:'Refresh data'};
  const aliases={'zoom-layer':'zoom','rename-layer':'rename','duplicate-layer':'duplicate','extent-layer':'extent','layer-up':'up','layer-down':'down','remove-layer':'remove','native-table':'table','native-process':'processing',stats:'statistics',data:'load-data',load:'load-data',original:'load-data','load-range':'load-data'};
  const ids=Object.freeze(Object.keys(labels)),management=Object.freeze(['zoom','style','rename','duplicate','extent','up','down','details','refresh','retry','remove']);
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -24,6 +24,13 @@
     if(native){require(nativeReady,nativeConnection);scope='native-result';}
     if(native&&id==='statistics')require(!!engine?.information?.capabilities?.resultSummary,'Update and pair the local engine to summarize full results.');
     if(id==='chart'&&native)require(!!engine?.information?.capabilities?.resultCharts,'Update the local engine to chart complete native results.');
+   }
+   if(['quality','zones'].includes(id)){
+    const capability=root.PortalStudyReports?.capability?.(layer,id);
+    require(ready||native,preview||raster||cap.attributePreview?display:fixed);
+    require(!!root.PortalStudyReports,'The data report tools are still loading.');
+    if(native){require(nativeReady,nativeConnection);scope='native-result';}
+    if(capability)require(capability.enabled,capability.reason);
    }
    if(id==='table'){
     require(!raster,'Raster display layers do not supply vector records.');
@@ -59,9 +66,16 @@
   }).join('');
  }
  function settings(layer,field){const row=root.document?.querySelector('[data-added-row="'+layer.id+'"]'),details=row?.querySelector('.layer-details');if(details)details.open=true;const input=row?.querySelector(field);input?.focus();if(field==='[data-added-name]')input?.select();return row;}
+ function recordMode(options){
+  const value=options.mode??options.scope;if(value===undefined)return null;
+  const mode=root.PortalDataWorkspace?.normalize?root.PortalDataWorkspace.normalize(value):value==='layer'?'all':value;
+  if(!['all','selection','area'].includes(mode))throw Error('Map view is a display extent. Save it as a study area before analysis.');return mode;
+ }
+ function output(detail){root.document?.dispatchEvent?.(new CustomEvent('portal-workflow-output',{detail:{projectId:root.PortalProjects?.current?.id||null,...detail}}));}
+ function stillCurrent(layer,data,ref){if(root.PortalLayers.layers.get(layer.id)!==layer||layer.data!==data||JSON.stringify(layer.cfg.nativeSource||null)!==ref)throw Error('The input data changed. Choose it again.');}
  async function run(name,value,options={}){
   const id=canonical(name),layer=resolve(value),action=get(layer,id);if(!action)throw Error('Unknown layer operation.');if(!action.enabled)throw Error(action.reason);
-  const L=root.PortalLayers; // Recheck membership before every operation, including legacy aliases.
+  const L=root.PortalLayers,mode=recordMode(options); // Recheck membership before every operation, including legacy aliases.
   if(id==='zoom')return L.zoom(layer);
   if(id==='up'||id==='down')return L.reorder(layer.id,id);
   if(id==='remove')return L.remove(layer.id);
@@ -70,23 +84,35 @@
   if(id==='style')return layer.rasterResource?root.PortalImport.styleRaster(layer):settings(layer,root.PortalLayers.isRaster(layer)?'[data-added-opacity]':'[data-added-color]');
   if(id==='refresh')return layer.checkUpdates();
   if(id==='load-data')return root.PortalDataWorkspace.open({layer,intent:options.intent});
-  if(id==='compare')return root.PortalSourceComparison.open({layer});
+  if(id==='compare')return root.PortalSourceComparison.open({layer,...(mode?{mode}:{}),...(options.resume?{resume:true}:{})});
+  if(id==='quality'||id==='zones')return root.PortalStudyReports.open(id,{layerId:layer.id,mode:mode||root.PortalDataWorkspace.defaultMode(layer),resume:!!options.resume});
   if(id==='table'){
+   if(mode){
+    const data=layer.data,ref=JSON.stringify(layer.cfg.nativeSource||null);
+    if(layer.cfg.nativeSource){const selected=await root.PortalDataWorkspace.nativeScope(layer,mode);stillCurrent(layer,data,ref);return root.PortalTasks.openNativeTable(layer,{...options,selectedOnly:false,fixedSelectionId:selected.selectionId||null,fixedScopeLabel:selected.label});}
+    const records=await root.PortalDataWorkspace.records(layer,mode);stillCurrent(layer,data,ref);return root.PortalInventory.openTable(layer.id,{...options,scope:'loaded',records});
+   }
    if(layer.cfg.nativeSource)return root.PortalTasks.openNativeTable(layer,options);
    if(root.PortalInventory.openTable(layer.id,{scope:'loaded',...options}))return true;
    L.selectLayer(layer.id);const panel=root.document?.querySelector('#attribute-table');if(panel?.hidden)root.PortalInventory.toggleTable();else root.PortalInventory.refresh();return true;
   }
-  if(id==='processing'){L.selectLayer(layer.id);return root.PortalGIS.open(options.operation||'extract-mask');}
-  if(id==='statistics'&&layer.cfg.nativeSource){L.selectLayer(layer.id);return root.PortalTaskGuides.open('count',{layerId:layer.id,mode:options.mode||options.scope||'all'});}
-  if(id==='statistics'||id==='chart')return root.PortalAnalysis.open(id==='statistics'?'stats':'chart',{layerId:layer.id,...options});
+  if(id==='processing'){L.selectLayer(layer.id);const value=root.PortalGIS.open(options.operation||'extract-mask');if(mode)root.PortalGIS.setInputMode?.(mode);return value;}
+  if(id==='statistics'&&layer.cfg.nativeSource){L.selectLayer(layer.id);return root.PortalTaskGuides.open('count',{layerId:layer.id,mode:mode||'all'});}
+  if(id==='statistics'||id==='chart')return root.PortalAnalysis.open(id==='statistics'?'stats':'chart',{layerId:layer.id,...options,...(mode?{scope:mode==='all'?'layer':mode}:{})});
   if(id==='export'){
-   if(layer.cfg.nativeSource)return root.PortalNativeEngine.download(layer.cfg.nativeSource.jobId,options.format||'parquet',options);
+   if(layer.cfg.nativeSource){
+    const data=layer.data,ref=JSON.stringify(layer.cfg.nativeSource),areaData=mode==='area'?root.PortalDataWorkspace.area()?.data:null,projectId=root.PortalProjects?.current?.id||null;
+    const selected=mode?await root.PortalDataWorkspace.nativeScope(layer,mode):null;stillCurrent(layer,data,ref);
+    const format=options.format||'parquet',selectionId=selected?.selectionId||options.selectionId||null;
+    const value=await root.PortalNativeEngine.download(layer.cfg.nativeSource.jobId,format,{...options,selectionId});if(value===false)return false;
+    output({kind:'data',phase:'downloaded',projectId,layerId:layer.id,mode:mode||(selectionId?'selection':'all'),format,sourceData:data,nativeSource:JSON.parse(ref),selectionId,areaData,records:selected?.count??layer.cfg.nativeSource.recordCount});return value;
+   }
    if(layer.cfg.originalFile&&!root.PortalDataWorkspace.ready(layer)){const file=layer.cfg.originalFile,url=root.URL.createObjectURL(file),a=root.document.createElement('a');a.href=url;a.download=file.name||layer.cfg.name;a.click();root.setTimeout(()=>root.URL.revokeObjectURL(url),1000);return;}
-   L.selectLayer(layer.id);if(options.format==='geojson')return L.exportLayer(layer);return root.PortalComposer.open('download');
+   L.selectLayer(layer.id);if(options.format==='geojson'&&!mode)return L.exportLayer(layer);return root.PortalComposer.open('download',{layerId:layer.id,...(mode?{scope:mode}:{})});
   }
-  if(id==='retry'){const cfg={...layer.cfg},style={restore:true,allowDuplicate:true,visible:layer.visible,opacity:layer.opacity,colorMode:layer.colorMode,sourceFilter:layer.sourceFilter,minArea:layer.minArea,heightField:layer.heightField};L.remove(layer.id);return L.add(cfg,style);}
+  if(id==='retry'){const cfg={...layer.cfg},style={restore:true,allowDuplicate:true,visible:layer.visible,opacity:layer.opacity,colorMode:layer.colorMode,sourceFilter:layer.sourceFilter,minArea:layer.minArea,heightField:layer.heightField,...(layer.colorField?{colorField:layer.colorField,colorStops:layer.colorStops,colorUnit:layer.colorUnit}:{} )};L.remove(layer.id);return L.add(cfg,style);}
   if(id==='duplicate'){
-   const cfg=layer.cfg,style={restore:true,allowDuplicate:true,visible:layer.visible,opacity:layer.opacity,colorMode:layer.colorMode,sourceFilter:layer.sourceFilter,minArea:layer.minArea,heightField:layer.heightField};
+   const cfg=layer.cfg,style={restore:true,allowDuplicate:true,visible:layer.visible,opacity:layer.opacity,colorMode:layer.colorMode,sourceFilter:layer.sourceFilter,minArea:layer.minArea,heightField:layer.heightField,...(layer.colorField?{colorField:layer.colorField,colorStops:layer.colorStops,colorUnit:layer.colorUnit}:{} )};
    const copy=cfg.type==='geojson'?await L.addGeoJSON(cfg.name+' · copy',root.PortalGISCore.clone(layer.data),{...cfg,id:undefined,color:layer.color},style):await L.add({...cfg,color:layer.color,type:cfg.type==='raster-pmtiles'?'pmtiles':cfg.type,name:cfg.name+' · copy'},style);
    if(copy){root.PortalDraw?.restoreLayerLabels(copy);if(cfg.nativeSource&&root.PortalNativeResults?.supported(copy))await root.PortalNativeResults.attach(copy);}return copy;
   }

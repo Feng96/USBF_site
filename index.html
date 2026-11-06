@@ -31,7 +31,8 @@
   <script defer src="i18n-design-zh.js?v=1.10-design"></script>
   <script defer src="i18n-tasks-zh.js?v=1.12.2-native-map"></script>
   <script defer src="i18n-sharing-zh.js?v=1.11-engine"></script>
-  <script defer src="i18n-workflows-zh.js?v=1.16-guided-tasks"></script>
+  <script defer src="i18n-workflows-zh.js?v=1.17-workflows"></script>
+  <script defer src="i18n-study-reports-zh.js?v=1.17-workflows"></script>
   <script defer src="i18n-data-sources-zh.js?v=1.13-unified"></script>
   <script defer src="i18n-layer-actions-zh.js?v=1.13-unified"></script>
   <script defer src="i18n-comparison-zh.js?v=1.14-analysis"></script>
@@ -47,10 +48,10 @@
   <script defer src="release-registry.js?v=1.12-results"></script>
   <script defer src="usbf-source.js?v=1.12-results"></script>
   <script defer src="public-sources.js?v=1.13-unified"></script>
-  <script defer src="map-legend.js?v=1.12-results"></script>
+  <script defer src="map-legend.js?v=1.17-workflows"></script>
   <script defer src="source-features.js?v=1.3"></script>
-  <script defer src="data-manager.js?v=1.15-linked-records"></script>
-  <script defer src="inventory.js?v=1.15-linked-records"></script>
+  <script defer src="data-manager.js?v=1.17-workflows"></script>
+  <script defer src="inventory.js?v=1.17-workflows"></script>
   <script defer src="data-import.js?v=1.6.3-purpose"></script>
   <script defer src="buildings-explorer.js?v=1.14.3-optional-data"></script>
   <script defer src="analysis-data.js?v=1.11-engine"></script>
@@ -62,26 +63,27 @@
   <script defer src="gis-core.js?v=1.8-scope"></script>
   <script defer src="gis-range.js?v=1.12-results"></script>
   <script defer src="gis-selection.js?v=1.12-results"></script>
-  <script defer src="native-result-map.js?v=1.15-linked-records"></script>
+  <script defer src="native-result-map.js?v=1.17-workflows"></script>
   <script defer src="gis-workspace.js?v=1.13-unified"></script>
   <script defer src="data-workspace.js?v=1.14-analysis"></script>
-  <script defer src="layer-actions.js?v=1.14-analysis"></script>
+  <script defer src="layer-actions.js?v=1.17-workflows"></script>
   <script defer src="source-building-matches.js?v=1.14-analysis"></script>
-  <script defer src="source-comparison.js?v=1.14-analysis"></script>
-  <script defer src="analysis-ui.js?v=1.14-analysis"></script>
-  <script defer src="map-composer.js?v=1.16-guided-tasks"></script>
+  <script defer src="source-comparison.js?v=1.17-workflows"></script>
+  <script defer src="analysis-ui.js?v=1.17-workflows"></script>
+  <script defer src="map-composer.js?v=1.17-workflows"></script>
   <script defer src="workspace-tools.js?v=1.4-ui"></script>
-  <script defer src="map-project-core.js?v=1.12-results"></script>
+  <script defer src="map-project-core.js?v=1.17-workflows"></script>
   <script defer src="map-share-core.js?v=1.11-engine"></script>
   <script defer src="shared-map.js?v=1.11-engine"></script>
   <script defer src="project-store.js?v=1.11-engine"></script>
-  <script defer src="map-project.js?v=1.11-engine"></script>
+  <script defer src="map-project.js?v=1.17-workflows"></script>
   <script defer src="readonly-viewer.js?v=1.11-engine"></script>
   <script defer src="local-files.js?v=1.12-results"></script>
   <script defer src="local-cache.js?v=1.11-engine"></script>
-  <script defer src="project-workspace.js?v=1.12-results"></script>
-  <script defer src="project-packages.js?v=1.12-results"></script>
-  <script defer src="task-guides.js?v=1.16-guided-tasks"></script>
+  <script defer src="project-workspace.js?v=1.17-workflows"></script>
+  <script defer src="project-packages.js?v=1.17-workflows"></script>
+  <script defer src="study-reports.js?v=1.17-workflows"></script>
+  <script defer src="task-guides.js?v=1.17-workflows"></script>
   <script defer src="map-share.js?v=1.11-engine"></script>
   <script defer src="device-settings.js?v=1.14-analysis"></script>
   <script defer src="app.js?v=1.14.3-optional-data"></script>
@@ -102,7 +104,8 @@
   <link rel="stylesheet" href="map-project.css?v=1.12-results">
   <link rel="stylesheet" href="device-settings.css?v=1.12-results">
   <link rel="stylesheet" href="native-result-map.css?v=1.12-results">
-  <link rel="stylesheet" href="task-guides.css?v=1.16-guided-tasks">
+  <link rel="stylesheet" href="task-guides.css?v=1.17-workflows">
+  <link rel="stylesheet" href="study-reports.css?v=1.17-workflows">
   <link rel="stylesheet" href="task-center.css?v=1.15-linked-records">
   <link rel="stylesheet" href="map-share.css?v=1.11-engine">
   <link rel="stylesheet" href="readonly-viewer.css?v=1.11-engine">
@@ -133,7 +136,7 @@
         <div class="toolbar-menu-section" role="presentation" data-i18n>Selected records</div><button data-gis-action="selection-table" data-i18n>Selected records table</button><button data-gis-action="zoom-selection" data-i18n>Zoom to selection</button><button data-gis-action="export-selected-geojson" data-i18n>Export selected GeoJSON</button><button data-gis-action="export-selected-csv" data-i18n>Export selected CSV</button><button data-gis-action="selected-new" data-i18n>Add selected to new layer</button><button data-gis-action="unselected-new" data-i18n>Extract unselected records</button>
       </div></details>
       <details class="tools-menu toolbar-dropdown" id="workspace-tools-menu" data-toolbar-menu="analysis"><summary class="tool" id="toolbar-analysis-trigger" aria-expanded="false" aria-controls="toolbar-analysis-menu" aria-haspopup="menu"><span data-i18n>Analysis</span></summary><div class="tools-popover toolbar-popover" id="toolbar-analysis-menu" role="menu" aria-labelledby="toolbar-analysis-trigger">
-        <button data-workspace-tool="statistics" data-layer-action="statistics" data-i18n>Statistics</button><button data-workspace-tool="chart" data-layer-action="chart" data-i18n>Charts</button><button data-source-comparison data-i18n>Compare sources</button><button data-workspace-tool="analysis" data-i18n>Overlay &amp; area summaries</button>
+        <button data-workspace-tool="statistics" data-layer-action="statistics" data-i18n>Statistics</button><button data-workspace-tool="chart" data-layer-action="chart" data-i18n>Charts</button><button data-source-comparison data-i18n>Compare sources</button><button data-layer-action="quality" data-i18n>Data quality report</button><button data-layer-action="zones" data-i18n>Summarize by area</button><button data-workspace-tool="analysis" data-i18n>Overlay &amp; area summaries</button>
         <div class="toolbar-menu-section" role="presentation" data-i18n>Geoprocessing</div><button data-gis-action="extract-box" data-i18n>Extract by box</button><button data-gis-action="extract-mask" data-i18n>Extract by mask</button><button data-gis-action="clip" data-i18n>Clip outlines</button><button data-gis-action="erase" data-i18n>Erase by mask</button><button data-gis-action="merge" data-i18n>Merge layers</button><button data-gis-action="dissolve" data-i18n>Dissolve polygons</button><button data-gis-action="buffer" data-i18n>Buffer</button><button data-gis-action="measure" data-i18n>Add area and boundary length</button><button data-gis-action="centroid" data-i18n>Create center points</button><button data-gis-action="singlepart" data-i18n>Multipart to singlepart</button><button data-gis-action="deduplicate" data-i18n>Remove exact duplicates</button>
       </div></details>
       <details class="tools-menu toolbar-dropdown" data-toolbar-menu="layer"><summary class="tool" id="toolbar-layer-trigger" aria-expanded="false" aria-controls="toolbar-layer-menu" aria-haspopup="menu"><span data-i18n>Layer</span></summary><div class="tools-popover toolbar-popover" id="toolbar-layer-menu" role="menu" aria-labelledby="toolbar-layer-trigger">

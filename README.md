@@ -15,14 +15,23 @@ one complete geometry by their exact result-row identity, including records
 beyond the preview. Stale requests and records without usable geometry cannot
 move the map. The Map action column is separate from original data and exports.
 
-Start a task now offers five guided steps for counts, height summaries, Buffer
-results and map exports. Each step explains its purpose, shows the actual state
-and opens an existing tool. A floating Continue task entry preserves progress
-while tools are open. Display-only data can be used for map design; analytical
-goals require fixed original records. Results, exports and Project saves are
-confirmed from successful operations, with explicit human review of coverage.
-Guide progress and summary values are session-only; summary downloads and
-Project files are separate outputs. Switching Projects resets guide progress.
+Start a task offers twelve goals grouped by getting data, analysis, checks and
+sharing. Every step opens the same action registry or public tool API as normal
+menus, with explicit layer and record scope. New goals cover area downloads,
+selection, charts, source comparison, Merge, Project handoffs, quality reports and
+zonal summaries. Successful operations drive completion; opening tools does not.
+Quality reports distinguish checked, invalid and not-checked records. Browser
+checks preserve raw attributes; native duplicate-ID and duplicate-geometry checks
+are explicitly unavailable. Zonal summaries read full original records, count
+whole intersecting buildings in every matching zone, and report density per km².
+Crossing buildings can count in multiple zones. The resulting layer defaults to
+Numeric field colors for density. The same numeric-field setting is available
+for complete GeoJSON layers; finite JSON numbers, including zero and negative
+values, use the shared map/PNG/PDF legend, while other values use a missing color.
+Project files preserve the field, unit and stops. Both tools expose JSON/CSV
+reports and use existing native APIs without changing the engine release.
+Guide progress remains session-only. Summary downloads and Project files are
+separate outputs; a handoff with native dependencies requires a complete package.
 
 Map feature clicks and table rows share one current focus. An open browser
 attribute table follows the matching source object through sorting and paging;
