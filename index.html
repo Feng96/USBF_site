@@ -31,7 +31,7 @@
   <script defer src="i18n-design-zh.js?v=1.10-design"></script>
   <script defer src="i18n-tasks-zh.js?v=1.12.2-native-map"></script>
   <script defer src="i18n-sharing-zh.js?v=1.11-engine"></script>
-  <script defer src="i18n-workflows-zh.js?v=1.12-results"></script>
+  <script defer src="i18n-workflows-zh.js?v=1.16-guided-tasks"></script>
   <script defer src="i18n-data-sources-zh.js?v=1.13-unified"></script>
   <script defer src="i18n-layer-actions-zh.js?v=1.13-unified"></script>
   <script defer src="i18n-comparison-zh.js?v=1.14-analysis"></script>
@@ -69,7 +69,7 @@
   <script defer src="source-building-matches.js?v=1.14-analysis"></script>
   <script defer src="source-comparison.js?v=1.14-analysis"></script>
   <script defer src="analysis-ui.js?v=1.14-analysis"></script>
-  <script defer src="map-composer.js?v=1.12.2-native-map"></script>
+  <script defer src="map-composer.js?v=1.16-guided-tasks"></script>
   <script defer src="workspace-tools.js?v=1.4-ui"></script>
   <script defer src="map-project-core.js?v=1.12-results"></script>
   <script defer src="map-share-core.js?v=1.11-engine"></script>
@@ -81,7 +81,7 @@
   <script defer src="local-cache.js?v=1.11-engine"></script>
   <script defer src="project-workspace.js?v=1.12-results"></script>
   <script defer src="project-packages.js?v=1.12-results"></script>
-  <script defer src="task-guides.js?v=1.13-unified"></script>
+  <script defer src="task-guides.js?v=1.16-guided-tasks"></script>
   <script defer src="map-share.js?v=1.11-engine"></script>
   <script defer src="device-settings.js?v=1.14-analysis"></script>
   <script defer src="app.js?v=1.14.3-optional-data"></script>
@@ -102,7 +102,7 @@
   <link rel="stylesheet" href="map-project.css?v=1.12-results">
   <link rel="stylesheet" href="device-settings.css?v=1.12-results">
   <link rel="stylesheet" href="native-result-map.css?v=1.12-results">
-  <link rel="stylesheet" href="task-guides.css?v=1.12-results">
+  <link rel="stylesheet" href="task-guides.css?v=1.16-guided-tasks">
   <link rel="stylesheet" href="task-center.css?v=1.15-linked-records">
   <link rel="stylesheet" href="map-share.css?v=1.11-engine">
   <link rel="stylesheet" href="readonly-viewer.css?v=1.11-engine">
@@ -180,7 +180,7 @@
         <div id="model-map-caption" class="model-map-caption" hidden><span id="model-map-kind">Experimental LoD2</span><strong id="model-map-name"></strong><button id="model-fit" data-i18n>Fit model</button><button id="close-model-view" aria-label="Return to footprint map">×</button></div>
         <div class="map-controls" aria-label="Map navigation"><button data-action="zoom-in" aria-label="Zoom in" data-i18n-aria-label><span data-icon="plus"></span></button><button data-action="zoom-out" aria-label="Zoom out" data-i18n-aria-label><span data-icon="minus"></span></button><span></span><button data-action="home" aria-label="Fit visible data layers" title="Fit visible data layers"><span data-icon="home"></span></button><button data-action="north" aria-label="North up" title="Map is north up"><span class="north-arrow">N<i></i></span></button></div>
         <div class="map-mode"><span class="mode-label" data-i18n>MAP VIEW</span><button id="mode-2d" class="active" data-action="view-2d" aria-pressed="true">2D</button><button id="mode-3d" data-action="view-3d" aria-pressed="false" title="Tilt the map and show available height or roof models">3D <span class="tiny-dot"></span></button></div>
-        <section class="welcome-card inventory-welcome" id="welcome-card" aria-label="Workspace introduction"><button class="icon-button close-welcome" data-action="close-welcome" aria-label="Dismiss introduction"><span data-icon="close"></span></button><h2>U.S. building inventory</h2><p data-i18n>Explore our published USBF inventory, compare public datasets and view experimental roof models.</p><div class="provider-tag">USBF · live from Source Cooperative</div><p id="usbf-publication" data-i18n>Checking the latest publication…</p><button class="primary-button" data-place="Washington, DC" data-i18n>Explore Washington, DC →</button><button class="text-button" data-open-models data-i18n>Browse 3D research samples →</button><button class="text-button demo-link" data-action="sample" hidden data-i18n>Synthetic UI sample</button><span id="feature-count" hidden></span></section>
+        <section class="welcome-card inventory-welcome" id="welcome-card" aria-label="Workspace introduction"><button class="icon-button close-welcome" data-action="close-welcome" aria-label="Dismiss introduction"><span data-icon="close"></span></button><h2>U.S. building inventory</h2><p data-i18n>Explore our published USBF inventory, compare public datasets and view experimental roof models.</p><div class="provider-tag">USBF · live from Source Cooperative</div><p id="usbf-publication" data-i18n>Checking the latest publication…</p><button class="primary-button" data-task-guides data-i18n>Start a task</button><button class="text-button" data-place="Washington, DC" data-i18n>Explore Washington, DC →</button><button class="text-button" data-open-models data-i18n>Browse 3D research samples →</button><button class="text-button demo-link" data-action="sample" hidden data-i18n>Synthetic UI sample</button><span id="feature-count" hidden></span></section>
         <div class="legend-card" id="legend-card" hidden><button class="legend-title" data-action="legend" aria-expanded="true" data-i18n>Legend <span data-icon="chevron-down"></span></button><div class="legend-body"><div><i class="legend-swatch unchanged"></i><span data-i18n>Illustrative unchanged</span></div><div><i class="legend-swatch modified"></i><span data-i18n>Illustrative modified</span></div><p data-i18n>Synthetic shapes · not real buildings</p></div></div>
         <div id="measure-card" class="measure-card" hidden><span data-icon="ruler"></span><span id="measure-text" data-i18n-system>Click the map to start measuring</span><button data-action="clear-measure" title="Clear measurement" aria-label="Clear measurement"><span data-icon="close"></span></button></div>
         <div class="map-bottom-note"><span data-icon="mouse"></span><span id="tool-hint" data-i18n-system>Drag to explore · Scroll to zoom · Click a building to inspect</span></div>

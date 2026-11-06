@@ -15,6 +15,15 @@ one complete geometry by their exact result-row identity, including records
 beyond the preview. Stale requests and records without usable geometry cannot
 move the map. The Map action column is separate from original data and exports.
 
+Start a task now offers five guided steps for counts, height summaries, Buffer
+results and map exports. Each step explains its purpose, shows the actual state
+and opens an existing tool. A floating Continue task entry preserves progress
+while tools are open. Display-only data can be used for map design; analytical
+goals require fixed original records. Results, exports and Project saves are
+confirmed from successful operations, with explicit human review of coverage.
+Guide progress and summary values are session-only; summary downloads and
+Project files are separate outputs. Switching Projects resets guide progress.
+
 Map feature clicks and table rows share one current focus. An open browser
 attribute table follows the matching source object through sorting and paging;
 table rows highlight the map without moving the camera. The native result table
