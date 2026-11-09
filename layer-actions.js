@@ -75,7 +75,7 @@
  function stillCurrent(layer,data,ref){if(root.PortalLayers.layers.get(layer.id)!==layer||layer.data!==data||JSON.stringify(layer.cfg.nativeSource||null)!==ref)throw Error('The input data changed. Choose it again.');}
  async function run(name,value,options={}){
   const id=canonical(name),layer=resolve(value),action=get(layer,id);if(!action)throw Error('Unknown layer operation.');if(!action.enabled)throw Error(action.reason);
-  const L=root.PortalLayers,mode=recordMode(options); // Recheck membership before every operation, including legacy aliases.
+  const L=root.PortalLayers,mode=recordMode(options);if(mode&&['table','processing','statistics','chart','export','compare','quality','zones'].includes(id))root.PortalOperationContext?.setOperation({layerId:layer.id,mode,action:action.label,projectId:root.PortalProjects?.current?.id}); // Recheck membership before every operation, including legacy aliases.
   if(id==='zoom')return L.zoom(layer);
   if(id==='up'||id==='down')return L.reorder(layer.id,id);
   if(id==='remove')return L.remove(layer.id);

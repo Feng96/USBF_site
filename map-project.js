@@ -45,6 +45,10 @@
       }
       p.layers.push(entry);
     }
+    if(options.workspaceState!==false&&!root.PortalReadOnlyMode){
+      if(root.PortalTaskGuides?.serialize)p.presentation.guideState=root.PortalTaskGuides.serialize({layerKeys});
+      if(root.PortalWorkspaceActivity?.serialize)p.presentation.outcomes=root.PortalWorkspaceActivity.serialize({layerKeys});
+    }
     // Capture every record, setting and model location before asynchronous file reads.
     for(const m of root.PortalLocalModels?.serializeModelEntries({includeOriginal:true})||[]){if(options.visibleOnly&&(!p.view.view3d||!m.visible))continue;if(!m.originalFile)throw Error('The original file for '+m.name+' is unavailable.');p.models.push({asset:asset(m.originalFile),placement:clone(m.placement),visible:m.visible});}
     if(options.visibleOnly&&p.research&&(!p.view.view3d||!p.research.visible))p.research=null;
@@ -84,7 +88,7 @@
     await PortalModels.select(r.id,r.method,false);if(PortalModels.current?.id!==r.id)throw Error('The saved research model could not load.');
     $('#model-roof-only').checked=r.roofOnly;$('#model-edges').checked=r.edges;$('#model-visible').checked=r.visible;$('#model-roof-only').dispatchEvent(new Event('change'));
   }
-  async function restore(prepared){
+  async function restore(prepared,options={}){
     const {project:p,files}=prepared,oldRows=Array.from(PortalLayers.layers.values()),oldIDs=new Set(oldRows.map(l=>l.id)),previous={view:state(),basemap:root.PortalBasemaps?.current(),active:PortalLayers.active?.id,place:$('#map-place-name').textContent,name:$('#workspace-document').textContent,research:currentResearch()},added=new Map(),token=++serial;
     document.querySelectorAll('dialog[open]').forEach(d=>{if(d.id!=='map-project-dialog')d.close();});portal.cancelPlaceSearch?.();root.PortalLoD1?.cancel?.({clear:true});root.PortalLocalModels?.cancelPending?.();root.PortalImport?.cancelPending?.();root.PortalLayers.invalidatePending?.();for(const l of oldRows)l.cancelAnalysis?.();await root.PortalAnalysis?.cancel({clear:true});root.PortalDraw?.cancel();root.PortalExplorer?.clearLocation();portal.clearSelection();PortalLayers.clearExternalSelection();root.PortalModels?.hide();
     try{
@@ -99,12 +103,20 @@
       for(const e of p.layers){const l=added.get(e.key);if(e.kind==='catalog')l.cfg.id=e.catalogId;}
       if(p.active)PortalLayers.selectLayer(added.get(p.active).id);
       await setView(p.view,files,undefined,false);setPresentation(p.presentation);$('#map-place-name').textContent=p.place;$('#workspace-document').textContent=p.name;$('#welcome-card').hidden=true;PortalLayers.syncOrder();PortalLayers.refresh();portal.saveView();setDataPolicy(p.dataPolicy||'latest');if(prepared.warnings?.length)portal.toast(prepared.warnings[0]);lastProject=p;restoredIDs=Array.from(added.values(),l=>l.id);
-      return {layers:added.size,models:p.models.length,notes:p.notes||[],dependencies:prepared.dependencies||[],warnings:prepared.warnings||[]};
+      const workspaceState={presentation:p.presentation,layersByKey:added};const workspaceWarnings=options.deferWorkspaceState?[]:await restoreWorkspaceState(workspaceState,{projectId:root.PortalProjects?.current?.id||null});
+      return {layers:added.size,models:p.models.length,notes:p.notes||[],dependencies:prepared.dependencies||[],warnings:[...(prepared.warnings||[]),...workspaceWarnings],workspaceState};
     }catch(err){
       for(const l of Array.from(PortalLayers.layers.values()))if(!oldIDs.has(l.id))PortalLayers.remove(l.id);
       await setView(previous.view,undefined,previous.basemap?.file);if(previous.active&&PortalLayers.layers.has(previous.active))PortalLayers.selectLayer(previous.active);$('#map-place-name').textContent=previous.place;$('#workspace-document').textContent=previous.name;
       await showResearch(previous.research);await setView(previous.view,undefined,undefined,false);throw err;
     }
+  }
+  async function restoreWorkspaceState(value,options={}){
+    const presentation=value?.presentation||{},layersByKey=value?.layersByKey||new Map(),context={layersByKey,projectId:options.projectId||root.PortalProjects?.current?.id||null},warnings=[];
+    for(const [module,data,label]of [[root.PortalWorkspaceActivity,presentation.outcomes,'Saved results'],[root.PortalTaskGuides,presentation.guideState,'Guide progress']]){
+      if(!module?.restore)continue;try{await module.restore(data,context);}catch(error){warnings.push(label+' could not be restored. Review the input again.');try{await module.restore(undefined,context);}catch(_){}}
+    }
+    return warnings;
   }
   function setMessage(s,error=false){const el=$('#project-message');if(el){el.textContent=s;el.classList.toggle('composer-error',error);}}
   function setBusy(value){busy=value;$('#map-project-dialog')?.querySelectorAll('button,input').forEach(el=>el.disabled=value);}
@@ -114,5 +126,5 @@
   function open(){if(root.PortalReadOnlyMode)return false;if(root.PortalProjects)return root.PortalProjects.open();if(!root.portal?.ready)return;let d=$('#map-project-dialog');if(!d){d=document.createElement('dialog');d.id='map-project-dialog';d.className='workspace-dialog project-dialog';d.setAttribute('aria-labelledby','map-project-title');d.innerHTML='<div class="workspace-dialog-heading"><h2 id="map-project-title" data-i18n>Save or open a map</h2><button type="button" data-close-project aria-label="Close saved maps" data-i18n-aria-label>×</button></div><div class="workspace-dialog-body"><form id="project-save-form" class="workspace-form"><label data-i18n>Map name<input id="project-name" maxlength="120" required value="My building map"></label><p data-i18n>Your layers, styles, drawings and imported models are included. Catalog sources reconnect to the latest data.</p><button class="primary" id="project-save-button" type="submit" data-i18n>Save map file</button></form><hr><label class="project-open-label" data-i18n>Open a saved map<input id="project-file" type="file" accept=".usbf.json,.json,application/json"></label><p class="project-note" data-i18n>Opening replaces the current map after the saved files have been checked. Save your current map first if you want to keep it.</p><p id="project-message" role="status" aria-live="polite" data-i18n-system></p></div>';document.body.append(d);d.querySelector('[data-close-project]').onclick=()=>d.close();$('#project-save-form').onsubmit=e=>{e.preventDefault();save();};$('#project-file').onchange=e=>openFile(e.target.files[0]);d.addEventListener('cancel',e=>{if(busy)e.preventDefault();});}if(lastProject)$('#project-name').value=lastProject.name;setMessage('');if(!d.open)d.showModal();}
   document.addEventListener('portal-layers-changed',()=>{if(busy||!$('#map-project-dialog')?.open||!restoredIDs.length)return;const failed=restoredIDs.map(id=>PortalLayers.layers.get(id)).filter(l=>l?.error);if(failed.length)setMessage('Map opened. '+failed.length+' source'+(failed.length===1?' is':'s are')+' temporarily unavailable. Retry from the layer settings.',true);});
   document.addEventListener('click',e=>{if(e.target.closest('[data-project-open]')){document.querySelectorAll('details.tools-menu[open]').forEach(d=>d.open=false);open();}});
-  root.PortalProject={getDataPolicy,setDataPolicy,forget(){lastProject=null;restoredIDs=[];},setPresentation,open,save,openFile,collect,prepare,restore,get busy(){return busy;},get last(){return lastProject;}};
+  root.PortalProject={getDataPolicy,setDataPolicy,forget(){lastProject=null;restoredIDs=[];},setPresentation,restoreWorkspaceState,open,save,openFile,collect,prepare,restore,get busy(){return busy;},get last(){return lastProject;}};
 })(globalThis);

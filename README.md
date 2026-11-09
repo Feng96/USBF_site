@@ -1,5 +1,40 @@
 # US Buildings
 
+## Guided workspace usability (1.18)
+
+Start a task checks each goal's actual requirements: original records, a saved
+area or nonempty selection, required fields, additional inputs and accessible
+native files. Missing requirements have direct repair actions. Closing a panel
+preserves work; reopening it from its normal tool entry also clears an explicit
+Interface hide. Advanced coverage and device details are folded by default.
+
+Tools share an input summary showing the actual workset, format, record scope,
+count, source coverage and browser/local execution. Map focus, batch selection
+and table filters have separate explanations. A map view is never silently used
+as an analytical extent. Counts read original records or complete native files;
+identical concurrent counts share a cancellable request.
+
+**Tasks & results** stays accessible from the status bar and Project menu.
+Charts, summaries and reports have independent, downloadable snapshots rather
+than relying on the last open tool. Project saves include guide intent, portable
+layer references and bounded result history. On reopen, guides recheck inputs
+and results; missing sources require an explicit replacement. Native selections
+must be selected again. Historical results remain inspectable without claiming
+that the current inputs have been rerun. Public map links omit this private state.
+
+Project save feedback identifies the browser backup and, when connected, the
+actual Projects folder. A folder-write failure preserves the browser revision.
+Device setup exposes download, start, pair and verification stages, followed by
+a return to the current task. It reports actual connection evidence; downloading
+an installer alone does not mark an engine installed or connected.
+
+Snapshots are limited to 32 results, 512 KiB per snapshot and 2 MiB overall;
+larger results retain descriptive metadata. Download history cannot reopen files
+that the browser has not retained. Native files remain verified references to
+their original workspace, with complete handoffs using Project packages.
+English remains the development language; Chinese translates interface and
+system text while preserving original fields, dataset names and values.
+
 ## Analysis and compact workspace (1.14 / engine 0.4 preview)
 
 The toolbar groups Data, Map, Select, Analysis, Layer, Project and Interface
@@ -30,8 +65,8 @@ for complete GeoJSON layers; finite JSON numbers, including zero and negative
 values, use the shared map/PNG/PDF legend, while other values use a missing color.
 Project files preserve the field, unit and stops. Both tools expose JSON/CSV
 reports and use existing native APIs without changing the engine release.
-Guide progress remains session-only. Summary downloads and Project files are
-separate outputs; a handoff with native dependencies requires a complete package.
+Guide intent and bounded outcome snapshots now persist with Projects. Summary
+downloads remain separate outputs; native handoffs require a complete package.
 
 Map feature clicks and table rows share one current focus. An open browser
 attribute table follows the matching source object through sorting and paging;

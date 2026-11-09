@@ -215,3 +215,5 @@
  .workflow-step-tools>label{flex-basis:100%}
  .workflow-entry-note{font-size:10px}
 }
+
+.workflow-requirements{padding:12px;margin:12px 0;border:1px solid #d5e3da;border-radius:8px;background:#f6faf7;font-size:12px}.workflow-requirements ul{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:8px}.workflow-requirements li{display:flex;align-items:center;gap:8px;flex-wrap:wrap;line-height:1.5}.workflow-requirements li>span:nth-child(2){flex:1;min-width:180px}.workflow-requirements .needs-input{color:#775523}.workflow-requirements .is-ready{color:#2c6e51}.workflow-requirements button{margin-left:auto}.workflow-requirements[hidden]{display:none!important}
