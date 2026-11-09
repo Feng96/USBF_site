@@ -54,6 +54,14 @@
       section.open=query?true:contentExpanded[section.dataset.layerContentSection];
     }
   }
+  function revealLayer(id){
+    const layer=layers.get(id);if(!layer)return null;
+    window.PortalInterface?.revealPanel('sidebar');window.PortalSidebar?.open('layers');
+    const filter=$('#layer-filter');if(filter.value){filter.value='';filter.dispatchEvent(new Event('input'));}
+    const group=window.PortalLayerPurpose?.section(layer)||'display';contentExpanded[group]=true;const section=$('[data-layer-content-section="'+group+'"]');if(section)section.open=true;
+    if(!layer.visible)setStyle(layer.id,{visible:true});active=layer.id;refresh();
+    const row=$('[data-added-row="'+layer.id+'"]');row?.scrollIntoView({block:'nearest'});row?.querySelector('[data-layer-activate]')?.focus({preventScroll:true});return layer;
+  }
   function contentMarkup(entries){
     const rank=new Map(entries.map((l,i)=>[l.id,i]));
     return '<p class="layer-content-order-note" data-i18n>Both sections can appear on the map. Map order 1 draws on top.</p>'+contentSections.map(section=>{
@@ -266,5 +274,5 @@
     let savedStyles=[];try{savedStyles=JSON.parse(q.get('styles')||'[]');if(!Array.isArray(savedStyles))savedStyles=[];}catch(e){}
     for(const saved of (q.get('data')||'').split(',').slice(0,20)){const [id,op,on]=saved.split(':'),c=catalog.find(c=>c.id===id);if(c){const n=Number(op);const st=savedStyles.find(x=>x[0]===id)||[];await add(c,{restore:true,colorMode:['uniform','source','height','change','metric'].includes(st[1])?st[1]:'uniform',colorField:typeof st[4]==='string'?st[4]:null,colorStops:window.PortalLegend?.validMetricStops?.(st[5])?st[5]:null,colorUnit:typeof st[6]==='string'?st[6].slice(0,60):'',sourceFilter:typeof st[2]==='string'?st[2]:'',minArea:Number.isFinite(st[3])?Math.max(0,st[3]):0,opacity:Number.isFinite(n)?Math.max(0,Math.min(1,n)):.75,visible:on!=='0'});$('#welcome-card').hidden=true;}}
   }
-  window.PortalLayers={filterSections,zoom,featureBounds,locateFeature,focusFeature,beginFeatureFocus,isFeatureFocusCurrent,get focus(){return focused;},details,exportLayer,sourceFeature,syncOrder,reorder,invalidatePending:()=>{generation++;beginFeatureFocus();pending.clear();renderCatalog();},validateGeoJSON:geojson,remove,clear:()=>{clearExternalSelection();for(const id of Array.from(layers.keys()))remove(id);},init,open,refresh,fullExtent,identify,setStyle,set3D,inspect,get active(){return layers.get(active);},get selection(){return selected;},selectLayer(id){if(active!==id)beginFeatureFocus();active=id;refresh();},writeShare,handleExport,clearExternalSelection,catalog,get layers(){return layers;},add,addGeoJSON:(name,data,meta={},options={})=>add({...meta,id:meta.id||'import-'+(++seq),name,type:'geojson',data,sourceKind:'vector',analysisQuality:meta.analysisQuality||'complete-geometry'}, {...options,throwOnError:true}),isRaster};
+  window.PortalLayers={revealLayer,filterSections,zoom,featureBounds,locateFeature,focusFeature,beginFeatureFocus,isFeatureFocusCurrent,get focus(){return focused;},details,exportLayer,sourceFeature,syncOrder,reorder,invalidatePending:()=>{generation++;beginFeatureFocus();pending.clear();renderCatalog();},validateGeoJSON:geojson,remove,clear:()=>{clearExternalSelection();for(const id of Array.from(layers.keys()))remove(id);},init,open,refresh,fullExtent,identify,setStyle,set3D,inspect,get active(){return layers.get(active);},get selection(){return selected;},selectLayer(id){if(active!==id)beginFeatureFocus();active=id;refresh();},writeShare,handleExport,clearExternalSelection,catalog,get layers(){return layers;},add,addGeoJSON:(name,data,meta={},options={})=>add({...meta,id:meta.id||'import-'+(++seq),name,type:'geojson',data,sourceKind:'vector',analysisQuality:meta.analysisQuality||'complete-geometry'}, {...options,throwOnError:true}),isRaster};
 })();

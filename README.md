@@ -1,5 +1,29 @@
 # US Buildings
 
+## Native result handoff (1.21)
+
+A completed local task means its result file is ready. **Add to analysis layers**
+is the explicit next step in Task center and in both Tasks & results views.
+Adding opens the Layers sidebar and its Analysis data section, reveals the
+result, and sets it as the current full native workset with All records
+as the input scope. The map camera stays unchanged; Zoom to layer is a separate
+action. An existing result offers Open analysis layer and is reused instead of
+creating duplicates, including simultaneous requests from different entrypoints.
+
+Only the result reference and a bounded display preview enter the browser. The
+original GeoParquet stays in the connected workspace Results folder; tables and
+analysis use complete local records. Map preparation runs independently of the
+handoff. If a preview or tiled view is unavailable, the result reference and full
+attribute table remain usable, with an explicit map availability message.
+Partial and zero-record results are labelled before and after adding.
+
+Result identity includes workspace, job, path, checksum and record count. New
+attachments verify file availability and recheck Project, workspace and result
+identity after asynchronous reads. Results cannot arrive in another Project
+after a switch. The current Project's outcome card stores the added layer link,
+and restored Projects resolve their native result references again. No task
+completion automatically adds data to a different map or changes its camera.
+
 ## Role-specific layer operations (1.20)
 
 Visualization layers, fixed analysis records, saved study boundaries and complete

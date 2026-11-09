@@ -47,8 +47,8 @@ module.exports=async qa=>{
   const create=requests.filter(r=>r.path==='/v1/jobs'&&r.method==='POST'&&r.body?.inputs?.[0]?.providerId===provider).at(-1);
   ok((reused||create.authorized)&&JSON.stringify((reused?detail.scope:create.body.scope).geometry)===JSON.stringify(plan.body.scope.geometry),provider+' execution uses the exact AOI reviewed in its task plan');
   const transport=detail.parts.map(part=>part.transport).filter(Boolean);ok(transport.length&&transport.every(t=>t.method==='checked-http-range'&&!t.wholeFileDownloaded&&t.networkBytes<t.sourceBytes),provider+' receipt records bounded checked HTTP ranges rather than whole-source downloads');
-  await p.locator('[data-task-select="'+job.id+'"]').click();await p.waitForFunction(()=>document.querySelector('[data-task-action=preview]'));
-  await p.locator('[data-task-action=preview]').click();await p.waitForFunction(id=>PortalLayers.active?.cfg.nativeSource?.jobId===id,job.nativeId);
+  await p.locator('[data-task-select="'+job.id+'"]').click();await p.waitForFunction(()=>document.querySelector('[data-task-action=add-result]'));
+  await p.locator('[data-task-action=add-result]').click();await p.waitForFunction(id=>PortalLayers.active?.cfg.nativeSource?.jobId===id,job.nativeId);
   const layerId=await p.evaluate(()=>PortalLayers.active.id);ok(await p.evaluate(id=>PortalLayers.layers.get(id).cfg.nativeSource.recordCount===PortalLayers.layers.get(id).data.features.length,layerId),'Tiny '+provider+' result enters the common native layer route with its full result count');
   const identity=await p.evaluate(id=>{const l=PortalLayers.layers.get(id);return {license:l.cfg.license,provider:l.cfg.provider,release:l.cfg.nativeSource.release,coverage:l.data.provenance.coverage};},layerId);
   ok(/ODbL/.test(identity.license)&&!!identity.provider&&identity.release.providerId===provider&&identity.release.releaseId===(provider==='overture-buildings'?'2026-10-21.0':'latest'),provider+' managed result preserves original provider, ODbL attribution and release identity');

@@ -20,6 +20,13 @@
 .workspace-activity-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}
 .workspace-activity-actions button{border:1px solid #bdcfbf;background:white;border-radius:5px;padding:7px 9px;color:#286647;font-size:11px;min-height:34px}
 .workspace-activity-actions button:hover:not(:disabled){background:#edf6ef}.workspace-activity-actions button:disabled{opacity:.48;cursor:default}
+.workspace-native-handoff{margin:12px 0;padding:11px;border:1px solid #a9c7b4;border-radius:6px;background:#eff8f1}
+.workspace-native-handoff>strong{font-size:12px;color:#285b40}.workspace-native-handoff p{margin:6px 0;font-size:11px;line-height:1.65}
+.workspace-native-handoff .workspace-native-records{font-variant-numeric:tabular-nums;color:#315d43}.workspace-native-records b{font-size:14px}
+.workspace-native-handoff .workspace-activity-actions{margin-top:9px}
+.workspace-activity-actions .workspace-activity-primary{background:#236b52;border-color:#236b52;color:#fff;font-weight:650;padding:9px 12px;min-height:38px}
+.workspace-activity-actions .workspace-activity-primary:hover:not(:disabled){background:#18533e;color:#fff}
+.workspace-native-empty{border-left:3px solid #8cae98;padding-left:8px}
 .workspace-activity-panel button:focus-visible,.workspace-activity-indicator:focus-visible{outline:3px solid #46856c;outline-offset:2px}
 .workspace-activity-panel .workspace-outcome-warning{color:#8a6129;background:#fff8e9;padding:8px;border-radius:4px}
 .workspace-activity-detail{margin:18px 0;padding-top:16px;border-top:1px solid #d8e3da}.workspace-activity-detail h3{font-size:15px;overflow-wrap:anywhere}.workspace-activity-detail svg{display:block;width:100%;height:auto;background:white;border:1px solid #e0e8e1;border-radius:4px}
