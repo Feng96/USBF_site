@@ -62,3 +62,11 @@
 .inventory-record-focus>div:first-child{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.inventory-record-focus strong{color:#14776b}.inventory-record-focus>div>span{max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .inventory-record-focus button{padding:3px 7px;border:1px solid #bedbd1;border-radius:4px;color:#246d53;background:#fff;font:inherit}.inventory-record-focus [data-table-focus-clear]{margin-left:auto}
 .inventory-record-focus p{margin:3px 0;color:#5e766d}.inventory-record-focus summary{cursor:pointer;color:#246d53}.inventory-focus-values{overflow:auto;max-height:95px}.inventory-focus-values table{border-collapse:collapse;width:100%}.inventory-focus-values th,.inventory-focus-values td{text-align:left;padding:4px 8px;border-bottom:1px solid #dceae3;overflow-wrap:anywhere;max-width:320px;vertical-align:top}
+
+/* Display inspection and analytical record tables have distinct visible roles. */
+.attribute-table #table-mode-title{font-size:11px;color:#315d70;white-space:nowrap}
+.attribute-table #table-layer-name{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#5f7367}
+.attribute-table[data-table-purpose=records] #table-mode-title{color:#216b50}
+.inventory-preview-note{margin:0;padding:7px 13px;border-bottom:1px solid #d7e5ec;background:#f1f7fa;color:#385c6c;font-size:11px;line-height:1.5;flex-shrink:0}
+.inventory-display-filter-note{font-size:10px;line-height:1.6;color:#667c6b;padding:8px;border:1px solid #d6e2d8;border-radius:4px;background:#f6faf6}
+@media(max-width:700px){.attribute-table #table-mode-title{font-size:10px}.attribute-table #table-layer-name{max-width:95px;font-size:10px}.inventory-preview-note{font-size:10px;padding:6px 9px}.attribute-table .table-header>div{gap:6px}.attribute-table .table-header{padding-left:9px;padding-right:9px}}

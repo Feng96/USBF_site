@@ -41,16 +41,20 @@
   if(layer?.cfg?.nativeSource)return 'analysis';
   return layer?.cfg?.type==='geojson'&&root.PortalAnalysisData?.capabilities(layer).geometryAnalysis?'analysis':'display';
  }
+ function primaryMarkup(layer){
+  const profile=root.PortalLayerActions.profile(layer),state=describe(layer);
+  let html=root.PortalLayerActions.markup(layer,{ids:profile.primary,legacyPurpose:{'load-data':'data','find-original':'original',table:'table'}});
+  // Existing scoped tools may still address these aliases; they use the same guard.
+  if(state.action&&state.action!=='original'&&profile.primary.includes('load-data'))html+=root.PortalLayerActions.markup(layer,{ids:['load-data'],legacyPurpose:{'load-data':state.action}}).replace('<button ','<button hidden ');
+  return html;
+ }
  function markup(layer,options={}){
   const state=describe(layer,options),id=layer?.id,cap=root.PortalAnalysisData?.capabilities(layer)||{},loading=root.PortalAnalysisLayers?.isLoading(layer),message=root.PortalAnalysisLayers?.message(layer);
   const button=(action,label,disabled=false)=>'<button type="button" class="layer-purpose-action" data-purpose-action="'+action+'" data-purpose-layer="'+esc(id)+'" '+(disabled?'disabled':'')+' data-i18n>'+esc(label)+'</button>';
   let actions='';
   if(id&&options.actions!==false){
    if(root.PortalLayerActions){
-    const primary=state.action?['load-data']:['table'];
-    actions=root.PortalLayerActions.markup(layer,{ids:primary,legacyPurpose:{'load-data':'data',table:'table'}});
-    // Keep legacy selectors callable without presenting duplicate operations.
-    if(state.action)actions+=root.PortalLayerActions.markup(layer,{ids:['load-data'],legacyPurpose:{'load-data':state.action}}).replace('<button ','<button hidden ');
+    actions=primaryMarkup(layer);
    }else{
    if(layer.cfg.nativeSource)actions=button('native-table','View full result table')+button('native-process','Process full native result');
    if(state.action)actions=button('data','Load analyzable data',loading)+button(state.action,state.actionLabel,loading);
@@ -84,5 +88,5 @@
   }else if(action==='original')original(layer);
  }
  if(root.document)document.addEventListener('click',event=>{const b=event.target.closest('[data-purpose-action]');if(b)act(root.PortalLayers?.layers.get(b.dataset.purposeLayer),b.dataset.purposeAction);});
- root.PortalLayerPurpose={section,describe,format,markup,analysisMarkup,act,original};
+ root.PortalLayerPurpose={primaryMarkup,section,describe,format,markup,analysisMarkup,act,original};
 })(globalThis);

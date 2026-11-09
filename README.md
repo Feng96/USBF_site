@@ -1,5 +1,35 @@
 # US Buildings
 
+## Role-specific layer operations (1.20)
+
+Visualization layers, fixed analysis records, saved study boundaries and complete
+local results have distinct primary actions and contextual menus. Sidebar rows
+and the toolbar Layer menu use the same role profile. Common management remains
+shared, with explicit names for copying a connection, a result reference or
+actual records, and for creating a display extent or a complete data extent.
+
+Display layers offer preview attributes, map styles/display filters, and either
+Prepare analysis data through a supported original-data adapter or Find original
+data. Their menus omit statistics, spatial processing and full-record exports.
+Analysis datasets retain attribute tables, scoped statistics/charts, processing,
+reports and record export. Disconnected local results offer connection and
+dependency repair before analytical operations; their bounded map preview is
+never used as the analytical input.
+
+Preview tables distinguish tile fragments from live source caches. They support
+inspection and an explicitly marked attribute-preview CSV, without analytical
+batch selection or GeoJSON geometry export. Full record tables retain raw
+attributes, selection and data export. Display filters change the map only;
+analysis continues to use its explicit original-record scope.
+
+Saved boundaries offer Set as current study area, Edit study area, a boundary
+attribute table and boundary export. Editing previews changes before an explicit
+Update or Cancel, retains the boundary layer ID, and rejects stale or cross-Project
+updates. Existing worksets preserve their original loading boundary. A complete
+polygon layer can create a separate frozen study boundary through Use as study
+area without modifying the source records. Fixed worksets show their original
+source name alongside their loading range.
+
 ## Layer content sections (1.19)
 
 Layer content has two collapsible sections: **Visualization layers** for tiles,

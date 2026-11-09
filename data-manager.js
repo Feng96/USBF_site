@@ -69,7 +69,7 @@
     const entries=Array.from(layers.values()).reverse();
     if(!$('#layer-filter').value)for(const section of document.querySelectorAll('[data-layer-content-section]'))contentExpanded[section.dataset.layerContentSection]=section.open;
     $('#added-layers').innerHTML=contentMarkup(entries);
-    if(window.PortalLayerActions)for(const l of entries){const row=$('[data-added-row="'+l.id+'"]');row.querySelector('.added-actions').innerHTML=PortalLayerActions.markup(l,{ids:PortalLayerActions.ids.filter(id=>!['up','down','remove'].includes(id)),legacyAdded:true,explainDisabled:true});row.querySelector('.layer-order-actions').innerHTML=PortalLayerActions.markup(l,{ids:['up','down'],legacyAdded:true});const removeButton=row.querySelector('[data-added-remove]');removeButton.dataset.layerAction='remove';removeButton.dataset.layerId=l.id;}
+    if(window.PortalLayerActions)for(const l of entries){const row=$('[data-added-row="'+l.id+'"]');row.querySelector('.added-actions').innerHTML=PortalLayerActions.markupProfile(l,{surface:'sidebar'});row.querySelector('.layer-order-actions').innerHTML=PortalLayerActions.markup(l,{ids:['up','down'],legacyAdded:true});const removeButton=row.querySelector('[data-added-remove]');removeButton.dataset.layerAction='remove';removeButton.dataset.layerId=l.id;}
     const demo=['footprints','original','height','lod2'].filter(k=>$('#layer-'+k).checked).length;
     $('#layer-count').textContent=layers.size+demo;
     $('#data-workspace-label').textContent=layers.size?layers.size+' added '+(layers.size===1?'layer':'layers'):(demo?'Synthetic demo layers':'No data layers added');

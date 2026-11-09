@@ -10,7 +10,7 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="vendor/maplibre-gl-5.6.2.css" integrity="sha384-gNYNsUmuZqDYiT3gbirWTV5K7rt71RoveS/yXAaU09d4ZUmeDVTD3XoqB6uJAIFR" crossorigin="anonymous">
   <link rel="stylesheet" href="styles.css?v=1.7-gis">
-  <link rel="stylesheet" href="layer-actions.css?v=1.13-unified">
+  <link rel="stylesheet" href="layer-actions.css?v=1.20-layer-roles">
   <link rel="stylesheet" href="source-comparison.css?v=1.14-analysis">
   <script defer src="vendor/maplibre-gl-5.6.2.js" integrity="sha384-1qC0PnXk2fgMDybOtZF1ui4LM5Sxm7o0TbEkwfxTTVdlZvuNENNGCKUub7d644HP" crossorigin="anonymous"></script>
   <script defer src="vendor/pmtiles-4.3.0.js"></script>
@@ -44,6 +44,9 @@
   <script defer src="i18n-usability-zh.js?v=1.18-usability"></script>
   <script defer src="i18n-guide-polish-zh.js?v=1.18-usability"></script>
   <script defer src="i18n-layer-content-zh.js?v=1.19-layer-sections"></script>
+  <script defer src="i18n-action-profiles-zh.js?v=1.20-layer-roles"></script>
+  <script defer src="i18n-preview-table-zh.js?v=1.20-layer-roles"></script>
+  <script defer src="i18n-boundary-workflow-zh.js?v=1.20-layer-roles"></script>
   <script defer src="i18n.js?v=1.11-engine"></script>
   <script defer src="sidebar.js?v=1.10-design"></script>
   <script defer src="interface-controls.js?v=1.18-usability"></script>
@@ -55,13 +58,13 @@
   <script defer src="public-sources.js?v=1.13-unified"></script>
   <script defer src="map-legend.js?v=1.17-workflows"></script>
   <script defer src="source-features.js?v=1.3"></script>
-  <script defer src="data-manager.js?v=1.19-layer-sections"></script>
-  <script defer src="inventory.js?v=1.18-usability"></script>
+  <script defer src="data-manager.js?v=1.20-layer-roles"></script>
+  <script defer src="inventory.js?v=1.20-layer-roles"></script>
   <script defer src="data-import.js?v=1.6.3-purpose"></script>
   <script defer src="buildings-explorer.js?v=1.14.3-optional-data"></script>
   <script defer src="analysis-data.js?v=1.11-engine"></script>
   <script defer src="data-sources.js?v=1.13-unified"></script>
-  <script defer src="layer-purpose.js?v=1.19-layer-sections"></script>
+  <script defer src="layer-purpose.js?v=1.20-layer-roles"></script>
   <script defer src="local-engine-client.js?v=1.14-analysis"></script>
   <script defer src="task-center.js?v=1.18-usability"></script>
   <script defer src="analysis-layers.js?v=1.14.2-preserve-view"></script>
@@ -70,9 +73,9 @@
   <script defer src="gis-selection.js?v=1.12-results"></script>
   <script defer src="native-result-map.js?v=1.17-workflows"></script>
   <script defer src="gis-workspace.js?v=1.13-unified"></script>
-  <script defer src="data-workspace.js?v=1.18-usability"></script>
+  <script defer src="data-workspace.js?v=1.20-layer-roles"></script>
   <script defer src="operation-context.js?v=1.18-usability"></script>
-  <script defer src="layer-actions.js?v=1.18-usability"></script>
+  <script defer src="layer-actions.js?v=1.20-layer-roles"></script>
   <script defer src="source-building-matches.js?v=1.14-analysis"></script>
   <script defer src="source-comparison.js?v=1.17-workflows"></script>
   <script defer src="analysis-ui.js?v=1.17-workflows"></script>
@@ -100,7 +103,7 @@
   <link rel="stylesheet" href="workspace.css?v=1.4-ui">
   <link rel="stylesheet" href="gis.css?v=1.8-scope">
   <link rel="stylesheet" href="data-workspace.css?v=1.18-usability">
-  <link rel="stylesheet" href="inventory.css?v=1.15-linked-records">
+  <link rel="stylesheet" href="inventory.css?v=1.20-layer-roles">
   <link rel="stylesheet" href="map-legend.css?v=1.3">
   <link rel="stylesheet" href="data-import.css?v=1.3">
   <link rel="stylesheet" href="buildings-explorer.css?v=1.6-pmtiles">
@@ -169,7 +172,7 @@
         <label class="layer-search"><span data-icon="search"></span><input id="layer-filter" placeholder="Filter layers…" aria-label="Filter layers" data-i18n-aria-label data-i18n-placeholder><kbd>/</kbd></label>
 
         <section id="added-layers" aria-label="Added data layers"><div class="empty-layers"><strong data-i18n>No layers added</strong><p data-i18n>Choose a dataset or open your own file.</p><button class="text-button" data-add-data data-i18n>+ Add data</button></div></section>
-        <section id="inventory-controls" class="inventory-controls" hidden><details class="style-panel"><summary data-i18n>Style &amp; filters</summary><div class="active-source-label" data-i18n>ACTIVE DATASET</div><label><span class="sr-only" data-i18n>Active dataset</span><select id="inventory-layer"></select></label><div class="inventory-stats"><div><strong id="visible-records">—</strong><span data-i18n>visible records</span></div><div><strong id="height-records">—</strong><span data-i18n>with height</span></div></div><p id="inventory-scope" data-i18n-system>Loaded map tiles · not a national count</p><div class="filter-heading" data-i18n>Filter &amp; style <button id="reset-filters" data-i18n>Reset</button></div><label data-i18n>Color by<select id="inventory-color"><option value="uniform" data-i18n>Uniform</option><option value="source" data-i18n>Footprint source</option><option value="height" data-i18n>Available height</option><option value="change" data-i18n>Recorded footprint changes</option></select></label><label data-i18n>Source<select id="inventory-source"><option value="" data-i18n>All sources</option></select></label><label data-i18n>Minimum area · m²<input type="number" id="inventory-area" min="0" step="10" value="0"></label><p id="inventory-change-note" hidden data-i18n>Gold: modified · Green: unchanged · Gray: not recorded.</p><p id="inventory-height-note" data-i18n-system>Height availability depends on the data source.</p><button class="inventory-table-button" data-action="table" data-i18n>Open attribute table →</button></details></section>
+        <section id="inventory-controls" class="inventory-controls" hidden><details class="style-panel"><summary data-i18n>Map style &amp; display filters</summary><div class="active-source-label" data-i18n>ACTIVE DATASET</div><label><span class="sr-only" data-i18n>Active dataset</span><select id="inventory-layer"></select></label><div class="inventory-stats"><div><strong id="visible-records">—</strong><span data-i18n>visible records</span></div><div><strong id="height-records">—</strong><span data-i18n>with height</span></div></div><p id="inventory-scope" data-i18n-system>Loaded map tiles · not a national count</p><div class="filter-heading" data-i18n>Display filters <button id="reset-filters" data-i18n>Reset</button></div><label data-i18n>Color by<select id="inventory-color"><option value="uniform" data-i18n>Uniform</option><option value="source" data-i18n>Footprint source</option><option value="height" data-i18n>Available height</option><option value="change" data-i18n>Recorded footprint changes</option></select></label><label data-i18n>Display source<select id="inventory-source"><option value="" data-i18n>All sources</option></select></label><label data-i18n>Display minimum area · m²<input type="number" id="inventory-area" min="0" step="10" value="0"></label><p id="inventory-change-note" hidden data-i18n>Gold: modified · Green: unchanged · Gray: not recorded.</p><p id="inventory-height-note" data-i18n-system>Height availability depends on the data source.</p><button class="inventory-table-button" data-action="table" data-i18n>Open attribute table →</button></details></section>
         <details class="layer-group demo-group"><summary><span data-i18n>DEMO LAYERS</span><span class="group-count">3</span></summary>
           <div class="layer-row is-current" data-layer-row="footprints"><div class="layer-main"><label><input id="layer-footprints" type="checkbox"><span class="layer-symbol footprint"></span><span><strong>Demo footprints</strong><small data-i18n>Synthetic demonstration</small></span></label><button class="icon-button layer-more" data-layer-info="footprints" aria-label="USBF footprints information"><span data-icon="info"></span></button></div><div class="layer-options"><div class="layer-legend"><span></span>Building footprint</div><label class="opacity-label" data-i18n>Opacity <input id="opacity" type="range" min="10" max="100" value="72" aria-label="Footprint opacity"><output id="opacity-value">72%</output></label></div></div>
           <div class="layer-row" data-layer-row="original"><div class="layer-main"><label><input id="layer-original" type="checkbox"><span class="layer-symbol original"></span><span><strong>Original footprints</strong><small data-i18n>Illustrative comparison</small></span></label><button class="icon-button layer-more" data-layer-info="original" aria-label="Original footprints information"><span data-icon="info"></span></button></div></div>
