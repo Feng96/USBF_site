@@ -187,7 +187,7 @@
    // Scoped workspaces and guides own their additional scope checks and wording.
    if(button.dataset.layerActionOwned)continue;
    const value=button.dataset.layerId||button.dataset.purposeLayer||root.PortalLayers?.active?.id,action=get(value,button.dataset.layerAction);if(!action)continue;
-   button.disabled=!action.enabled;button.setAttribute('aria-disabled',String(!action.enabled));button.title=t(action.reason||'');if(button.dataset.layerActionLabel!==action.label){button.dataset.layerActionLabel=action.label;button.textContent=action.label;root.PortalI18n?.refresh?.(button);}
+   button.disabled=!action.enabled;button.setAttribute('aria-disabled',String(!action.enabled));button.title=t(action.reason||'');if(button.hasAttribute('data-layer-action-label')&&button.dataset.layerActionLabel!==action.label){button.dataset.layerActionLabel=action.label;button.textContent=action.label;root.PortalI18n?.refresh?.(button);}
    const reason=button.nextElementSibling;if(reason?.classList.contains('layer-action-reason'))reason.textContent=action.enabled?'':action.reason;
   }
  }
