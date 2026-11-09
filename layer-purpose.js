@@ -35,6 +35,12 @@
   return {kind:'image',label:'Image preview',format:fileFormat,note:'This image supplies a visual reference, not building records for these tools.'};
  }
  function badges(state){return '<div class="layer-purpose-badges"><span class="layer-purpose-badge purpose-'+state.kind+'" data-i18n>'+esc(state.label)+'</span><span class="layer-format">'+esc(state.format)+'</span></div>';}
+ /* Group by access to fixed original records, independently of visibility,
+    connection health and the file used to draw their map preview. */
+ function section(layer){
+  if(layer?.cfg?.nativeSource)return 'analysis';
+  return layer?.cfg?.type==='geojson'&&root.PortalAnalysisData?.capabilities(layer).geometryAnalysis?'analysis':'display';
+ }
  function markup(layer,options={}){
   const state=describe(layer,options),id=layer?.id,cap=root.PortalAnalysisData?.capabilities(layer)||{},loading=root.PortalAnalysisLayers?.isLoading(layer),message=root.PortalAnalysisLayers?.message(layer);
   const button=(action,label,disabled=false)=>'<button type="button" class="layer-purpose-action" data-purpose-action="'+action+'" data-purpose-layer="'+esc(id)+'" '+(disabled?'disabled':'')+' data-i18n>'+esc(label)+'</button>';
@@ -78,5 +84,5 @@
   }else if(action==='original')original(layer);
  }
  if(root.document)document.addEventListener('click',event=>{const b=event.target.closest('[data-purpose-action]');if(b)act(root.PortalLayers?.layers.get(b.dataset.purposeLayer),b.dataset.purposeAction);});
- root.PortalLayerPurpose={describe,format,markup,analysisMarkup,act,original};
+ root.PortalLayerPurpose={section,describe,format,markup,analysisMarkup,act,original};
 })(globalThis);

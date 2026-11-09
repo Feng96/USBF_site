@@ -1,5 +1,22 @@
 # US Buildings
 
+## Layer content sections (1.19)
+
+Layer content has two collapsible sections: **Visualization layers** for tiles,
+live previews and reference imagery, and **Analysis data** for fixed original
+records, derived results, study boundaries and complete local result references.
+Classification uses shared capabilities rather than file extensions, visibility
+or connection status. A GeoJSON tile export remains a visualization preview;
+a disconnected native result stays in Analysis data with its repair actions.
+
+Each layer appears once and uses the existing action registry. Both sections
+support map visibility, settings and attribute tables where available. Section
+counts follow the shared filter, and collapsed sections survive layer refreshes.
+Empty sections link to the data catalog or the normal data-preparation panel.
+Sections do not alter map stacking: every row shows its global map position,
+where 1 is on top, and Move up/down retains the normal global order. Projects
+restore the same layer identities, styles and rendering order.
+
 ## Guided workspace usability (1.18)
 
 Start a task checks each goal's actual requirements: original records, a saved
